@@ -114,7 +114,7 @@ function AnimatedCompactFlow({ value, isPositive }: { value: number; isPositive:
   const color = isPositive ? "#34d399" : "#f87171";
   return (
     <span className="font-mono font-bold tabular-nums" style={{ color, textShadow: `0 0 10px ${color}30` }}>
-      {isPositive ? "" : "-"}${formatCompact(Math.abs(display))}
+      {isPositive ? "" : "-"}{formatCompact(Math.abs(display))}
     </span>
   );
 }
@@ -559,7 +559,7 @@ export default function MarketPage() {
                             </div>
                             <div className="flex items-center gap-3 flex-wrap">
                               <span className={`text-xs font-bold font-mono tabular-nums ${isInflow ? "text-emerald-400" : "text-red-400"}`} data-testid={`text-netflow-${coin.symbol}`}>
-                                {isInflow ? "" : "-"}${formatCompact(Math.abs(coin.netFlow))}
+                                {isInflow ? "" : "-"}{formatCompact(Math.abs(coin.netFlow))}
                               </span>
                               <span className={`text-[12px] font-medium font-mono tabular-nums ${coin.change24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                                 {coin.change24h >= 0 ? "+" : ""}{coin.change24h.toFixed(1)}%

@@ -585,7 +585,7 @@ export default function StrategyPage() {
                   </div>
                 </div>
                 <div className="text-2xl font-bold mt-2" data-testid="text-total-assets">
-                  ${formatCompact(totalPremium)}
+                  {formatCompact(totalPremium)}
                 </div>
               </CardContent>
             </Card>
