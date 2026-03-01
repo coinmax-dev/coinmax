@@ -166,7 +166,7 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
               <button
                 key={f.model}
                 className={`
-                  relative min-w-[170px] max-w-[190px] rounded-xl ${isBest ? "pt-5 px-2.5 pb-2.5" : "p-2.5"} text-left shrink-0 snap-start
+                  relative min-w-[170px] max-w-[190px] rounded-xl ${isBest ? "pt-7 px-2.5 pb-2.5" : "p-2.5"} text-left shrink-0 snap-start
                   transition-all duration-300 border
                   ${isActive
                     ? "border-[var(--accent)] shadow-[0_0_12px_var(--glow)] scale-[1.02]"
