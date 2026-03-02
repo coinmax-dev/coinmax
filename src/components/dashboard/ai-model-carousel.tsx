@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, Minus, Sparkles, Brain, Zap, ChevronLeft, ChevronRight, Target, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Sparkles, Brain, Zap, Target, Activity } from "lucide-react";
 import { formatUSD } from "@/lib/constants";
 import { useTranslation } from "react-i18next";
 
@@ -92,7 +92,7 @@ function MiniGauge({ value, accent, glow }: { value: number; accent: string; glo
     const t = setTimeout(() => setAnimValue(value), 200);
     return () => clearTimeout(t);
   }, [value]);
-  const size = 32; const sw = 2.5; const r = (size-sw)/2-1;
+  const size = 30; const sw = 2.5; const r = (size-sw)/2-1;
   const c = 2*Math.PI*r; const offset = c-(animValue/100)*c;
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
@@ -105,7 +105,7 @@ function MiniGauge({ value, accent, glow }: { value: number; accent: string; glo
           style={{ filter: `drop-shadow(0 0 4px rgba(${glow},0.5))` }}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold tabular-nums" style={{ color: accent }}>{value}</span>
+      <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold tabular-nums" style={{ color: accent }}>{value}</span>
     </div>
   );
 }
@@ -131,32 +131,26 @@ function FeaturedCard({
   return (
     <div
       onClick={onSelect}
-      className="ai-featured-card w-full text-left relative overflow-hidden rounded-2xl active:scale-[0.985] transition-transform duration-200 cursor-pointer"
+      className="ai-featured-card w-full text-left relative overflow-hidden rounded-xl cursor-pointer active:scale-[0.985] transition-transform duration-200"
       style={{
-        background: `linear-gradient(165deg, rgba(${meta.glow},0.12) 0%, rgba(12,20,16,0.97) 35%, rgba(8,14,11,0.99) 100%)`,
-        border: `1px solid rgba(${meta.glow},${isActive ? '0.35' : '0.12'})`,
+        background: `linear-gradient(160deg, rgba(${meta.glow},0.1) 0%, rgba(255,255,255,0.03) 40%, rgba(0,0,0,0.15) 100%)`,
+        backdropFilter: 'blur(12px)',
+        border: `1px solid rgba(${meta.glow},${isActive ? '0.3' : '0.1'})`,
         boxShadow: isActive
-          ? `0 0 40px rgba(${meta.glow},0.12), 0 8px 32px rgba(0,0,0,0.5)`
-          : `0 4px 20px rgba(0,0,0,0.4)`,
+          ? `0 0 24px rgba(${meta.glow},0.1), inset 0 1px 0 rgba(255,255,255,0.06)`
+          : `inset 0 1px 0 rgba(255,255,255,0.04)`,
       }}
     >
-      <div className="ai-shimmer-sweep" style={{ '--shimmer-color': `rgba(${meta.glow},0.06)` } as React.CSSProperties} />
+      <div className="ai-shimmer-sweep" style={{ '--shimmer-color': `rgba(${meta.glow},0.05)` } as React.CSSProperties} />
 
-      <div className="absolute top-0 left-0 right-0 h-[1px] ai-top-glow"
-        style={{ background: `linear-gradient(90deg, transparent 5%, rgba(${meta.glow},0.5) 50%, transparent 95%)` }}
+      <div className="absolute -top-10 -right-10 w-32 h-32 pointer-events-none ai-corner-orb"
+        style={{ background: `radial-gradient(circle, rgba(${meta.glow},0.12) 0%, transparent 65%)` }}
       />
 
-      <div className="absolute -top-12 -right-12 w-40 h-40 pointer-events-none ai-corner-orb"
-        style={{ background: `radial-gradient(circle, rgba(${meta.glow},0.15) 0%, transparent 60%)` }}
-      />
-      <div className="absolute -bottom-8 -left-8 w-32 h-32 pointer-events-none opacity-50"
-        style={{ background: `radial-gradient(circle, rgba(${dirGlow},0.08) 0%, transparent 60%)` }}
-      />
-
-      <div className="relative p-4">
-        <div className="flex items-start gap-4">
+      <div className="relative p-3.5">
+        <div className="flex items-start gap-3.5">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2.5 mb-3">
+            <div className="flex items-center gap-2 mb-2.5">
               <div className="relative">
                 <div
                   className="h-8 w-8 rounded-lg flex items-center justify-center text-[11px] font-black ai-model-icon"
@@ -169,78 +163,74 @@ function FeaturedCard({
                   {meta.icon}
                 </div>
                 <div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-amber-400 border-2 ai-best-dot"
-                  style={{ borderColor: 'rgba(8,14,11,0.9)' }}
+                  style={{ borderColor: 'rgba(15,25,20,0.9)' }}
                 />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[15px] font-bold text-foreground tracking-tight">{forecast.model}</span>
-                  <span className="ai-best-badge inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-widest"
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[14px] font-bold text-foreground tracking-tight">{forecast.model}</span>
+                  <span className="ai-best-badge inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[7px] font-extrabold uppercase tracking-widest"
                     style={{
                       background: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05))',
                       color: '#fbbf24',
                       border: '1px solid rgba(251,191,36,0.2)',
-                      boxShadow: '0 0 8px rgba(251,191,36,0.1)',
                     }}
                   >
-                    <Zap className="h-2 w-2" />
+                    <Zap className="h-1.5 w-1.5" />
                     Best
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="ai-direction-badge flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+            <div className="flex items-center gap-2 mb-2.5">
+              <div className="ai-direction-badge flex items-center gap-1 px-2 py-0.5 rounded-md"
                 style={{
                   background: `rgba(${dirGlow},0.1)`,
-                  border: `1px solid rgba(${dirGlow},0.2)`,
-                  boxShadow: `0 0 12px rgba(${dirGlow},0.06)`,
+                  border: `1px solid rgba(${dirGlow},0.15)`,
                 }}
               >
                 {isBullish ? (
-                  <TrendingUp className="h-3.5 w-3.5" style={{ color: dirColor }} />
+                  <TrendingUp className="h-3 w-3" style={{ color: dirColor }} />
                 ) : isBearish ? (
-                  <TrendingDown className="h-3.5 w-3.5" style={{ color: dirColor }} />
+                  <TrendingDown className="h-3 w-3" style={{ color: dirColor }} />
                 ) : (
-                  <Minus className="h-3.5 w-3.5" style={{ color: dirColor }} />
+                  <Minus className="h-3 w-3" style={{ color: dirColor }} />
                 )}
-                <span className="text-[12px] font-extrabold tracking-wide" style={{ color: dirColor }}>
+                <span className="text-[11px] font-extrabold" style={{ color: dirColor }}>
                   {forecast.direction}
                 </span>
               </div>
-              <span className={`text-[14px] font-mono font-bold ai-pct-value ${priceDiff >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}
-                style={{ textShadow: `0 0 8px rgba(${priceDiff >= 0 ? '0,231,160' : '255,73,118'},0.3)` }}
+              <span className={`text-[13px] font-mono font-bold ${priceDiff >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}
+                style={{ textShadow: `0 0 6px rgba(${priceDiff >= 0 ? '0,231,160' : '255,73,118'},0.25)` }}
               >
                 {priceDiff >= 0 ? "+" : ""}{priceDiff.toFixed(2)}%
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Target className="h-3 w-3 text-muted-foreground/40" />
-              <span className="text-[10px] text-muted-foreground/50 font-medium">{t("dashboard.target")}</span>
-              <span className="font-mono font-bold text-foreground/90 text-[16px] tracking-tight"
-                style={{ textShadow: '0 0 12px rgba(255,255,255,0.06)' }}
-              >
+              <span className="text-[9px] text-muted-foreground/45 font-medium">{t("dashboard.target")}</span>
+              <span className="font-mono font-bold text-foreground/90 text-[15px] tracking-tight">
                 {formatUSD(forecast.targetPrice)}
               </span>
             </div>
           </div>
 
-          <AnimatedGauge value={forecast.confidence} accent={meta.accent} glow={meta.glow} size={68} />
+          <AnimatedGauge value={forecast.confidence} accent={meta.accent} glow={meta.glow} size={64} />
         </div>
 
         {forecast.reasoning && (
-          <div className="mt-3 pt-3 relative" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          <div className="mt-2.5 pt-2.5 relative" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
             <div
               className="cursor-pointer"
               onClick={(e) => { e.stopPropagation(); setReasonExpanded(prev => !prev); }}
             >
-              <p className={`text-[10px] text-muted-foreground/60 leading-relaxed ai-reasoning-text ${reasonExpanded ? '' : 'line-clamp-2'}`}>
+              <p className={`text-[10px] text-muted-foreground/55 leading-relaxed ${reasonExpanded ? '' : 'line-clamp-2'}`}>
                 <Sparkles className="inline h-2.5 w-2.5 mr-1 text-amber-400/50 ai-sparkle-icon" />
                 {forecast.reasoning}
               </p>
-              <span className="text-[8px] text-muted-foreground/35 mt-1 inline-block font-medium tracking-wide">
+              <span className="text-[8px] text-muted-foreground/30 mt-0.5 inline-block font-medium tracking-wide">
                 {reasonExpanded ? 'SHOW LESS' : 'READ MORE'}
               </span>
             </div>
@@ -251,8 +241,8 @@ function FeaturedCard({
       {isActive && (
         <div className="absolute bottom-0 left-0 right-0 h-[2px] ai-active-bar"
           style={{
-            background: `linear-gradient(90deg, transparent, rgba(${meta.glow},0.8), transparent)`,
-            boxShadow: `0 0 20px rgba(${meta.glow},0.5)`,
+            background: `linear-gradient(90deg, transparent, rgba(${meta.glow},0.7), transparent)`,
+            boxShadow: `0 0 12px rgba(${meta.glow},0.4)`,
           }}
         />
       )}
@@ -264,12 +254,10 @@ function CompactModelPill({
   forecast,
   isActive,
   onSelect,
-  delay,
 }: {
   forecast: ForecastItem;
   isActive: boolean;
   onSelect: () => void;
-  delay: number;
 }) {
   const meta = getModelMeta(forecast.model);
   const isBullish = forecast.direction === "BULLISH";
@@ -279,42 +267,33 @@ function CompactModelPill({
 
   return (
     <button
-      onClick={onSelect}
-      className="ai-compact-pill shrink-0 snap-start relative overflow-hidden rounded-xl transition-all duration-300 active:scale-[0.96]"
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      className="ai-marquee-pill shrink-0 relative overflow-hidden rounded-lg transition-all duration-300 active:scale-[0.96]"
       style={{
-        width: 150,
-        animationDelay: `${delay}ms`,
+        width: 140,
         background: isActive
-          ? `linear-gradient(150deg, rgba(${meta.glow},0.12) 0%, rgba(12,20,16,0.95) 100%)`
-          : 'linear-gradient(150deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.15) 100%)',
-        border: isActive ? `1px solid rgba(${meta.glow},0.3)` : '1px solid rgba(255,255,255,0.05)',
-        boxShadow: isActive
-          ? `0 0 20px rgba(${meta.glow},0.1), 0 4px 16px rgba(0,0,0,0.3)`
-          : '0 2px 8px rgba(0,0,0,0.2)',
+          ? `linear-gradient(150deg, rgba(${meta.glow},0.12) 0%, rgba(255,255,255,0.04) 100%)`
+          : 'rgba(255,255,255,0.02)',
+        backdropFilter: 'blur(8px)',
+        border: isActive ? `1px solid rgba(${meta.glow},0.25)` : '1px solid rgba(255,255,255,0.04)',
+        boxShadow: isActive ? `0 0 12px rgba(${meta.glow},0.08)` : 'none',
       }}
     >
-      {isActive && (
-        <div className="absolute top-0 left-0 right-0 h-[1px]"
-          style={{ background: `linear-gradient(90deg, transparent, rgba(${meta.glow},0.5), transparent)` }}
-        />
-      )}
-
-      <div className="p-2.5">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 min-w-0">
+      <div className="p-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
             <div
-              className="h-6 w-6 rounded-md flex items-center justify-center text-[9px] font-black shrink-0"
+              className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-black shrink-0"
               style={{
                 background: isActive
                   ? `linear-gradient(135deg, ${meta.accent}, rgba(${meta.glow},0.5))`
                   : `rgba(${meta.glow},0.12)`,
                 color: isActive ? "#fff" : meta.accent,
-                boxShadow: isActive ? `0 2px 10px rgba(${meta.glow},0.3)` : 'none',
               }}
             >
               {meta.icon}
             </div>
-            <span className={`text-[11px] font-bold truncate ${isActive ? 'text-foreground/95' : 'text-foreground/55'}`}>
+            <span className={`text-[10px] font-bold truncate ${isActive ? 'text-foreground/90' : 'text-foreground/50'}`}>
               {forecast.model}
             </span>
           </div>
@@ -330,60 +309,51 @@ function CompactModelPill({
             ) : (
               <Minus className="h-2.5 w-2.5" style={{ color: dirColor }} />
             )}
-            <span className="text-[9px] font-bold" style={{ color: dirColor }}>
+            <span className="text-[8px] font-bold" style={{ color: dirColor }}>
               {forecast.direction}
             </span>
           </div>
-          <span className={`text-[10px] font-mono font-bold ${priceDiff >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
+          <span className={`text-[9px] font-mono font-bold ${priceDiff >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
             {priceDiff >= 0 ? "+" : ""}{priceDiff.toFixed(2)}%
           </span>
         </div>
       </div>
 
       {isActive && (
-        <div className="absolute bottom-0 left-0 right-0 h-[1.5px]"
-          style={{
-            background: `linear-gradient(90deg, transparent, rgba(${meta.glow},0.6), transparent)`,
-            boxShadow: `0 0 8px rgba(${meta.glow},0.3)`,
-          }}
+        <div className="absolute bottom-0 left-0 right-0 h-[1px]"
+          style={{ background: `linear-gradient(90deg, transparent, rgba(${meta.glow},0.5), transparent)` }}
         />
       )}
     </button>
   );
 }
 
+function MarqueeRow({ children, paused }: { children: React.ReactNode; paused: boolean }) {
+  return (
+    <div className="ai-marquee-track overflow-hidden relative">
+      <div className="absolute left-0 top-0 bottom-0 w-6 z-10 pointer-events-none"
+        style={{ background: 'linear-gradient(90deg, rgba(15,25,20,0.9), transparent)' }}
+      />
+      <div className="absolute right-0 top-0 bottom-0 w-6 z-10 pointer-events-none"
+        style={{ background: 'linear-gradient(270deg, rgba(15,25,20,0.9), transparent)' }}
+      />
+      <div className={`ai-marquee-inner flex gap-2 ${paused ? 'ai-marquee-paused' : ''}`}>
+        {children}
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectModel }: AiModelCarouselProps) {
   const { t } = useTranslation();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [marqueeHovered, setMarqueeHovered] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 100);
     return () => clearTimeout(t);
   }, []);
-
-  const updateScrollState = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 5);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 5);
-  }, []);
-
-  useEffect(() => {
-    updateScrollState();
-    const el = scrollRef.current;
-    if (el) {
-      el.addEventListener('scroll', updateScrollState, { passive: true });
-      return () => el.removeEventListener('scroll', updateScrollState);
-    }
-  }, [updateScrollState, forecasts]);
-
-  const scroll = (dir: "left" | "right") => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({ left: dir === "left" ? -160 : 160, behavior: "smooth" });
-  };
 
   const sorted = useMemo(() => {
     if (!forecasts) return [];
@@ -392,12 +362,18 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
 
   if (isLoading) {
     return (
-      <div className="space-y-3 ai-section-loading">
-        <Skeleton className="h-12 w-full rounded-2xl" />
-        <Skeleton className="h-[160px] w-full rounded-2xl" />
+      <div className="ai-wrapper-glass rounded-2xl p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-9 rounded-xl" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-2.5 w-16" />
+          </div>
+        </div>
+        <Skeleton className="h-[140px] w-full rounded-xl" />
         <div className="flex gap-2 overflow-hidden">
           {[0, 1, 2].map(i => (
-            <Skeleton key={i} className="h-[80px] w-[150px] rounded-xl shrink-0" />
+            <Skeleton key={i} className="h-[60px] w-[140px] rounded-lg shrink-0" />
           ))}
         </div>
       </div>
@@ -416,63 +392,64 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
   const otherForecasts = sorted.slice(1);
 
   return (
-    <div className={`ai-analysis-section space-y-3 ${mounted ? 'ai-mounted' : ''}`}>
-      <div className="ai-header-card relative overflow-hidden rounded-2xl p-3.5"
-        style={{
-          background: `linear-gradient(140deg, rgba(${consensusGlow},0.08) 0%, rgba(12,20,16,0.95) 50%, rgba(8,14,11,0.98) 100%)`,
-          border: '1px solid rgba(255,255,255,0.06)',
-          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 16px rgba(0,0,0,0.3)`,
-        }}
-      >
-        <div className="ai-header-scanline" style={{ '--scan-color': `rgba(${consensusGlow},0.4)` } as React.CSSProperties} />
+    <div
+      className={`ai-wrapper-glass relative overflow-hidden rounded-2xl ${mounted ? 'ai-mounted' : ''}`}
+      style={{
+        background: `linear-gradient(170deg, rgba(${consensusGlow},0.04) 0%, rgba(255,255,255,0.02) 30%, rgba(0,0,0,0.12) 100%)`,
+        backdropFilter: 'blur(20px) saturate(1.4)',
+        WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        boxShadow: `0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)`,
+      }}
+    >
+      <div className="ai-header-scanline" style={{ '--scan-color': `rgba(${consensusGlow},0.3)` } as React.CSSProperties} />
 
-        <div className="absolute top-0 left-0 right-0 h-[1px]"
-          style={{ background: `linear-gradient(90deg, transparent 15%, rgba(${consensusGlow},0.25) 50%, transparent 85%)` }}
-        />
+      <div className="absolute top-0 left-0 right-0 h-[1px]"
+        style={{ background: `linear-gradient(90deg, transparent 10%, rgba(${consensusGlow},0.2) 50%, transparent 90%)` }}
+      />
 
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative h-9 w-9 rounded-xl flex items-center justify-center overflow-hidden ai-brain-icon"
+      <div className="p-4 pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="relative h-8 w-8 rounded-xl flex items-center justify-center overflow-hidden ai-brain-icon"
               style={{
                 background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(139,92,246,0.05))',
-                border: '1px solid rgba(139,92,246,0.2)',
-                boxShadow: '0 0 16px rgba(139,92,246,0.1)',
+                border: '1px solid rgba(139,92,246,0.15)',
               }}
             >
-              <Brain className="h-4.5 w-4.5 text-violet-400" />
+              <Brain className="h-4 w-4 text-violet-400" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[14px] font-bold text-foreground/95 tracking-tight">AI Analysis</span>
-                <span className="relative flex h-2 w-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] font-bold text-foreground/95 tracking-tight">AI Analysis</span>
+                <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-40" style={{ backgroundColor: consensusColor }} />
-                  <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: consensusColor, boxShadow: `0 0 6px ${consensusColor}` }} />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ backgroundColor: consensusColor, boxShadow: `0 0 4px ${consensusColor}` }} />
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <Activity className="h-2.5 w-2.5 text-muted-foreground/40" />
-                <span className="text-[9px] text-muted-foreground/45 font-medium tracking-wide">{sorted.length} models analyzed</span>
+              <div className="flex items-center gap-1 mt-0.5">
+                <Activity className="h-2 w-2 text-muted-foreground/35" />
+                <span className="text-[9px] text-muted-foreground/40 font-medium">{sorted.length} models</span>
               </div>
             </div>
           </div>
 
-          <div className="ai-consensus-badge flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
             style={{
-              background: `linear-gradient(135deg, rgba(${consensusGlow},0.12), rgba(${consensusGlow},0.04))`,
-              border: `1px solid rgba(${consensusGlow},0.2)`,
-              boxShadow: `0 0 16px rgba(${consensusGlow},0.08)`,
+              background: `rgba(${consensusGlow},0.08)`,
+              border: `1px solid rgba(${consensusGlow},0.15)`,
             }}
           >
-            {consensus === "BULLISH" ? <TrendingUp className="h-3.5 w-3.5" style={{ color: consensusColor }} /> : consensus === "BEARISH" ? <TrendingDown className="h-3.5 w-3.5" style={{ color: consensusColor }} /> : <Minus className="h-3.5 w-3.5" style={{ color: consensusColor }} />}
-            <span className="text-[11px] font-extrabold tracking-wide" style={{ color: consensusColor, textShadow: `0 0 8px rgba(${consensusGlow},0.3)` }}>
+            {consensus === "BULLISH" ? <TrendingUp className="h-3 w-3" style={{ color: consensusColor }} /> : consensus === "BEARISH" ? <TrendingDown className="h-3 w-3" style={{ color: consensusColor }} /> : <Minus className="h-3 w-3" style={{ color: consensusColor }} />}
+            <span className="text-[10px] font-extrabold" style={{ color: consensusColor }}>
               {consensus}
             </span>
-            <span className="text-[9px] font-bold text-muted-foreground/40 ml-0.5">{bullCount}/{sorted.length}</span>
+            <span className="text-[9px] font-bold text-muted-foreground/35 ml-0.5">{bullCount}/{sorted.length}</span>
           </div>
         </div>
       </div>
 
-      <div className="ai-featured-wrapper">
+      <div className="px-4 pb-3">
         <FeaturedCard
           forecast={bestForecast}
           isActive={activeModel === bestForecast.model || !activeModel}
@@ -481,50 +458,23 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
       </div>
 
       {otherForecasts.length > 0 && (
-        <div className="relative ai-pills-section">
-          {canScrollLeft && (
-            <button
-              onClick={() => scroll("left")}
-              className="absolute -left-1 top-1/2 -translate-y-1/2 z-10 h-7 w-7 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
-              style={{
-                background: 'rgba(8,14,11,0.95)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <ChevronLeft className="h-3.5 w-3.5 text-foreground/70" />
-            </button>
-          )}
-          {canScrollRight && (
-            <button
-              onClick={() => scroll("right")}
-              className="absolute -right-1 top-1/2 -translate-y-1/2 z-10 h-7 w-7 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
-              style={{
-                background: 'rgba(8,14,11,0.95)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <ChevronRight className="h-3.5 w-3.5 text-foreground/70" />
-            </button>
-          )}
-
-          <div
-            ref={scrollRef}
-            className="flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-1"
-          >
-            {otherForecasts.map((f, idx) => (
+        <div
+          className="pb-3 pt-1"
+          onMouseEnter={() => setMarqueeHovered(true)}
+          onMouseLeave={() => setMarqueeHovered(false)}
+          onTouchStart={() => setMarqueeHovered(true)}
+          onTouchEnd={() => setMarqueeHovered(false)}
+        >
+          <MarqueeRow paused={marqueeHovered}>
+            {otherForecasts.map((f) => (
               <CompactModelPill
                 key={f.model}
                 forecast={f}
                 isActive={activeModel === f.model}
                 onSelect={() => onSelectModel(f.model)}
-                delay={idx * 60}
               />
             ))}
-          </div>
+          </MarqueeRow>
         </div>
       )}
     </div>

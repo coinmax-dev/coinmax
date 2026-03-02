@@ -486,18 +486,14 @@
 
 /* ═══════ AI Analysis Section Animations ═══════ */
 
-.ai-analysis-section {
+.ai-wrapper-glass {
   opacity: 0;
   transform: translateY(16px);
   transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.ai-analysis-section.ai-mounted {
+.ai-wrapper-glass.ai-mounted {
   opacity: 1;
   transform: translateY(0);
-}
-
-.ai-header-card {
-  animation: aiSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .ai-header-scanline {
@@ -522,10 +518,6 @@
 
 .ai-brain-icon {
   animation: aiBrainPulse 3s ease-in-out infinite;
-}
-
-.ai-consensus-badge {
-  animation: aiSlideLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
 }
 
 .ai-featured-card {
@@ -582,40 +574,12 @@
   animation: aiBestGlow 2.5s ease-in-out infinite;
 }
 
-.ai-direction-badge {
-  animation: aiDirectionIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
-}
-
-.ai-pct-value {
-  animation: aiValueIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
-}
-
 .ai-sparkle-icon {
   animation: aiSparkle 2s ease-in-out infinite;
 }
 
 .ai-active-bar {
   animation: aiActiveBarPulse 2s ease-in-out infinite;
-}
-
-.ai-reasoning-text {
-  animation: aiReasoningIn 0.6s ease-out 0.4s both;
-}
-
-.ai-compact-pill {
-  animation: aiPillSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.ai-top-glow {
-  animation: aiTopGlowPulse 3s ease-in-out infinite;
-}
-
-.ai-featured-wrapper {
-  animation: aiSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
-}
-
-.ai-pills-section {
-  animation: aiSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
 }
 
 @keyframes aiSlideUp {
@@ -720,24 +684,40 @@
   50% { opacity: 1; }
 }
 
+/* ═══ Marquee auto-scroll for model pills ═══ */
+
+.ai-marquee-track {
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-marquee-inner {
+  display: flex;
+  gap: 0.5rem;
+  width: max-content;
+  animation: aiMarqueeScroll 20s linear infinite;
+  padding: 0 0.25rem;
+}
+
+.ai-marquee-inner.ai-marquee-paused {
+  animation-play-state: paused;
+}
+
+@keyframes aiMarqueeScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .ai-analysis-section,
-  .ai-header-card,
-  .ai-consensus-badge,
+  .ai-wrapper-glass,
   .ai-featured-card,
   .ai-gauge-container,
-  .ai-model-icon,
-  .ai-direction-badge,
-  .ai-pct-value,
-  .ai-reasoning-text,
-  .ai-compact-pill,
-  .ai-featured-wrapper,
-  .ai-pills-section {
+  .ai-model-icon {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
-  .ai-analysis-section {
+  .ai-wrapper-glass {
     opacity: 1 !important;
     transform: none !important;
   }
@@ -751,11 +731,14 @@
   .ai-best-badge,
   .ai-sparkle-icon,
   .ai-active-bar,
-  .ai-corner-orb,
-  .ai-top-glow {
+  .ai-corner-orb {
     animation: none !important;
   }
   .ai-gauge-arc {
     transition-duration: 0.3s !important;
+  }
+  .ai-marquee-inner {
+    animation: none !important;
+    overflow-x: auto;
   }
 }
