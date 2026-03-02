@@ -476,18 +476,6 @@ export function PriceChart({
               );
             })}
 
-            {forecast && (
-              <>
-                <div className="w-px h-3.5 bg-white/[0.08] mx-1 shrink-0" />
-                <Badge
-                  className={`text-[9px] shrink-0 ${directionColor} no-default-hover-elevate no-default-active-elevate border-0 whitespace-nowrap`}
-                  data-testid="badge-forecast-direction"
-                >
-                  <Sparkles className="mr-0.5 h-2 w-2" />
-                  {activeModel || "AI"} {direction} {confidence}%
-                </Badge>
-              </>
-            )}
             {forecastLoading && !forecast && (
               <>
                 <div className="w-px h-3.5 bg-white/[0.08] mx-1 shrink-0" />
@@ -526,23 +514,37 @@ export function PriceChart({
           }}
           data-testid="chart-price"
         >
-          {forecast && targetPrice && (
+          {forecast && (
             <div
-              className="absolute top-2 left-2 z-10"
+              className="absolute top-2 left-2 z-10 flex flex-col gap-1"
               style={{ animation: "fadeSlideIn 0.5s ease-out" }}
               data-testid="forecast-target-label"
             >
               <div
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold backdrop-blur-sm"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold backdrop-blur-sm w-fit"
                 style={{
-                  backgroundColor: direction === "BULLISH" ? "rgba(0,231,160,0.1)" : direction === "BEARISH" ? "rgba(255,73,118,0.1)" : "rgba(234,179,8,0.1)",
+                  backgroundColor: direction === "BULLISH" ? "rgba(0,231,160,0.12)" : direction === "BEARISH" ? "rgba(255,73,118,0.12)" : "rgba(234,179,8,0.12)",
                   border: `1px solid ${direction === "BULLISH" ? "rgba(0,231,160,0.2)" : direction === "BEARISH" ? "rgba(255,73,118,0.2)" : "rgba(234,179,8,0.2)"}`,
                   color: forecastLineColor,
                 }}
+                data-testid="badge-forecast-direction"
               >
-                <Sparkles className="h-2.5 w-2.5" />
-                {t("dashboard.target")}: {formatUSD(targetPrice)}
+                <Sparkles className="h-2 w-2" />
+                {activeModel || "AI"} {direction} {confidence}%
               </div>
+              {targetPrice && (
+                <div
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold backdrop-blur-sm w-fit"
+                  style={{
+                    backgroundColor: direction === "BULLISH" ? "rgba(0,231,160,0.08)" : direction === "BEARISH" ? "rgba(255,73,118,0.08)" : "rgba(234,179,8,0.08)",
+                    border: `1px solid ${direction === "BULLISH" ? "rgba(0,231,160,0.15)" : direction === "BEARISH" ? "rgba(255,73,118,0.15)" : "rgba(234,179,8,0.15)"}`,
+                    color: forecastLineColor,
+                  }}
+                >
+                  <Sparkles className="h-2 w-2" />
+                  {t("dashboard.target")}: {formatUSD(targetPrice)}
+                </div>
+              )}
             </div>
           )}
 
