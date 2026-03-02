@@ -102,19 +102,19 @@ export default function Dashboard() {
   return (
     <div className="space-y-4 pb-24" data-testid="page-dashboard">
       <div
-        className="gradient-green-dark rounded-b-2xl p-4 pt-2"
+        className="gradient-green-dark rounded-b-2xl px-3 pb-3 pt-1.5"
         style={{ animation: "fadeSlideIn 0.5s ease-out" }}
       >
-        <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div className="flex items-start justify-between gap-2">
           <PriceHeader coin={selectedCoin} isLoading={pricesLoading} />
           <Button
             size="icon"
             variant="ghost"
             onClick={() => navigate(`/market?coin=${selectedAsset}`)}
-            className="mt-1 shrink-0"
+            className="mt-0.5 shrink-0 h-7 w-7"
             data-testid="button-market-analysis"
           >
-            <BarChart3 className="h-5 w-5" />
+            <BarChart3 className="h-4 w-4" />
           </Button>
         </div>
         <PriceChart

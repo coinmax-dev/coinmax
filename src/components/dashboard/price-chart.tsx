@@ -438,78 +438,74 @@ export function PriceChart({
 
   return (
     <div data-testid="chart-price-container">
-      {/* Toolbar row */}
       {onTimeframeChange && (
-        <div className="mb-1.5 space-y-1" data-testid="timeframe-selector">
-          <div className="flex items-center gap-0.5 flex-wrap">
-            {TIMEFRAMES.map(tf => (
-              <button
-                key={tf.key}
-                className={`px-2 py-1 rounded text-[11px] font-medium transition-all duration-200 ${
-                  selectedTimeframe === tf.key
-                    ? "bg-[rgba(0,231,160,0.15)] text-[#00e7a0] shadow-[0_0_8px_rgba(0,231,160,0.15)]"
-                    : "text-[rgba(180,195,190,0.5)] hover:text-[rgba(180,195,190,0.8)] hover:bg-white/[0.03]"
-                }`}
-                onClick={() => onTimeframeChange(tf.key)}
-                data-testid={`button-tf-${tf.key}`}
-              >
-                {tf.label}
-              </button>
-            ))}
-
-            <div className="w-px h-4 bg-white/10 mx-1" />
-
-            {hasOhlc && CHART_TYPES.map(ct => {
-              const Icon = ct.icon;
-              return (
+        <div className="mb-2 space-y-1.5" data-testid="timeframe-selector">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-0.5">
+              {TIMEFRAMES.map(tf => (
                 <button
-                  key={ct.key}
-                  className={`p-1 rounded transition-all duration-200 ${
-                    chartType === ct.key
-                      ? "bg-[rgba(0,231,160,0.15)] text-[#00e7a0]"
-                      : "text-[rgba(180,195,190,0.4)] hover:text-[rgba(180,195,190,0.7)] hover:bg-white/[0.03]"
+                  key={tf.key}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-all duration-200 ${
+                    selectedTimeframe === tf.key
+                      ? "bg-[rgba(0,231,160,0.15)] text-[#00e7a0] shadow-[0_0_8px_rgba(0,231,160,0.12)]"
+                      : "text-[rgba(180,195,190,0.45)] hover:text-[rgba(180,195,190,0.75)] hover:bg-white/[0.03]"
                   }`}
-                  onClick={() => setChartType(ct.key)}
-                  title={ct.label}
+                  onClick={() => onTimeframeChange(tf.key)}
+                  data-testid={`button-tf-${tf.key}`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  {tf.label}
                 </button>
-              );
-            })}
-          </div>
+              ))}
 
-          {forecast && (
-            <div className="flex items-center">
+              <div className="w-px h-3.5 bg-white/[0.08] mx-1" />
+
+              {hasOhlc && CHART_TYPES.map(ct => {
+                const Icon = ct.icon;
+                return (
+                  <button
+                    key={ct.key}
+                    className={`p-0.5 rounded transition-all duration-200 ${
+                      chartType === ct.key
+                        ? "bg-[rgba(0,231,160,0.15)] text-[#00e7a0]"
+                        : "text-[rgba(180,195,190,0.35)] hover:text-[rgba(180,195,190,0.65)] hover:bg-white/[0.03]"
+                    }`}
+                    onClick={() => setChartType(ct.key)}
+                    title={ct.label}
+                  >
+                    <Icon className="h-3 w-3" />
+                  </button>
+                );
+              })}
+            </div>
+
+            {forecast && (
               <Badge
-                className={`text-[10px] shrink-0 ${directionColor} no-default-hover-elevate no-default-active-elevate border-0`}
+                className={`text-[9px] shrink-0 ${directionColor} no-default-hover-elevate no-default-active-elevate border-0`}
                 data-testid="badge-forecast-direction"
               >
-                <Sparkles className="mr-1 h-2.5 w-2.5" />
+                <Sparkles className="mr-0.5 h-2 w-2" />
                 {activeModel || "AI"} {direction} {confidence}%
               </Badge>
-            </div>
-          )}
-          {forecastLoading && !forecast && (
-            <div className="flex items-center">
-              <Badge className="text-[10px] shrink-0 bg-muted/30 text-muted-foreground no-default-hover-elevate no-default-active-elevate animate-pulse border-0">
-                <Sparkles className="mr-1 h-2.5 w-2.5" />
+            )}
+            {forecastLoading && !forecast && (
+              <Badge className="text-[9px] shrink-0 bg-muted/30 text-muted-foreground no-default-hover-elevate no-default-active-elevate animate-pulse border-0">
+                <Sparkles className="mr-0.5 h-2 w-2" />
                 {t("common.loading")}
               </Badge>
+            )}
+          </div>
+
+          {hasOhlc && lastCandle && (
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[8px] sm:text-[9px] font-mono leading-none overflow-x-auto scrollbar-hide">
+              <span className="text-[rgba(180,195,190,0.4)] whitespace-nowrap">O <span className="text-[rgba(220,235,230,0.75)]">{formatUSD(lastCandle.open)}</span></span>
+              <span className="text-[rgba(180,195,190,0.4)] whitespace-nowrap">H <span className="text-[rgba(220,235,230,0.75)]">{formatUSD(lastCandle.high)}</span></span>
+              <span className="text-[rgba(180,195,190,0.4)] whitespace-nowrap">L <span className="text-[rgba(220,235,230,0.75)]">{formatUSD(lastCandle.low)}</span></span>
+              <span className="text-[rgba(180,195,190,0.4)] whitespace-nowrap">C <span className="text-[rgba(220,235,230,0.75)]">{formatUSD(lastCandle.close)}</span></span>
+              <span className={`font-semibold whitespace-nowrap ${priceChange >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
+                {priceChange >= 0 ? "+" : ""}{priceChangePercent.toFixed(2)}%
+              </span>
             </div>
           )}
-        </div>
-      )}
-
-      {/* OHLC info bar */}
-      {hasOhlc && lastCandle && onTimeframeChange && (
-        <div className="flex items-center gap-2 sm:gap-3 mb-1 text-[9px] sm:text-[10px] font-mono px-0.5 overflow-x-auto scrollbar-hide">
-          <span className="text-[rgba(180,195,190,0.45)] whitespace-nowrap">O <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.open)}</span></span>
-          <span className="text-[rgba(180,195,190,0.45)] whitespace-nowrap">H <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.high)}</span></span>
-          <span className="text-[rgba(180,195,190,0.45)] whitespace-nowrap">L <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.low)}</span></span>
-          <span className="text-[rgba(180,195,190,0.45)] whitespace-nowrap">C <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.close)}</span></span>
-          <span className={`font-semibold whitespace-nowrap ${priceChange >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
-            {priceChange >= 0 ? "+" : ""}{priceChangePercent.toFixed(2)}%
-          </span>
         </div>
       )}
 
