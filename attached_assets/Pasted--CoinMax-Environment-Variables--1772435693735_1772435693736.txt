@@ -1,0 +1,44 @@
+# ===========================================
+# CoinMax Environment Variables
+# ===========================================
+# See .env.example for documentation
+
+# ---------- Server ----------
+NODE_ENV=development
+PORT=5000
+
+# ---------- Database (PostgreSQL) ----------
+SUPABASE_DATABASE_URL=postgresql://postgres:onelong53541314@db.jqgimdgtpwnunrlwexib.supabase.co:5432/postgres
+
+# ---------- Supabase (Frontend) ----------
+VITE_SUPABASE_URL=https://jqgimdgtpwnunrlwexib.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxZ2ltZGd0cHdudW5ybHdleGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4Mjg5OTAsImV4cCI6MjA4NjQwNDk5MH0.0b1K4Td9vkNYy40etWSbcqgg2fdpkjkD7_Z6Z1KJHUQ
+
+# ---------- Web3 / Thirdweb ----------
+THIRDWEB_CLIENT_ID=55c901cbfcccbc3592ae2157f8c7c3b5
+VITE_THIRDWEB_CLIENT_ID=55c901cbfcccbc3592ae2157f8c7c3b5
+VITE_THIRDWEB_SECRET_KEY=Q88ZHElJa7qeiBLbnHgXQgFz99kWFA_eVvLpSsCGiGqTSIqKUV0YMrLQCQZXuk8xpDHYYs4jwRWUocXACW5sIw
+
+# ---------- Smart Contracts (Base Sepolia Testnet) ----------
+# USDC on Base Sepolia: 0x4dd80edd423658408B99950f85Bc3c98BcFcDfac
+VITE_VAULT_CONTRACT_ADDRESS=0x2A638a6Bf8a25a8B80Ec7070D0190f2d76C22e53
+VITE_NODE_CONTRACT_ADDRESS=0x941C3A9459cEe89644996d48A640544DA202ae35
+VITE_VIP_CONTRACT_ADDRESS=0x0a4660277E5837f4fEf519025a7a3D50385830CD
+
+# ---------- AI / OpenAI ----------
+AI_INTEGRATIONS_OPENAI_API_KEY=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
+AI_INTEGRATIONS_OPENAI_BASE_URL=https://api.openai.com/v1
+
+# ---------- Cloudflare AI Gateway ----------
+CF_AI_GATEWAY_URL=https://gateway.ai.cloudflare.com/v1/f3ba29631ca74b71ae36bed1f107657b/corex/compat/chat/completions
+CF_AI_TOKEN=2zHo5c3wlVfMdIosGBN4AKFbKp_1a2y-t7wj9ldD
+
+# ---------- News API ----------
+NEWS_API_KEY=c4e864c79b8a485eae1301e602c5fd86
+
+# ---------- Real-time Data Refresh (ms) ----------
+CRON_INTERVAL_MS=60000
+PRICE_REFRESH_MS=30000
+KLINE_REFRESH_MS=10000
+DEPTH_REFRESH_MS=60000
+AI_PREDICTION_REFRESH_MS=300000
