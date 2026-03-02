@@ -226,8 +226,10 @@ function buildSmallRoadColumns(cells: (CellData | null)[]): SmallRoadColumn[] {
 function SmallRoadGrid({ cells, visibleCount }: { cells: (CellData | null)[]; visibleCount: number }) {
   const columns = useMemo(() => buildSmallRoadColumns(cells), [cells]);
   const maxRows = 9;
-  const startCol = Math.max(0, columns.length - 13);
-  const visibleCols = columns.slice(startCol);
+  const totalDisplayCols = 13;
+  const startCol = Math.max(0, columns.length - (totalDisplayCols - 2));
+  const dataCols = columns.slice(startCol);
+  const emptyCols = totalDisplayCols - dataCols.length;
   const gridLine = "1px solid rgba(255,255,255,0.12)";
 
   const colOffsets = useMemo(() => {
@@ -236,12 +238,12 @@ function SmallRoadGrid({ cells, visibleCount }: { cells: (CellData | null)[]; vi
       offset += Math.min(columns[c].circles.length, maxRows);
     }
     const offsets: number[] = [];
-    for (const col of visibleCols) {
+    for (const col of dataCols) {
       offsets.push(offset);
       offset += Math.min(col.circles.length, maxRows);
     }
     return offsets;
-  }, [columns, startCol, visibleCols, maxRows]);
+  }, [columns, startCol, dataCols, maxRows]);
 
   return (
     <div className="relative overflow-hidden rounded-lg" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.15)" }}>
@@ -259,8 +261,11 @@ function SmallRoadGrid({ cells, visibleCount }: { cells: (CellData | null)[]; vi
           ))}
         </div>
 
-        <div className="flex flex-1">
-          {visibleCols.map((col, ci) => {
+        <div
+          className="grid flex-1"
+          style={{ gridTemplateColumns: `repeat(${totalDisplayCols}, 1fr)` }}
+        >
+          {dataCols.map((col, ci) => {
             const colCells = col.circles.slice(0, maxRows);
             const isUp = col.direction === "up";
             const strokeColor = isUp ? "#a3e635" : "#fb7185";
@@ -269,12 +274,12 @@ function SmallRoadGrid({ cells, visibleCount }: { cells: (CellData | null)[]; vi
             const baseIdx = colOffsets[ci] ?? 0;
 
             return (
-              <div key={ci + startCol} className="flex-1 flex flex-col">
+              <div key={ci + startCol} className="flex flex-col">
                 {Array.from({ length: maxRows }, (_, ri) => {
                   const circle = colCells[ri];
                   const globalIdx = baseIdx + ri;
                   const isVis = globalIdx < visibleCount;
-                  const isLast = ci === visibleCols.length - 1 && ri === colCells.length - 1;
+                  const isLast = ci === dataCols.length - 1 && ri === colCells.length - 1;
 
                   return (
                     <div
@@ -307,14 +312,34 @@ function SmallRoadGrid({ cells, visibleCount }: { cells: (CellData | null)[]; vi
               </div>
             );
           })}
+
+          {Array.from({ length: emptyCols }, (_, ei) => (
+            <div key={`empty-${ei}`} className="flex flex-col">
+              {Array.from({ length: maxRows }, (_, ri) => (
+                <div
+                  key={ri}
+                  className="flex items-center justify-center"
+                  style={{
+                    height: 34,
+                    borderRight: gridLine,
+                    borderBottom: gridLine,
+                  }}
+                />
+              ))}
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="flex ml-[24px]" style={{ borderTop: gridLine }}>
-        {visibleCols.map((_, ci) => (
+      <div
+        className="grid ml-[24px]"
+        style={{ gridTemplateColumns: `repeat(${totalDisplayCols}, 1fr)` }}
+      >
+        {Array.from({ length: totalDisplayCols }, (_, ci) => (
           <div
             key={ci}
-            className="flex-1 text-center text-[11px] text-muted-foreground/50 font-mono py-1.5"
+            className="text-center text-[11px] text-muted-foreground/50 font-mono py-1.5"
+            style={{ borderRight: ci < totalDisplayCols - 1 ? gridLine : "none", borderTop: gridLine }}
             data-testid={`col-label-${ci + startCol + 1}`}
           >
             {ci + startCol + 1}
