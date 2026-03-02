@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveAccount } from "thirdweb/react";
-import { shortenAddress, formatCompact } from "@/lib/constants";
+import { shortenAddress } from "@/lib/constants";
 import { useMaPrice } from "@/hooks/use-ma-price";
-import { Copy, Crown, WalletCards, Wallet, ArrowDownToLine, ArrowUpFromLine, Users, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp } from "lucide-react";
+import { Copy, Crown, WalletCards, Wallet, ArrowUpFromLine, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -107,17 +107,17 @@ export default function ProfilePage() {
     <div className="space-y-4 pb-24" data-testid="page-profile">
       <div className="gradient-green-dark p-4 pt-2 rounded-b-2xl" style={{ animation: "fadeSlideIn 0.4s ease-out" }}>
         <h2 className="text-lg font-bold mb-3" data-testid="text-profile-title">{t("profile.assetsOverview")}</h2>
-        <Card className="border-border bg-card/50 glow-green-sm mb-3">
+        <Card className="border-border bg-card/50 glow-green-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="text-[12px] text-muted-foreground mb-1">{t("profile.netAssets")}</div>
+                <div className="text-[12px] text-muted-foreground mb-1">{t("profile.totalAssets")}</div>
                 {!isConnected ? (
                   <div className="text-2xl font-bold text-muted-foreground" data-testid="text-net-assets">--</div>
                 ) : profileLoading ? (
                   <Skeleton className="h-8 w-24" />
                 ) : (
-                  <div className="text-2xl font-bold text-neon-value" data-testid="text-net-assets">{formatCompact(net)}</div>
+                  <div className="text-2xl font-bold text-neon-value" data-testid="text-net-assets">{formatMA(net)}</div>
                 )}
               </div>
               <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center glow-green-sm">
@@ -126,50 +126,6 @@ export default function ProfilePage() {
             </div>
           </CardContent>
         </Card>
-        <div className="grid grid-cols-3 gap-3">
-          <Card className="border-border bg-card/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-1 text-[12px] text-muted-foreground mb-1">
-                <ArrowDownToLine className="h-3 w-3" /> {t("profile.deposited")}
-              </div>
-              {!isConnected ? (
-                <div className="text-sm font-bold text-muted-foreground" data-testid="text-total-deposited">--</div>
-              ) : profileLoading ? (
-                <Skeleton className="h-5 w-16" />
-              ) : (
-                <div className="text-sm font-bold text-neon-value" data-testid="text-total-deposited">{formatCompact(deposited)}</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-1 text-[12px] text-muted-foreground mb-1">
-                <ArrowUpFromLine className="h-3 w-3" /> {t("profile.withdrawn")}
-              </div>
-              {!isConnected ? (
-                <div className="text-sm font-bold text-muted-foreground" data-testid="text-total-withdrawn">--</div>
-              ) : profileLoading ? (
-                <Skeleton className="h-5 w-16" />
-              ) : (
-                <div className="text-sm font-bold text-neon-value" data-testid="text-total-withdrawn">{formatCompact(withdrawn)}</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-1 text-[12px] text-muted-foreground mb-1">
-                <Users className="h-3 w-3" /> {t("profile.referral")}
-              </div>
-              {!isConnected ? (
-                <div className="text-sm font-bold text-muted-foreground" data-testid="text-referral-earnings">--</div>
-              ) : profileLoading ? (
-                <Skeleton className="h-5 w-16" />
-              ) : (
-                <div className="text-sm font-bold text-neon-value" data-testid="text-referral-earnings">{formatCompactMA(referralEarnings)}</div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       {isConnected && (

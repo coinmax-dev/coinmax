@@ -318,6 +318,7 @@
   "profile": {
     "assetsOverview": "Assets Overview",
     "netAssets": "Net Assets",
+    "totalAssets": "Total Assets",
     "deposited": "Deposited",
     "withdrawn": "Withdrawn",
     "referral": "Referral",

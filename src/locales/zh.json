@@ -318,6 +318,7 @@
   "profile": {
     "assetsOverview": "资产概览",
     "netAssets": "净资产",
+    "totalAssets": "总资产",
     "deposited": "已存入",
     "withdrawn": "已提取",
     "referral": "推荐",
