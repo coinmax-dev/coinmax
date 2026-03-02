@@ -865,3 +865,42 @@
   0%, 100% { transform: rotate(-8deg); }
   50% { transform: rotate(8deg); }
 }
+
+/* ═══════ Exchange Depth — Diamond Indicator ═══════ */
+
+.depth-diamond-wrap {
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.3));
+}
+
+.depth-diamond-icon {
+  color: rgba(255, 255, 255, 0.85);
+  animation: depthDiamondSway 2.5s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes depthDiamondSway {
+  0%, 100% { transform: rotate(calc(-12deg + var(--sway-amount, 0deg))); }
+  50% { transform: rotate(calc(12deg + var(--sway-amount, 0deg))); }
+}
+
+.depth-row {
+  transition: background 0.2s;
+}
+.depth-row:hover {
+  background: rgba(255,255,255,0.02);
+  border-radius: 6px;
+}
+
+.depth-bar-buy {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.depth-bar-sell {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .depth-diamond-icon {
+    animation: none !important;
+  }
+}

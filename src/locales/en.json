@@ -63,6 +63,8 @@
     "trending": "Trending",
     "orderBookDepth": "Order Book Depth - {{symbol}}",
     "lsRatio": "L/S Ratio",
+    "buyLabel": "Buy",
+    "sellLabel": "Sell",
     "target": "Target",
     "aiForecast": "AI Forecast",
     "sentimentIndex": "Sentiment Index",

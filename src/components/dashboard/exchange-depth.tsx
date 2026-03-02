@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Diamond } from "lucide-react";
 import { fetchExchangeDepth } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 
@@ -25,7 +26,6 @@ interface ExchangeDepthProps {
   symbol: string;
 }
 
-/* Fast-ticking animated percentage for live feel */
 function JitterPercent({ value, color }: { value: number; color: string }) {
   const [display, setDisplay] = useState(value);
   const tickRef = useRef<ReturnType<typeof setTimeout>>();
@@ -36,7 +36,7 @@ function JitterPercent({ value, color }: { value: number; color: string }) {
 
   useEffect(() => {
     const tick = () => {
-      setDisplay(prev => {
+      setDisplay(() => {
         const jitter = (Math.random() - 0.5) * 0.5;
         return Math.max(0, Math.min(100, value + jitter));
       });
@@ -47,9 +47,59 @@ function JitterPercent({ value, color }: { value: number; color: string }) {
   }, [value]);
 
   return (
-    <span className="font-mono font-medium tabular-nums" style={{ color }}>
+    <span className="font-mono font-semibold tabular-nums" style={{ color }}>
       {display.toFixed(1)}%
     </span>
+  );
+}
+
+const EXCHANGE_ICONS: Record<string, string> = {
+  "Binance": "₿",
+  "OKX": "◎",
+  "Bybit": "BY",
+  "Bitfinex": "bf",
+  "Kraken": "Kr",
+  "KuCoin": "KC",
+  "Gate.io": "Gt",
+  "MEXC": "MX",
+  "Huobi": "Hb",
+  "Coinbase": "CB",
+  "Bitstamp": "Bs",
+  "Gemini": "Gm",
+  "Crypto.com": "Cr",
+  "WhiteBIT": "WB",
+  "dYdX": "dX",
+  "Lighter": "Lt",
+  "BingX": "BX",
+  "Bitunix": "Bu",
+  "Deribit": "Db",
+  "Aster": "As",
+  "Bitmex": "Bm",
+};
+
+function getExchangeIcon(name: string) {
+  return EXCHANGE_ICONS[name] || name.substring(0, 2).toUpperCase();
+}
+
+function DepthDiamond({ buyPercent }: { buyPercent: number }) {
+  const swayAmount = (buyPercent - 50) * 0.3;
+
+  return (
+    <div
+      className="depth-diamond-wrap absolute z-10"
+      style={{
+        left: `${buyPercent}%`,
+        top: '50%',
+        transform: `translate(-50%, -50%)`,
+      }}
+    >
+      <Diamond
+        className="depth-diamond-icon h-3.5 w-3.5"
+        style={{
+          '--sway-amount': `${swayAmount}deg`,
+        } as React.CSSProperties}
+      />
+    </div>
   );
 }
 
@@ -85,23 +135,24 @@ export function ExchangeDepth({ symbol }: ExchangeDepthProps) {
 
   return (
     <div data-testid="section-exchange-depth">
-      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+      <div className="flex items-center justify-between gap-2 mb-3">
         <h3 className="text-sm font-semibold">{t("dashboard.orderBookDepth", { symbol })}</h3>
         {data && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="text-[11px] text-emerald-400 border-emerald-400/30 no-default-hover-elevate no-default-active-elevate">
+          <div className="flex items-center gap-1.5">
+            <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-400/30 no-default-hover-elevate no-default-active-elevate">
               {t("dashboard.lsRatio")}: {data.longShortRatio.toFixed(2)}
             </Badge>
-            <Badge variant="outline" className="text-[11px] text-primary/70 border-primary/30 no-default-hover-elevate no-default-active-elevate">
+            <Badge variant="outline" className="text-[10px] text-primary/70 border-primary/30 no-default-hover-elevate no-default-active-elevate">
               {t("common.live")}
             </Badge>
           </div>
         )}
       </div>
+
       {isLoading ? (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {Array.from({ length: 8 }, (_, i) => (
-            <Skeleton key={i} className="h-5 w-full rounded-sm" />
+            <Skeleton key={i} className="h-7 w-full rounded-md" />
           ))}
         </div>
       ) : (
@@ -109,7 +160,7 @@ export function ExchangeDepth({ symbol }: ExchangeDepthProps) {
           {exchanges.map((ex, index) => (
             <div
               key={ex.name}
-              className="flex items-center gap-2"
+              className="depth-row flex items-center gap-2"
               data-testid={`exchange-${ex.name.toLowerCase().replace(/\./g, "")}`}
               style={{
                 opacity: mounted ? 1 : 0,
@@ -117,22 +168,52 @@ export function ExchangeDepth({ symbol }: ExchangeDepthProps) {
                 transition: `opacity 0.4s ease ${index * 40}ms, transform 0.4s ease ${index * 40}ms`,
               }}
             >
-              <span className="w-20 shrink-0 text-[13px] font-medium truncate">{ex.name}</span>
-              <span className="w-9 shrink-0 text-[12px] text-right">
+              <div className="flex items-center gap-1.5 w-[72px] shrink-0">
+                <div className="depth-exchange-icon h-5 w-5 rounded flex items-center justify-center text-[7px] font-black shrink-0"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    color: 'rgba(255,255,255,0.6)',
+                  }}
+                >
+                  {getExchangeIcon(ex.name)}
+                </div>
+                <span className="text-[11px] font-medium text-foreground/80 truncate">{ex.name}</span>
+              </div>
+
+              <span className="w-[28px] shrink-0 text-[10px] text-right text-emerald-400/80 font-medium">
+                {t("dashboard.buyLabel")}
+              </span>
+
+              <span className="w-[40px] shrink-0 text-[10px] text-right">
                 <JitterPercent value={ex.buy} color="#34d399" />
               </span>
-              <div className="flex-1 flex h-4 overflow-hidden rounded-sm">
-                <div
-                  className="bg-emerald-500 transition-all duration-700 ease-out"
-                  style={{ width: mounted ? `${ex.buy}%` : "0%" }}
-                />
-                <div
-                  className="bg-red-500 transition-all duration-700 ease-out"
-                  style={{ width: mounted ? `${ex.sell}%` : "0%" }}
-                />
+
+              <div className="flex-1 relative h-5 overflow-visible">
+                <div className="absolute inset-0 flex h-full rounded overflow-hidden">
+                  <div
+                    className="depth-bar-buy transition-all duration-700 ease-out"
+                    style={{
+                      width: mounted ? `${ex.buy}%` : "0%",
+                      background: 'linear-gradient(90deg, rgba(16,185,129,0.6), rgba(16,185,129,0.85))',
+                    }}
+                  />
+                  <div
+                    className="depth-bar-sell transition-all duration-700 ease-out"
+                    style={{
+                      width: mounted ? `${ex.sell}%` : "0%",
+                      background: 'linear-gradient(90deg, rgba(239,68,68,0.85), rgba(239,68,68,0.6))',
+                    }}
+                  />
+                </div>
+                <DepthDiamond buyPercent={ex.buy} />
               </div>
-              <span className="w-9 shrink-0 text-[12px]">
+
+              <span className="w-[40px] shrink-0 text-[10px]">
                 <JitterPercent value={ex.sell} color="#f87171" />
+              </span>
+
+              <span className="w-[28px] shrink-0 text-[10px] text-red-400/80 font-medium">
+                {t("dashboard.sellLabel")}
               </span>
             </div>
           ))}
