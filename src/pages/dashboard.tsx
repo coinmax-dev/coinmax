@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { ASSET_IDS } from "@/lib/constants";
 import { fetchExchangeDepth, getAiForecastMulti } from "@/lib/api";
 import { useCryptoPrices, useBinanceKlines, useOrderBook } from "@/hooks/use-crypto-price";
@@ -33,6 +34,8 @@ interface MultiForecastResponse {
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
+  const { i18n } = useTranslation();
+  const lang = i18n.language;
   const [selectedAsset, setSelectedAsset] = useState("BTC");
   const [selectedTimeframe, setSelectedTimeframe] = useState<ChartTimeframe>("1H");
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
@@ -69,8 +72,8 @@ export default function Dashboard() {
   });
 
   const { data: multiResult, isLoading: forecastLoading } = useQuery<MultiForecastResponse>({
-    queryKey: ["ai-forecast-multi", selectedAsset, selectedTimeframe],
-    queryFn: () => getAiForecastMulti(selectedAsset, selectedTimeframe),
+    queryKey: ["ai-forecast-multi", selectedAsset, selectedTimeframe, lang],
+    queryFn: () => getAiForecastMulti(selectedAsset, selectedTimeframe, lang),
     staleTime: 3 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     retry: 1,

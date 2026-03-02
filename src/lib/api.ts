@@ -882,25 +882,25 @@ export async function fetchExchangePrices() {
 // D) Supabase Edge Functions (need API keys)
 // ─────────────────────────────────────────────
 
-export async function getAiPrediction(asset: string, timeframe: string) {
+export async function getAiPrediction(asset: string, timeframe: string, lang?: string) {
   const { data, error } = await supabase.functions.invoke("ai-prediction", {
-    body: { asset, timeframe },
+    body: { asset, timeframe, lang: lang || "en" },
   });
   if (error) throw error;
   return data;
 }
 
-export async function getAiForecast(asset: string, timeframe: string) {
+export async function getAiForecast(asset: string, timeframe: string, lang?: string) {
   const { data, error } = await supabase.functions.invoke("ai-forecast", {
-    body: { asset, timeframe },
+    body: { asset, timeframe, lang: lang || "en" },
   });
   if (error) throw error;
   return data;
 }
 
-export async function getAiForecastMulti(asset: string, timeframe: string) {
+export async function getAiForecastMulti(asset: string, timeframe: string, lang?: string) {
   const { data, error } = await supabase.functions.invoke("ai-forecast-multi", {
-    body: { asset, timeframe },
+    body: { asset, timeframe, lang: lang || "en" },
   });
   if (error) throw error;
   return data;

@@ -29,12 +29,13 @@ interface AiPredictionGridProps {
 }
 
 export function AiPredictionGrid({ asset, currentPrice }: AiPredictionGridProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
   const [selectedTf, setSelectedTf] = useState<string>("1H");
 
   const { data: prediction, isLoading, isFetching } = useQuery<PredictionResult>({
-    queryKey: ["ai-prediction", asset, selectedTf],
-    queryFn: () => getAiPrediction(asset, selectedTf),
+    queryKey: ["ai-prediction", asset, selectedTf, lang],
+    queryFn: () => getAiPrediction(asset, selectedTf, lang),
     staleTime: 3 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   });

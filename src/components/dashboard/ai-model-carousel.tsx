@@ -227,11 +227,11 @@ function FeaturedCard({
               className="cursor-pointer"
               onClick={(e) => { e.stopPropagation(); setReasonExpanded(prev => !prev); }}
             >
-              <p className={`text-[11px] text-muted-foreground/70 leading-relaxed ${reasonExpanded ? '' : 'line-clamp-2'}`}>
-                <Sparkles className="inline h-2.5 w-2.5 mr-1 text-amber-400/60 ai-sparkle-icon" />
+              <p className={`text-[11px] text-foreground/60 leading-relaxed ${reasonExpanded ? '' : 'line-clamp-2'}`}>
+                <Sparkles className="inline h-2.5 w-2.5 mr-1 text-amber-400/70 ai-sparkle-icon" />
                 {forecast.reasoning}
               </p>
-              <span className="text-[9px] text-muted-foreground/45 mt-1 inline-block font-semibold tracking-wide uppercase">
+              <span className="text-[9px] text-primary/50 mt-1 inline-block font-semibold tracking-wide uppercase">
                 {reasonExpanded ? t("dashboard.showLess") : t("dashboard.readMore")}
               </span>
             </div>
@@ -260,11 +260,13 @@ function CompactModelPill({
   isActive: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useTranslation();
   const meta = getModelMeta(forecast.model);
   const isBullish = forecast.direction === "BULLISH";
   const isBearish = forecast.direction === "BEARISH";
   const priceDiff = forecast.currentPrice ? ((forecast.targetPrice - forecast.currentPrice) / forecast.currentPrice * 100) : 0;
   const dirColor = isBullish ? "#00e7a0" : isBearish ? "#ff4976" : "#facc15";
+  const dirLabel = isBullish ? t("dashboard.bullish") : isBearish ? t("dashboard.bearish") : t("dashboard.mixed");
 
   return (
     <button
@@ -311,7 +313,7 @@ function CompactModelPill({
               <Minus className="h-2.5 w-2.5" style={{ color: dirColor }} />
             )}
             <span className="text-[8px] font-bold" style={{ color: dirColor }}>
-              {forecast.direction}
+              {dirLabel}
             </span>
           </div>
           <span className={`text-[9px] font-mono font-bold ${priceDiff >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
@@ -385,9 +387,10 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
 
   const bullCount = sorted.filter(f => f.direction === "BULLISH").length;
   const bearCount = sorted.filter(f => f.direction === "BEARISH").length;
-  const consensus = bullCount > bearCount ? "BULLISH" : bearCount > bullCount ? "BEARISH" : "MIXED";
-  const consensusColor = consensus === "BULLISH" ? "#00e7a0" : consensus === "BEARISH" ? "#ff4976" : "#facc15";
-  const consensusGlow = consensus === "BULLISH" ? "0,231,160" : consensus === "BEARISH" ? "255,73,118" : "250,204,21";
+  const consensusRaw = bullCount > bearCount ? "BULLISH" : bearCount > bullCount ? "BEARISH" : "MIXED";
+  const consensusColor = consensusRaw === "BULLISH" ? "#00e7a0" : consensusRaw === "BEARISH" ? "#ff4976" : "#facc15";
+  const consensusGlow = consensusRaw === "BULLISH" ? "0,231,160" : consensusRaw === "BEARISH" ? "255,73,118" : "250,204,21";
+  const consensusLabel = consensusRaw === "BULLISH" ? t("dashboard.bullish") : consensusRaw === "BEARISH" ? t("dashboard.bearish") : t("dashboard.mixed");
 
   const bestForecast = sorted[0];
   const otherForecasts = sorted.slice(1);
@@ -422,7 +425,7 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[14px] font-bold text-foreground tracking-tight">AI Analysis</span>
+                <span className="text-[14px] font-bold text-foreground tracking-tight">{t("dashboard.aiAnalysis")}</span>
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-40" style={{ backgroundColor: consensusColor }} />
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ backgroundColor: consensusColor, boxShadow: `0 0 4px ${consensusColor}` }} />
@@ -430,7 +433,7 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
               </div>
               <div className="flex items-center gap-1 mt-0.5">
                 <Activity className="h-2.5 w-2.5 text-muted-foreground/50" />
-                <span className="text-[10px] text-muted-foreground/55 font-medium">{sorted.length} models</span>
+                <span className="text-[10px] text-muted-foreground/55 font-medium">{t("dashboard.modelsCount", { count: sorted.length })}</span>
               </div>
             </div>
           </div>
@@ -441,9 +444,9 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
               border: `1px solid rgba(${consensusGlow},0.3)`,
             }}
           >
-            {consensus === "BULLISH" ? <TrendingUp className="h-3 w-3" style={{ color: consensusColor }} /> : consensus === "BEARISH" ? <TrendingDown className="h-3 w-3" style={{ color: consensusColor }} /> : <Minus className="h-3 w-3" style={{ color: consensusColor }} />}
+            {consensusRaw === "BULLISH" ? <TrendingUp className="h-3 w-3" style={{ color: consensusColor }} /> : consensusRaw === "BEARISH" ? <TrendingDown className="h-3 w-3" style={{ color: consensusColor }} /> : <Minus className="h-3 w-3" style={{ color: consensusColor }} />}
             <span className="text-[10px] font-extrabold" style={{ color: consensusColor }}>
-              {consensus}
+              {consensusLabel}
             </span>
             <span className="text-[9px] font-bold text-muted-foreground/50 ml-0.5">{bullCount}/{sorted.length}</span>
           </div>

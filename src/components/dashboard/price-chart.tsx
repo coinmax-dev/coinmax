@@ -543,15 +543,6 @@ export function PriceChart({
         </div>
       )}
 
-      {/* AI reasoning */}
-      {forecast?.reasoning && (
-        <div className="mt-1.5 px-0.5" data-testid="text-forecast-reasoning">
-          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
-            <Sparkles className="inline h-2.5 w-2.5 mr-1 text-amber-400" />
-            {forecast.reasoning}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
