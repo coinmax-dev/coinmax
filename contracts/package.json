@@ -10,5 +10,9 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts": "^5.1.0",
     "hardhat": "^2.22.0"
+  },
+  "overrides": {
+    "minimatch": "^10.2.3",
+    "serialize-javascript": "^7.0.3"
   }
 }
