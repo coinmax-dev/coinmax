@@ -654,7 +654,7 @@ export default function MarketPage() {
                     return (
                       <div
                         key={`${item.pair}-${item.exchange}`}
-                        className={`flex items-center justify-between gap-2 p-3 flex-wrap ${idx < filteredPositions.length - 1 ? "border-b border-border" : ""}`}
+                        className={`p-3 ${idx < filteredPositions.length - 1 ? "border-b border-border" : ""}`}
                         data-testid={`futures-oi-${item.symbol}-${item.exchange}`}
                         style={{
                           opacity: mounted ? 1 : 0,
@@ -662,40 +662,39 @@ export default function MarketPage() {
                           transition: `opacity 0.4s ease ${idx * 60}ms, transform 0.4s ease ${idx * 60}ms`,
                         }}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="flex items-center gap-1.5 w-14 shrink-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
                             <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: exColor }} />
-                            <div>
+                            <div className="min-w-0">
                               <div className="text-xs font-bold">{item.pair}</div>
-                              <div className="text-[12px] text-muted-foreground truncate">{item.exchange}</div>
+                              <div className="text-[11px] text-muted-foreground">{item.exchange}</div>
                             </div>
+                            <Badge className={`text-[10px] shrink-0 no-default-hover-elevate no-default-active-elevate ${isPositive ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"}`}>
+                              <AnimatedValue value={item.priceChange24h} decimals={2} prefix={isPositive ? "+" : ""} suffix="%" />
+                            </Badge>
                           </div>
-                          <Badge className={`text-[11px] no-default-hover-elevate no-default-active-elevate ${isPositive ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"}`}>
-                            <AnimatedValue value={item.priceChange24h} decimals={2} prefix={isPositive ? "+" : ""} suffix="%" />
-                          </Badge>
+                          <div className="text-right shrink-0">
+                            <div className="text-sm font-bold font-mono tabular-nums" data-testid={`text-oi-value-${item.symbol}-${item.exchange}`}>
+                              <AnimatedCompactFlow value={item.openInterestValue} isPositive={true} />
+                            </div>
+                            <div className="text-[11px] text-muted-foreground font-mono tabular-nums">{item.openInterest.toLocaleString()} {t("market.contracts")}</div>
+                          </div>
                         </div>
-                        <div className="text-right flex-1 max-w-[180px]">
-                          <div className="text-xs font-bold font-mono tabular-nums" data-testid={`text-oi-value-${item.symbol}-${item.exchange}`}>
-                            <AnimatedCompactFlow value={item.openInterestValue} isPositive={true} />
-                          </div>
-                          <div className="text-[12px] text-muted-foreground font-mono tabular-nums">{item.openInterest.toLocaleString()} {t("market.contracts")}</div>
-                          {/* OI proportion bar with shimmer */}
-                          <div className="h-1 rounded-full bg-muted/20 overflow-hidden mt-1 relative">
+                        <div className="h-1 rounded-full bg-muted/20 overflow-hidden mt-2 relative">
+                          <div
+                            className="h-full rounded-full bg-emerald-500/60 relative overflow-hidden"
+                            style={{
+                              width: mounted ? `${oiPct}%` : "0%",
+                              transition: `width 0.7s ease ${idx * 80}ms`,
+                            }}
+                          >
                             <div
-                              className="h-full rounded-full bg-emerald-500/60 relative overflow-hidden"
+                              className="absolute inset-0 opacity-40"
                               style={{
-                                width: mounted ? `${oiPct}%` : "0%",
-                                transition: `width 0.7s ease ${idx * 80}ms`,
+                                background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
+                                animation: `shimmer 2s ease-in-out infinite ${idx * 0.15}s`,
                               }}
-                            >
-                              <div
-                                className="absolute inset-0 opacity-40"
-                                style={{
-                                  background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
-                                  animation: `shimmer 2s ease-in-out infinite ${idx * 0.15}s`,
-                                }}
-                              />
-                            </div>
+                            />
                           </div>
                         </div>
                       </div>
