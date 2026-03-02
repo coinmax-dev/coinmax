@@ -440,72 +440,74 @@ export function PriceChart({
     <div data-testid="chart-price-container">
       {/* Toolbar row */}
       {onTimeframeChange && (
-        <div className="flex items-center gap-0.5 mb-1.5 flex-wrap" data-testid="timeframe-selector">
-          {/* Timeframes */}
-          {TIMEFRAMES.map(tf => (
-            <button
-              key={tf.key}
-              className={`px-2 py-1 rounded text-[11px] font-medium transition-all duration-200 ${
-                selectedTimeframe === tf.key
-                  ? "bg-[rgba(0,231,160,0.15)] text-[#00e7a0] shadow-[0_0_8px_rgba(0,231,160,0.15)]"
-                  : "text-[rgba(180,195,190,0.5)] hover:text-[rgba(180,195,190,0.8)] hover:bg-white/[0.03]"
-              }`}
-              onClick={() => onTimeframeChange(tf.key)}
-              data-testid={`button-tf-${tf.key}`}
-            >
-              {tf.label}
-            </button>
-          ))}
-
-          {/* Separator */}
-          <div className="w-px h-4 bg-white/10 mx-1" />
-
-          {/* Chart type buttons */}
-          {hasOhlc && CHART_TYPES.map(ct => {
-            const Icon = ct.icon;
-            return (
+        <div className="mb-1.5 space-y-1" data-testid="timeframe-selector">
+          <div className="flex items-center gap-0.5 flex-wrap">
+            {TIMEFRAMES.map(tf => (
               <button
-                key={ct.key}
-                className={`p-1 rounded transition-all duration-200 ${
-                  chartType === ct.key
-                    ? "bg-[rgba(0,231,160,0.15)] text-[#00e7a0]"
-                    : "text-[rgba(180,195,190,0.4)] hover:text-[rgba(180,195,190,0.7)] hover:bg-white/[0.03]"
+                key={tf.key}
+                className={`px-2 py-1 rounded text-[11px] font-medium transition-all duration-200 ${
+                  selectedTimeframe === tf.key
+                    ? "bg-[rgba(0,231,160,0.15)] text-[#00e7a0] shadow-[0_0_8px_rgba(0,231,160,0.15)]"
+                    : "text-[rgba(180,195,190,0.5)] hover:text-[rgba(180,195,190,0.8)] hover:bg-white/[0.03]"
                 }`}
-                onClick={() => setChartType(ct.key)}
-                title={ct.label}
+                onClick={() => onTimeframeChange(tf.key)}
+                data-testid={`button-tf-${tf.key}`}
               >
-                <Icon className="h-3.5 w-3.5" />
+                {tf.label}
               </button>
-            );
-          })}
+            ))}
 
-          {/* AI forecast badge */}
+            <div className="w-px h-4 bg-white/10 mx-1" />
+
+            {hasOhlc && CHART_TYPES.map(ct => {
+              const Icon = ct.icon;
+              return (
+                <button
+                  key={ct.key}
+                  className={`p-1 rounded transition-all duration-200 ${
+                    chartType === ct.key
+                      ? "bg-[rgba(0,231,160,0.15)] text-[#00e7a0]"
+                      : "text-[rgba(180,195,190,0.4)] hover:text-[rgba(180,195,190,0.7)] hover:bg-white/[0.03]"
+                  }`}
+                  onClick={() => setChartType(ct.key)}
+                  title={ct.label}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              );
+            })}
+          </div>
+
           {forecast && (
-            <Badge
-              className={`ml-auto text-[10px] shrink-0 ${directionColor} no-default-hover-elevate no-default-active-elevate border-0`}
-              data-testid="badge-forecast-direction"
-            >
-              <Sparkles className="mr-1 h-2.5 w-2.5" />
-              {activeModel || "AI"} {direction} {confidence}%
-            </Badge>
+            <div className="flex items-center">
+              <Badge
+                className={`text-[10px] shrink-0 ${directionColor} no-default-hover-elevate no-default-active-elevate border-0`}
+                data-testid="badge-forecast-direction"
+              >
+                <Sparkles className="mr-1 h-2.5 w-2.5" />
+                {activeModel || "AI"} {direction} {confidence}%
+              </Badge>
+            </div>
           )}
           {forecastLoading && !forecast && (
-            <Badge className="ml-auto text-[10px] shrink-0 bg-muted/30 text-muted-foreground no-default-hover-elevate no-default-active-elevate animate-pulse border-0">
-              <Sparkles className="mr-1 h-2.5 w-2.5" />
-              {t("common.loading")}
-            </Badge>
+            <div className="flex items-center">
+              <Badge className="text-[10px] shrink-0 bg-muted/30 text-muted-foreground no-default-hover-elevate no-default-active-elevate animate-pulse border-0">
+                <Sparkles className="mr-1 h-2.5 w-2.5" />
+                {t("common.loading")}
+              </Badge>
+            </div>
           )}
         </div>
       )}
 
       {/* OHLC info bar */}
       {hasOhlc && lastCandle && onTimeframeChange && (
-        <div className="flex items-center gap-3 mb-1 text-[10px] font-mono px-0.5">
-          <span className="text-[rgba(180,195,190,0.45)]">O <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.open)}</span></span>
-          <span className="text-[rgba(180,195,190,0.45)]">H <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.high)}</span></span>
-          <span className="text-[rgba(180,195,190,0.45)]">L <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.low)}</span></span>
-          <span className="text-[rgba(180,195,190,0.45)]">C <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.close)}</span></span>
-          <span className={`font-semibold ${priceChange >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
+        <div className="flex items-center gap-2 sm:gap-3 mb-1 text-[9px] sm:text-[10px] font-mono px-0.5 overflow-x-auto scrollbar-hide">
+          <span className="text-[rgba(180,195,190,0.45)] whitespace-nowrap">O <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.open)}</span></span>
+          <span className="text-[rgba(180,195,190,0.45)] whitespace-nowrap">H <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.high)}</span></span>
+          <span className="text-[rgba(180,195,190,0.45)] whitespace-nowrap">L <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.low)}</span></span>
+          <span className="text-[rgba(180,195,190,0.45)] whitespace-nowrap">C <span className="text-[rgba(220,235,230,0.8)]">{formatUSD(lastCandle.close)}</span></span>
+          <span className={`font-semibold whitespace-nowrap ${priceChange >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
             {priceChange >= 0 ? "+" : ""}{priceChangePercent.toFixed(2)}%
           </span>
         </div>
@@ -524,15 +526,14 @@ export function PriceChart({
           }}
           data-testid="chart-price"
         >
-          {/* AI target overlay */}
           {forecast && targetPrice && (
             <div
-              className="absolute top-2 right-2 z-10"
+              className="absolute top-2 left-2 z-10"
               style={{ animation: "fadeSlideIn 0.5s ease-out" }}
               data-testid="forecast-target-label"
             >
               <div
-                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold backdrop-blur-sm"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold backdrop-blur-sm"
                 style={{
                   backgroundColor: direction === "BULLISH" ? "rgba(0,231,160,0.1)" : direction === "BEARISH" ? "rgba(255,73,118,0.1)" : "rgba(234,179,8,0.1)",
                   border: `1px solid ${direction === "BULLISH" ? "rgba(0,231,160,0.2)" : direction === "BEARISH" ? "rgba(255,73,118,0.2)" : "rgba(234,179,8,0.2)"}`,
