@@ -66,54 +66,54 @@ export default function ProfileNodesPage() {
     return new Date(d).toLocaleDateString();
   };
 
+  const cardBorder = "1px solid rgba(74, 222, 128, 0.15)";
+  const cardBg = "rgba(10, 15, 10, 0.6)";
+
   return (
-    <div className="space-y-4 pb-24" data-testid="page-profile-nodes">
-      <div className="gradient-green-dark px-4 pb-4 pt-2 rounded-b-2xl" style={{ animation: "fadeSlideIn 0.4s ease-out" }}>
-        <div className="flex items-center justify-center relative mb-4">
-          <Button
-            size="icon"
-            variant="ghost"
+    <div className="min-h-screen pb-24" style={{ background: "#0a0a0a" }} data-testid="page-profile-nodes">
+      <div className="px-4 pt-3 pb-4">
+        <div className="flex items-center justify-center relative mb-6">
+          <button
             onClick={() => navigate("/profile")}
-            className="absolute left-0"
-            data-testid="button-back-profile"
+            className="absolute left-0 w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-bold">{t("profile.nodeDetailsTitle")}</h1>
+            <ArrowLeft className="h-5 w-5 text-white/80" />
+          </button>
+          <h1 className="text-[17px] font-bold tracking-wide">{t("profile.nodeDetailsTitle")}</h1>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 mb-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
+            <span className="text-[13px] text-white/50">
               {currentRank} ({t("profile.realLevel")})
             </span>
-            <span className="text-sm font-bold">{currentRank}</span>
+            <span className="text-[13px] font-bold text-white/90">{currentRank}</span>
           </div>
-          <div className="w-full h-2.5 rounded-full bg-black/40 overflow-hidden">
+          <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
             <div
-              className="h-full rounded-full transition-all duration-500"
+              className="h-full rounded-full transition-all duration-700"
               style={{
-                width: `${Math.max(levelProgress, 2)}%`,
-                background: "linear-gradient(90deg, #4ade80, #22c55e, #a3e635)",
+                width: `${Math.max(levelProgress, 3)}%`,
+                background: "linear-gradient(90deg, #22c55e, #84cc16, #eab308)",
               }}
             />
           </div>
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{t("profile.myNodesLabel")}</span>
-              <span className="text-sm">💎 {activeCount}/{totalDays || 0}Day</span>
+              <span className="text-[13px] font-semibold text-white/90">{t("profile.myNodesLabel")}</span>
+              <span className="text-[13px] text-white/60">🟡 {activeCount}/{totalDays || 0}Day</span>
             </div>
-            <Info className="h-4 w-4 text-muted-foreground" />
+            <Info className="h-4 w-4 text-white/30" />
           </div>
         </div>
       </div>
 
       {!isConnected ? (
-        <div className="px-4" style={{ animation: "fadeSlideIn 0.5s ease-out 0.1s both" }}>
-          <div className="glass-card rounded-2xl p-6 text-center" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-            <WalletCards className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">{t("profile.connectToViewNodes")}</p>
+        <div className="px-4">
+          <div className="rounded-2xl p-8 text-center" style={{ border: cardBorder, background: cardBg }}>
+            <WalletCards className="h-8 w-8 text-white/30 mx-auto mb-3" />
+            <p className="text-sm text-white/40">{t("profile.connectToViewNodes")}</p>
           </div>
         </div>
       ) : isLoading ? (
@@ -124,89 +124,88 @@ export default function ProfileNodesPage() {
         </div>
       ) : (
         <>
-          <div className="px-4 space-y-4" style={{ animation: "fadeSlideIn 0.45s ease-out 0.1s both" }}>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                className="glass-card rounded-xl py-3 px-4 flex items-center justify-between transition-all active:scale-[0.98]"
-                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
-                onClick={() => navigate("/profile/nodes")}
-              >
-                <span className="text-sm font-bold">{t("profile.applyLargeNode")}</span>
-                <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <button
-                className="glass-card rounded-xl py-3 px-4 flex items-center justify-between transition-all active:scale-[0.98]"
-                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
-                onClick={() => navigate("/profile/nodes")}
-              >
-                <span className="text-sm font-bold">{t("profile.applySmallNode")}</span>
-                <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="text-[11px] text-muted-foreground -mt-1">{t("profile.contribution")}${NODE_PLANS.MAX.price} + {t("profile.frozenFunds")}${NODE_PLANS.MAX.frozenAmount.toLocaleString()}</div>
-              <div className="text-[11px] text-muted-foreground -mt-1">{t("profile.contribution")}${NODE_PLANS.MINI.price} + {t("profile.frozenFunds")}${NODE_PLANS.MINI.frozenAmount.toLocaleString()}</div>
-            </div>
+          <div className="px-4 space-y-4">
+            <div className="rounded-2xl p-4 space-y-4" style={{ border: cardBorder, background: cardBg }}>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  className="rounded-full py-2.5 px-4 flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
+                  style={{ border: "1px solid rgba(74, 222, 128, 0.3)", background: "rgba(74, 222, 128, 0.06)" }}
+                  onClick={() => navigate("/profile/nodes")}
+                >
+                  <span className="text-[13px] font-bold text-white/90">{t("profile.applyLargeNode")}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-primary/70" />
+                </button>
+                <button
+                  className="rounded-full py-2.5 px-4 flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
+                  style={{ border: "1px solid rgba(74, 222, 128, 0.3)", background: "rgba(74, 222, 128, 0.06)" }}
+                  onClick={() => navigate("/profile/nodes")}
+                >
+                  <span className="text-[13px] font-bold text-white/90">{t("profile.applySmallNode")}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-primary/70" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-center -mt-1">
+                <span className="text-[11px] text-white/35">{t("profile.contribution")} {NODE_PLANS.MAX.price}</span>
+                <span className="text-[11px] text-white/35">{t("profile.contribution")} {NODE_PLANS.MINI.price}</span>
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div
-                className="glass-card rounded-xl p-4 text-center space-y-2"
-                style={{ border: "1px solid rgba(255,255,255,0.06)" }}
-              >
-                <div className="text-xs text-muted-foreground">{t("profile.nodeTotalAmount")} 🔊</div>
-                <DollarSign className="h-6 w-6 mx-auto text-primary" />
-                <div className="text-lg font-bold text-primary">${totalEarnings.toFixed(2)}</div>
-              </div>
-              <div
-                className="glass-card rounded-xl p-4 text-center space-y-2"
-                style={{ border: "1px solid rgba(255,255,255,0.06)" }}
-              >
-                <div className="text-xs text-muted-foreground">{t("profile.releaseDays")}</div>
-                <Calendar className="h-6 w-6 mx-auto text-primary" />
-                <div className="text-lg font-bold">{daysActive}/{totalDays || 0}Day</div>
-              </div>
-              <div
-                className="glass-card rounded-xl p-4 text-center space-y-2"
-                style={{ border: "1px solid rgba(255,255,255,0.06)" }}
-              >
-                <div className="text-xs text-muted-foreground">{t("profile.releasedEarnings")}</div>
-                <DollarSign className="h-6 w-6 mx-auto text-primary" />
-                <div className="text-lg font-bold text-primary">${releasedEarnings.toFixed(2)}</div>
-              </div>
-              <div
-                className="glass-card rounded-xl p-4 text-center space-y-2"
-                style={{ border: "1px solid rgba(255,255,255,0.06)" }}
-              >
-                <div className="text-xs text-muted-foreground">{t("profile.releaseStatus")}</div>
-                <Disc className="h-6 w-6 mx-auto text-primary" />
-                <div className="text-lg font-bold">{releaseStatus}</div>
-              </div>
-            </div>
-
-            <div
-              className="glass-card rounded-xl px-4 py-3 flex items-center justify-between"
-              style={{ border: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <div className="h-3 w-3 rounded-full bg-blue-500" />
+              <div className="grid grid-cols-2 gap-3">
+                <div
+                  className="rounded-xl p-4 text-center space-y-2"
+                  style={{ border: cardBorder, background: "rgba(5,10,5,0.5)" }}
+                >
+                  <div className="text-[12px] text-white/45 font-medium">{t("profile.nodeTotalAmount")} 🔊</div>
+                  <DollarSign className="h-6 w-6 mx-auto text-white/70" />
+                  <div className="text-lg font-bold text-primary">${totalEarnings.toFixed(0)}</div>
                 </div>
-                <span className="text-sm">
-                  {t("profile.availableBalance")}：<span className="font-bold">${availableBalance.toFixed(2)}</span>
-                  {lockedEarnings > 0 && (
-                    <span className="text-muted-foreground text-xs ml-1">({t("profile.locked")}: ${lockedEarnings.toFixed(2)})</span>
-                  )}
-                </span>
-                <Headphones className="h-4 w-4 text-muted-foreground" />
+                <div
+                  className="rounded-xl p-4 text-center space-y-2"
+                  style={{ border: cardBorder, background: "rgba(5,10,5,0.5)" }}
+                >
+                  <div className="text-[12px] text-white/45 font-medium">{t("profile.releaseDays")}</div>
+                  <Calendar className="h-6 w-6 mx-auto text-white/70" />
+                  <div className="text-lg font-bold text-white/90">{daysActive}/{totalDays || 0}Day</div>
+                </div>
               </div>
-              <button className="text-xs border border-border rounded-md px-3 py-1 text-muted-foreground hover:text-foreground transition-colors">
-                {t("profile.withdrawBtn")}
-              </button>
-            </div>
-          </div>
 
-          <div className="px-4" style={{ animation: "fadeSlideIn 0.5s ease-out 0.15s both" }}>
-            <div className="flex gap-2 mb-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div
+                  className="rounded-xl p-4 text-center space-y-2"
+                  style={{ border: cardBorder, background: "rgba(5,10,5,0.5)" }}
+                >
+                  <div className="text-[12px] text-white/45 font-medium">{t("profile.releasedEarnings")}</div>
+                  <DollarSign className="h-6 w-6 mx-auto text-white/70" />
+                  <div className="text-lg font-bold text-primary">${releasedEarnings.toFixed(0)}</div>
+                </div>
+                <div
+                  className="rounded-xl p-4 text-center space-y-2"
+                  style={{ border: cardBorder, background: "rgba(5,10,5,0.5)" }}
+                >
+                  <div className="text-[12px] text-white/45 font-medium">{t("profile.releaseStatus")}</div>
+                  <Disc className="h-6 w-6 mx-auto text-white/70" />
+                  <div className="text-lg font-bold text-white/90">{releaseStatus}</div>
+                </div>
+              </div>
+
+              <div
+                className="rounded-xl px-4 py-3 flex items-center justify-between"
+                style={{ border: cardBorder, background: "rgba(5,10,5,0.5)" }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] text-white/50">{t("profile.availableBalance")}:</span>
+                  <span className="text-[13px] font-bold text-white/90">${availableBalance.toFixed(0)}/${lockedEarnings.toFixed(0)}</span>
+                  <Headphones className="h-3.5 w-3.5 text-white/30" />
+                </div>
+                <button
+                  className="text-[12px] rounded-md px-3 py-1 text-white/50 transition-colors hover:text-white/80"
+                  style={{ border: "1px solid rgba(255,255,255,0.15)" }}
+                >
+                  {t("profile.withdrawBtn")}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
               {([
                 { key: "purchase" as TabKey, label: t("profile.purchaseRecords") },
                 { key: "earnings" as TabKey, label: t("profile.earningsDetailTab") },
@@ -214,11 +213,14 @@ export default function ProfileNodesPage() {
               ]).map((tab) => (
                 <button
                   key={tab.key}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                    activeTab === tab.key
-                      ? "border-primary text-primary bg-primary/10"
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
+                  className="px-4 py-2 rounded-lg text-[13px] font-medium transition-all"
+                  style={{
+                    border: activeTab === tab.key
+                      ? "1px solid rgba(74, 222, 128, 0.5)"
+                      : "1px solid rgba(255,255,255,0.1)",
+                    color: activeTab === tab.key ? "#4ade80" : "rgba(255,255,255,0.4)",
+                    background: activeTab === tab.key ? "rgba(74, 222, 128, 0.08)" : "transparent",
+                  }}
                   onClick={() => setActiveTab(tab.key)}
                 >
                   {tab.label}
@@ -229,30 +231,30 @@ export default function ProfileNodesPage() {
             {activeTab === "purchase" && (
               <div className="space-y-2">
                 {allMemberships.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground text-sm">
+                  <div className="text-center py-16 text-white/25 text-[14px] italic">
                     {t("profile.noData")}
                   </div>
                 ) : (
                   allMemberships.map((m) => (
                     <div
                       key={m.id}
-                      className="glass-card rounded-xl p-3 space-y-1.5"
-                      style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+                      className="rounded-xl p-3 space-y-1.5"
+                      style={{ border: cardBorder, background: cardBg }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold">
+                        <span className="text-[13px] font-bold text-white/90">
                           {m.nodeType === "MAX" ? t("profile.applyLargeNode") : t("profile.applySmallNode")}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          m.status === "ACTIVE" ? "bg-green-500/20 text-green-400" :
-                          m.status === "PENDING_MILESTONES" ? "bg-yellow-500/20 text-yellow-400" :
-                          m.status === "CANCELLED" ? "bg-red-500/20 text-red-400" :
-                          "bg-muted text-muted-foreground"
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full ${
+                          m.status === "ACTIVE" ? "bg-green-500/15 text-green-400" :
+                          m.status === "PENDING_MILESTONES" ? "bg-yellow-500/15 text-yellow-400" :
+                          m.status === "CANCELLED" ? "bg-red-500/15 text-red-400" :
+                          "bg-white/5 text-white/30"
                         }`}>
                           {m.status}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-1 text-[12px] text-muted-foreground">
+                      <div className="grid grid-cols-2 gap-1 text-[11px] text-white/35">
                         <span>{t("profile.contribution")}: ${Number(m.contributionAmount || m.depositAmount || 0).toFixed(0)}</span>
                         <span>{t("profile.frozenFunds")}: ${Number(m.frozenAmount || 0).toLocaleString()}</span>
                         <span>{t("profile.startDate")}: {formatDate(m.startDate)}</span>
@@ -264,9 +266,9 @@ export default function ProfileNodesPage() {
                             <span
                               key={i}
                               className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                ms.status === "ACHIEVED" ? "bg-green-500/20 text-green-400" :
-                                ms.status === "FAILED" ? "bg-red-500/20 text-red-400" :
-                                "bg-muted/50 text-muted-foreground"
+                                ms.status === "ACHIEVED" ? "bg-green-500/15 text-green-400" :
+                                ms.status === "FAILED" ? "bg-red-500/15 text-red-400" :
+                                "bg-white/5 text-white/30"
                               }`}
                             >
                               {ms.requiredRank} ({ms.deadlineDays}d)
@@ -283,27 +285,27 @@ export default function ProfileNodesPage() {
             {activeTab === "earnings" && (
               <div className="space-y-2">
                 {earningsRecords.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground text-sm">
+                  <div className="text-center py-16 text-white/25 text-[14px] italic">
                     {t("profile.noData")}
                   </div>
                 ) : (
                   earningsRecords.map((r) => (
                     <div
                       key={r.id}
-                      className="glass-card rounded-xl p-3 flex items-center justify-between"
-                      style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+                      className="rounded-xl p-3 flex items-center justify-between"
+                      style={{ border: cardBorder, background: cardBg }}
                     >
                       <div>
-                        <div className="text-sm font-medium">
+                        <div className="text-[13px] font-medium text-white/80">
                           {r.rewardType === "FIXED_YIELD" ? t("profile.dailyEarnings") :
                            r.rewardType === "POOL_DIVIDEND" ? t("profile.poolDividend") :
                            t("profile.teamCommission")}
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-[11px] text-white/30">
                           {r.details?.node_type || "--"} · {formatDate(r.createdAt)}
                         </div>
                       </div>
-                      <div className="text-sm font-bold text-primary">
+                      <div className="text-[13px] font-bold text-primary">
                         +${Number(r.amount || 0).toFixed(4)}
                       </div>
                     </div>
@@ -315,36 +317,39 @@ export default function ProfileNodesPage() {
             {activeTab === "detail" && (
               <div className="space-y-2">
                 {activeNodes.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground text-sm">
+                  <div className="text-center py-16 text-white/25 text-[14px] italic">
                     {t("profile.noData")}
                   </div>
                 ) : (
                   activeNodes.map((n) => (
                     <div
                       key={n.id}
-                      className="glass-card rounded-xl p-3 space-y-2"
-                      style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+                      className="rounded-xl p-3 space-y-2"
+                      style={{ border: cardBorder, background: cardBg }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold">
+                        <span className="text-[13px] font-bold text-white/90">
                           {n.nodeType === "MAX" ? t("profile.applyLargeNode") : t("profile.applySmallNode")}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          n.status === "ACTIVE" ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full ${
+                          n.status === "ACTIVE" ? "bg-green-500/15 text-green-400" : "bg-yellow-500/15 text-yellow-400"
                         }`}>
                           {n.status}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-1 text-[12px] text-muted-foreground">
+                      <div className="grid grid-cols-2 gap-1 text-[11px] text-white/35">
                         <span>{t("profile.frozenFunds")}: ${Number(n.frozenAmount || 0).toLocaleString()}</span>
                         <span>{t("profile.dailyEarnings")}: {(Number(n.dailyRate || 0) * 100).toFixed(1)}%</span>
                         <span>{t("profile.milestoneSchedule")}: {n.milestoneStage}/{n.totalMilestones}</span>
                         <span>{t("profile.earningsCapacity")}: {(Number(n.earningsCapacity || 0) * 100).toFixed(0)}%</span>
                       </div>
-                      <div className="w-full h-1.5 rounded-full bg-black/40 overflow-hidden">
+                      <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
                         <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${n.totalMilestones > 0 ? (n.milestoneStage / n.totalMilestones) * 100 : 0}%` }}
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${n.totalMilestones > 0 ? (n.milestoneStage / n.totalMilestones) * 100 : 0}%`,
+                            background: "linear-gradient(90deg, #22c55e, #84cc16)",
+                          }}
                         />
                       </div>
                     </div>
