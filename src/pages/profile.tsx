@@ -3,9 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveAccount } from "thirdweb/react";
-import { shortenAddress } from "@/lib/constants";
 import { useMaPrice } from "@/hooks/use-ma-price";
-import { Copy, Crown, WalletCards, Wallet, ArrowUpFromLine, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp } from "lucide-react";
+import { Copy, Crown, WalletCards, Wallet, ArrowUpFromLine, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp, Share2, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -103,212 +102,305 @@ export default function ProfilePage() {
   const totalEarnings = nodeEarnings + vaultYield + referralEarnings;
   const net = deposited - withdrawn + referralEarnings;
 
+  const refCode = profile?.refCode;
+  const referralLink = useMemo(() => {
+    if (!refCode || typeof window === "undefined") return "";
+    return `${window.location.origin}?ref=${refCode}`;
+  }, [refCode]);
+
+  const copyToClipboard = (text: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      toast({ title: t("common.copied"), description: t("common.copiedDesc") });
+    } catch {
+      toast({ title: t("common.copied"), description: text });
+    }
+  };
+
+  const shareReferralLink = () => {
+    if (!referralLink) return;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({
+        title: "CoinMax",
+        text: t("profile.inviteFriendsDesc"),
+        url: referralLink,
+      }).catch(() => {});
+    } else {
+      copyToClipboard(referralLink);
+    }
+  };
+
+  const cardBorder = "1px solid rgba(74, 222, 128, 0.15)";
+  const cardBg = "rgba(10, 15, 10, 0.6)";
+
   return (
     <div className="space-y-4 pb-24" data-testid="page-profile">
-      <div className="gradient-green-dark p-4 pt-2 rounded-b-2xl" style={{ animation: "fadeSlideIn 0.4s ease-out" }}>
-        <h2 className="text-lg font-bold mb-3" data-testid="text-profile-title">{t("profile.assetsOverview")}</h2>
-        <Card className="border-border bg-card/50 glow-green-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <div className="text-[12px] text-muted-foreground mb-1">{t("profile.totalAssets")}</div>
-                {!isConnected ? (
-                  <div className="text-2xl font-bold text-muted-foreground" data-testid="text-net-assets">--</div>
-                ) : profileLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold text-neon-value" data-testid="text-net-assets">{formatMA(net)}</div>
-                )}
-              </div>
-              <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center glow-green-sm">
-                <Wallet className="h-5 w-5 text-primary" />
-              </div>
+      <div className="px-4 pt-3" style={{ animation: "fadeSlideIn 0.4s ease-out" }}>
+        <div
+          className="rounded-2xl p-4"
+          style={{ border: cardBorder, background: cardBg }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] text-white/40 mb-1.5">{t("profile.connectedWallet")}</div>
+              {!isConnected ? (
+                <div className="font-mono text-[14px] text-white/30" data-testid="text-wallet-address">{t("common.notConnected")}</div>
+              ) : profileLoading ? (
+                <Skeleton className="h-5 w-48" />
+              ) : (
+                <div
+                  className="font-mono text-[14px] font-medium text-white/80 break-all leading-relaxed"
+                  data-testid="text-wallet-address"
+                >
+                  {walletAddr}
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
+            {isConnected && (
+              <button
+                onClick={() => copyToClipboard(walletAddr)}
+                className="shrink-0 mt-1 p-2 rounded-lg transition-colors hover:bg-white/5"
+                data-testid="button-copy-address"
+              >
+                <Copy className="h-5 w-5 text-white/50" />
+              </button>
+            )}
+          </div>
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            {isConnected && profile ? (
+              <>
+                <span
+                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/70"
+                  style={{ border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)" }}
+                  data-testid="badge-rank"
+                >
+                  {t("common.rank")}: {profile.rank}
+                </span>
+                <span
+                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/70"
+                  style={{ border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)" }}
+                  data-testid="badge-node-type"
+                >
+                  {t("common.node")}: {profile.nodeType}
+                </span>
+                {profile.isVip && (
+                  <span
+                    className="text-[12px] px-3 py-1 rounded-md font-medium text-primary"
+                    style={{ border: "1px solid rgba(74, 222, 128, 0.3)", background: "rgba(74, 222, 128, 0.08)" }}
+                    data-testid="badge-vip"
+                  >
+                    VIP
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <span
+                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/40"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}
+                >
+                  {t("common.rank")}: --
+                </span>
+                <span
+                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/40"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}
+                >
+                  {t("common.node")}: --
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {isConnected && referralLink && (
+        <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.05s both" }}>
+          <div
+            className="rounded-2xl p-4"
+            style={{ border: cardBorder, background: cardBg }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Link2 className="h-4 w-4 text-primary" />
+              <span className="text-[13px] font-semibold text-white/80">{t("profile.inviteFriends")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="flex-1 min-w-0 rounded-lg px-3 py-2.5 font-mono text-[12px] text-white/50 truncate"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                {referralLink}
+              </div>
+              <button
+                onClick={() => copyToClipboard(referralLink)}
+                className="shrink-0 px-3 py-2.5 rounded-lg text-[12px] font-medium text-white/70 transition-colors hover:bg-white/5"
+                style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+              <button
+                onClick={shareReferralLink}
+                className="shrink-0 px-3 py-2.5 rounded-lg text-[12px] font-medium text-primary transition-colors hover:bg-primary/5"
+                style={{ border: "1px solid rgba(74, 222, 128, 0.3)", background: "rgba(74, 222, 128, 0.06)" }}
+              >
+                <Share2 className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-2 text-[11px] text-white/30">{t("profile.inviteFriendsDesc")}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="gradient-green-dark px-4 py-4 rounded-2xl mx-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.08s both" }}>
+        <h2 className="text-[15px] font-bold mb-3" data-testid="text-profile-title">{t("profile.assetsOverview")}</h2>
+        <div
+          className="rounded-xl p-4"
+          style={{ border: cardBorder, background: "rgba(5,10,5,0.4)" }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[12px] text-white/40 mb-1">{t("profile.totalAssets")}</div>
+              {!isConnected ? (
+                <div className="text-2xl font-bold text-white/30" data-testid="text-net-assets">--</div>
+              ) : profileLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="text-2xl font-bold text-neon-value" data-testid="text-net-assets">{formatMA(net)}</div>
+              )}
+            </div>
+            <div className="h-10 w-10 rounded-full flex items-center justify-center" style={{ background: "rgba(74, 222, 128, 0.12)" }}>
+              <Wallet className="h-5 w-5 text-primary" />
+            </div>
+          </div>
+        </div>
       </div>
 
       {isConnected && (
-        <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.08s both" }}>
-          <Card className="border-border bg-card glow-green-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <div className="text-[12px] text-muted-foreground mb-0.5">{t("profile.totalEarningsLabel")}</div>
-                    {profileLoading ? (
-                      <Skeleton className="h-6 w-20" />
-                    ) : (
-                      <div className="text-lg font-bold text-neon-value" data-testid="text-total-earnings">
-                        {formatMA(totalEarnings)}
-                      </div>
-                    )}
-                  </div>
+        <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.1s both" }}>
+          <div
+            className="rounded-2xl p-4"
+            style={{ border: cardBorder, background: cardBg }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(74, 222, 128, 0.12)" }}>
+                  <TrendingUp className="h-5 w-5 text-primary" />
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    toast({ title: t("profile.withdrawEarnings"), description: t("profile.withdrawEarningsDesc") });
-                  }}
-                  disabled={totalEarnings <= 0}
-                  data-testid="button-withdraw-earnings"
-                >
-                  <ArrowUpFromLine className="mr-1 h-3 w-3" /> {t("common.withdraw")}
-                </Button>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-md bg-card/80 border border-border/50 p-2">
-                  <div className="text-[11px] text-muted-foreground">{t("profile.nodeEarningsLabel")}</div>
-                  <div className="text-xs font-bold text-neon-value">{formatCompactMA(nodeEarnings)}</div>
-                </div>
-                <div className="rounded-md bg-card/80 border border-border/50 p-2">
-                  <div className="text-[11px] text-muted-foreground">{t("profile.vaultEarningsLabel")}</div>
-                  <div className="text-xs font-bold text-neon-value">{formatCompactMA(vaultYield)}</div>
-                </div>
-                <div className="rounded-md bg-card/80 border border-border/50 p-2">
-                  <div className="text-[11px] text-muted-foreground">{t("profile.brokerEarningsLabel")}</div>
-                  <div className="text-xs font-bold text-neon-value">{formatCompactMA(referralEarnings)}</div>
+                <div>
+                  <div className="text-[12px] text-white/40 mb-0.5">{t("profile.totalEarningsLabel")}</div>
+                  {profileLoading ? (
+                    <Skeleton className="h-6 w-20" />
+                  ) : (
+                    <div className="text-lg font-bold text-neon-value" data-testid="text-total-earnings">
+                      {formatMA(totalEarnings)}
+                    </div>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <Button
+                size="sm"
+                onClick={() => {
+                  toast({ title: t("profile.withdrawEarnings"), description: t("profile.withdrawEarningsDesc") });
+                }}
+                disabled={totalEarnings <= 0}
+                data-testid="button-withdraw-earnings"
+              >
+                <ArrowUpFromLine className="mr-1 h-3 w-3" /> {t("common.withdraw")}
+              </Button>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg p-2" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(5,10,5,0.4)" }}>
+                <div className="text-[11px] text-white/35">{t("profile.nodeEarningsLabel")}</div>
+                <div className="text-xs font-bold text-neon-value">{formatCompactMA(nodeEarnings)}</div>
+              </div>
+              <div className="rounded-lg p-2" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(5,10,5,0.4)" }}>
+                <div className="text-[11px] text-white/35">{t("profile.vaultEarningsLabel")}</div>
+                <div className="text-xs font-bold text-neon-value">{formatCompactMA(vaultYield)}</div>
+              </div>
+              <div className="rounded-lg p-2" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(5,10,5,0.4)" }}>
+                <div className="text-[11px] text-white/35">{t("profile.brokerEarningsLabel")}</div>
+                <div className="text-xs font-bold text-neon-value">{formatCompactMA(referralEarnings)}</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {!isConnected && (
         <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.1s both" }}>
-          <Card className="border-border bg-card border-dashed">
-            <CardContent className="p-4 text-center">
-              <WalletCards className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground" data-testid="text-connect-prompt">
-                {t("common.connectWalletPrompt")}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl p-6 text-center" style={{ border: "1px dashed rgba(255,255,255,0.1)", background: cardBg }}>
+            <WalletCards className="h-8 w-8 text-white/20 mx-auto mb-2" />
+            <p className="text-[13px] text-white/30" data-testid="text-connect-prompt">
+              {t("common.connectWalletPrompt")}
+            </p>
+          </div>
         </div>
       )}
 
-      <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.1s both" }}>
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-foreground mb-1">{t("profile.connectedWallet")}</div>
-                {!isConnected ? (
-                  <div className="font-mono text-sm text-muted-foreground" data-testid="text-wallet-address">{t("common.notConnected")}</div>
-                ) : profileLoading ? (
-                  <Skeleton className="h-5 w-32" />
-                ) : (
-                  <div className="font-mono text-sm font-medium" data-testid="text-wallet-address">
-                    {shortenAddress(walletAddr)}
-                  </div>
-                )}
-              </div>
-              {isConnected && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => {
-                    navigator.clipboard.writeText(walletAddr);
-                    toast({ title: t("common.copied"), description: t("common.copiedDesc") });
-                  }}
-                  data-testid="button-copy-address"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              )}
+      <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.15s both" }}>
+        <div
+          className="rounded-2xl p-4"
+          style={{ border: cardBorder, background: cardBg }}
+        >
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Crown className="h-4 w-4 text-primary shrink-0" />
+              <span className="text-[13px] font-semibold text-white/80">
+                {isConnected && profile?.isVip ? t("profile.vipActive") : t("profile.upgradeToVip")}
+              </span>
             </div>
-            {isConnected && profile && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="text-[12px] no-default-hover-elevate no-default-active-elevate" data-testid="badge-rank">
-                  {t("common.rank")}: {profile.rank}
-                </Badge>
-                <Badge variant="secondary" className="text-[12px] no-default-hover-elevate no-default-active-elevate" data-testid="badge-node-type">
-                  {t("common.node")}: {profile.nodeType}
-                </Badge>
-                {profile.isVip && (
-                  <Badge className="bg-primary/20 text-primary text-[12px] no-default-hover-elevate no-default-active-elevate" data-testid="badge-vip">
-                    VIP
-                  </Badge>
+            {isConnected && !profile?.isVip && (
+              <Button
+                size="sm"
+                onClick={() => vipMutation.mutate()}
+                disabled={vipMutation.isPending}
+                data-testid="button-subscribe-vip"
+              >
+                {vipMutation.isPending ? (
+                  <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> {getPaymentStatusLabel(payment.status) || t("common.processing")}</>
+                ) : (
+                  <>{t("profile.subscribeVip")} (${VIP_PLANS.monthly.price})</>
                 )}
-              </div>
+              </Button>
             )}
             {!isConnected && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="text-[12px] no-default-hover-elevate no-default-active-elevate">
-                  {t("common.rank")}: --
-                </Badge>
-                <Badge variant="secondary" className="text-[12px] no-default-hover-elevate no-default-active-elevate">
-                  {t("common.node")}: --
-                </Badge>
-              </div>
+              <span
+                className="text-[12px] px-3 py-1 rounded-md text-white/40"
+                style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}
+              >
+                {t("common.connectToUnlock")}
+              </span>
             )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.15s both" }}>
-        <Card className="border-border bg-card glow-green-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Crown className="h-4 w-4 text-primary shrink-0" />
-                <span className="text-xs font-semibold">
-                  {isConnected && profile?.isVip ? t("profile.vipActive") : t("profile.upgradeToVip")}
-                </span>
-              </div>
-              {isConnected && !profile?.isVip && (
-                <Button
-                  size="sm"
-                  onClick={() => vipMutation.mutate()}
-                  disabled={vipMutation.isPending}
-                  data-testid="button-subscribe-vip"
-                >
-                  {vipMutation.isPending ? (
-                    <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> {getPaymentStatusLabel(payment.status) || t("common.processing")}</>
-                  ) : (
-                    <>{t("profile.subscribeVip")} (${VIP_PLANS.monthly.price})</>
-                  )}
-                </Button>
-              )}
-              {!isConnected && (
-                <Badge variant="secondary" className="text-[12px] no-default-hover-elevate no-default-active-elevate">
-                  {t("common.connectToUnlock")}
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.2s both" }}>
-        <h3 className="text-sm font-bold mb-3">{t("profile.menu")}</h3>
-        <Card className="border-border bg-card">
-          <CardContent className="p-0">
-            {MENU_ITEMS.map((item, idx) => (
-              <button
-                key={item.path}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover-elevate ${
-                  idx < MENU_ITEMS.length - 1 ? "border-b border-border/50" : ""
-                }`}
-                onClick={() => navigate(item.path)}
-                data-testid={`menu-${item.path.split("/").pop()}`}
-              >
-                <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                  <item.icon className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium">{t(item.labelKey)}</div>
-                  <div className="text-[12px] text-muted-foreground">{t(item.descKey)}</div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+        <h3 className="text-[13px] font-bold mb-3 text-white/60">{t("profile.menu")}</h3>
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ border: cardBorder, background: cardBg }}
+        >
+          {MENU_ITEMS.map((item, idx) => (
+            <button
+              key={item.path}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.02] ${
+                idx < MENU_ITEMS.length - 1 ? "border-b" : ""
+              }`}
+              style={{ borderColor: "rgba(255,255,255,0.05)" }}
+              onClick={() => navigate(item.path)}
+              data-testid={`menu-${item.path.split("/").pop()}`}
+            >
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(74, 222, 128, 0.08)" }}>
+                <item.icon className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium text-white/80">{t(item.labelKey)}</div>
+                <div className="text-[11px] text-white/30">{t(item.descKey)}</div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-white/20 shrink-0" />
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
