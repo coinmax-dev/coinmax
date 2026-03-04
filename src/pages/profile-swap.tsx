@@ -1,10 +1,19 @@
 import { ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
+import { BridgeWidget } from "thirdweb/react";
+import { getThirdwebClient } from "@/lib/thirdweb";
 
 export default function ProfileSwapPage() {
   const { t } = useTranslation();
   const [, navigate] = useLocation();
+
+  let client: ReturnType<typeof getThirdwebClient> | null = null;
+  try {
+    client = getThirdwebClient();
+  } catch {
+    client = null;
+  }
 
   return (
     <div className="min-h-screen pb-24" style={{ background: "#0a0a0a" }}>
@@ -21,19 +30,25 @@ export default function ProfileSwapPage() {
       </div>
 
       <div className="px-4">
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ border: "1px solid rgba(74, 222, 128, 0.15)", background: "rgba(10, 15, 10, 0.6)" }}
-        >
-          <iframe
-            src="https://thirdweb.com/bridge/widget?showThirdwebBranding=false"
-            width="100%"
-            height="750"
-            style={{ border: 0, display: "block" }}
-            title="Swap"
-            allow="clipboard-write"
-          />
-        </div>
+        {client ? (
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ border: "1px solid rgba(74, 222, 128, 0.15)", background: "rgba(10, 15, 10, 0.6)" }}
+          >
+            <BridgeWidget
+              client={client}
+              theme="dark"
+              showThirdwebBranding={false}
+            />
+          </div>
+        ) : (
+          <div
+            className="rounded-2xl p-8 text-center"
+            style={{ border: "1px solid rgba(74, 222, 128, 0.15)", background: "rgba(10, 15, 10, 0.6)" }}
+          >
+            <p className="text-[13px] text-white/40">{t("profile.swapUnavailable")}</p>
+          </div>
+        )}
       </div>
     </div>
   );
