@@ -18,7 +18,6 @@ import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 
 const MENU_ITEMS = [
-  { labelKey: "profile.nodeManagement", icon: Server, path: "/profile/nodes", descKey: "profile.nodeManagementDesc" },
   { labelKey: "profile.swap", icon: ArrowLeftRight, path: "/profile/swap", descKey: "profile.swapDesc" },
   { labelKey: "profile.referralTeam", icon: GitBranch, path: "/profile/referral", descKey: "profile.referralTeamDesc" },
   { labelKey: "profile.transactionHistory", icon: History, path: "/profile/transactions", descKey: "profile.transactionHistoryDesc" },
@@ -432,6 +431,34 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+
+        <button
+          className="w-full rounded-2xl p-4 flex items-center gap-3 text-left transition-all active:scale-[0.98] relative overflow-hidden group"
+          style={{
+            background: "linear-gradient(135deg, #0d1f12 0%, #0f0f0f 60%, #0f1a0f 100%)",
+            border: "1px solid rgba(74,222,128,0.25)",
+          }}
+          onClick={() => navigate("/profile/nodes")}
+          data-testid="menu-nodes"
+        >
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "linear-gradient(135deg, rgba(74,222,128,0.05), transparent)" }} />
+          <div className="absolute -right-6 -top-6 w-28 h-28 opacity-[0.07]" style={{ background: "radial-gradient(circle, #4ade80, transparent 70%)" }} />
+          <div
+            className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 relative"
+            style={{
+              background: "linear-gradient(135deg, rgba(74,222,128,0.25), rgba(74,222,128,0.08))",
+              border: "1px solid rgba(74,222,128,0.3)",
+              boxShadow: "0 0 12px rgba(74,222,128,0.15)",
+            }}
+          >
+            <Server className="h-5 w-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0 relative">
+            <div className="text-[14px] font-bold text-white">{t("profile.nodeManagement")}</div>
+            <div className="text-[11px] text-white/40 mt-0.5">{t("profile.nodeManagementDesc")}</div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-primary/60 shrink-0 relative" />
+        </button>
 
         <div className="pt-1">
           <div
