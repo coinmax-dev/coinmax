@@ -130,34 +130,56 @@ export default function ProfileReferralPage() {
             <span className="text-[13px] font-bold text-white">{t("profile.currentLevel")}</span>
           </div>
 
-          <div className="relative h-28 mb-4 rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)" }}>
-            <svg viewBox="0 0 400 120" className="w-full h-full" preserveAspectRatio="none">
+          <div className="relative mb-4 rounded-2xl overflow-hidden" style={{ height: 200, background: "linear-gradient(135deg, rgba(10,30,18,0.8), rgba(15,40,24,0.5), rgba(20,50,30,0.3))", border: "1px solid rgba(74,222,128,0.12)" }}>
+            <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(ellipse at 80% 20%, rgba(163,230,53,0.25), transparent 60%)" }} />
+            <div className="absolute inset-0 opacity-15" style={{ background: "radial-gradient(ellipse at 20% 80%, rgba(74,222,128,0.3), transparent 50%)" }} />
+            <svg viewBox="0 0 420 200" className="w-full h-full relative" preserveAspectRatio="xMidYMid meet">
               <defs>
                 <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#22c55e" />
+                  <stop offset="50%" stopColor="#4ade80" />
                   <stop offset="100%" stopColor="#a3e635" />
                 </linearGradient>
+                <linearGradient id="areaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(74,222,128,0.2)" />
+                  <stop offset="100%" stopColor="rgba(74,222,128,0)" />
+                </linearGradient>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
-              <path d="M 20 100 Q 80 95 120 85 Q 160 75 200 65 Q 240 55 280 40 Q 320 25 360 15 Q 380 10 390 8" stroke="url(#lineGrad)" strokeWidth="2.5" fill="none" />
+              <path d="M 30 165 C 60 160, 80 152, 110 145 C 140 138, 160 128, 190 118 C 220 108, 240 95, 270 78 C 300 61, 320 42, 350 28 C 370 18, 390 12, 400 10" stroke="url(#lineGrad)" strokeWidth="3" fill="none" filter="url(#glow)" strokeLinecap="round" />
+              <path d="M 30 165 C 60 160, 80 152, 110 145 C 140 138, 160 128, 190 118 C 220 108, 240 95, 270 78 C 300 61, 320 42, 350 28 C 370 18, 390 12, 400 10 L 400 190 L 30 190 Z" fill="url(#areaGrad)" />
               {[
-                { x: 40, y: 98, label: "V1" },
-                { x: 100, y: 88, label: "V2" },
-                { x: 160, y: 75, label: "V3" },
-                { x: 220, y: 62, label: "V4" },
-                { x: 280, y: 42, label: "V5" },
-                { x: 340, y: 18, label: "V6" },
-                { x: 385, y: 8, label: "V7" },
-              ].map((p) => (
+                { x: 30, y: 165, label: "V1" },
+                { x: 95, y: 148, label: "V2" },
+                { x: 160, y: 128, label: "V3" },
+                { x: 225, y: 105, label: "V4" },
+                { x: 290, y: 72, label: "V5", reward: "30,000 CMX" },
+                { x: 350, y: 28, label: "V6", reward: "100,000 CMX" },
+                { x: 400, y: 10, label: "V7", reward: "300,000 CMX" },
+              ].map((p: any) => (
                 <g key={p.label}>
-                  <circle cx={p.x} cy={p.y} r="4" fill="#4ade80" stroke="#0a0a0a" strokeWidth="2" />
-                  <text x={p.x} y={p.y - 10} textAnchor="middle" fill="rgba(255,255,255,0.7)" fontSize="9" fontWeight="600">{p.label}</text>
+                  <circle cx={p.x} cy={p.y} r="6" fill="rgba(74,222,128,0.15)" stroke="none">
+                    <animate attributeName="r" values="6;9;6" dur="2.5s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2.5s" repeatCount="indefinite" />
+                  </circle>
+                  <circle cx={p.x} cy={p.y} r="4" fill="#4ade80" stroke="#0f2818" strokeWidth="2" />
+                  <text x={p.x} y={p.y - 14} textAnchor="middle" fill="white" fontSize="11" fontWeight="700">{p.label}</text>
+                  {p.reward && (
+                    <text x={p.x + 8} y={p.y + 16} textAnchor="start" fill="rgba(163,230,53,0.55)" fontSize="7.5" fontWeight="500">
+                      {p.reward}
+                    </text>
+                  )}
                 </g>
               ))}
-              <text x="280" y="58" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V5 Reward 30,000 CMX</text>
-              <text x="320" y="35" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V6 Reward 100,000 CMX</text>
-              <text x="350" y="7" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V7 Reward 300,000 CMX</text>
-              <text x="350" y="50" fill="rgba(255,255,255,0.2)" fontSize="7">50 people</text>
-              <text x="370" y="30" fill="rgba(255,255,255,0.2)" fontSize="7">200 people</text>
+              <text x="355" y="68" fill="rgba(255,255,255,0.2)" fontSize="7.5" fontWeight="500">50 people</text>
+              <text x="365" y="48" fill="rgba(255,255,255,0.2)" fontSize="7.5" fontWeight="500">200 people</text>
+              <text x="340" y="100" fill="rgba(255,255,255,0.12)" fontSize="7">30 people</text>
             </svg>
           </div>
 
