@@ -155,7 +155,7 @@ export default function ProfilePage() {
                 <Skeleton className="h-5 w-48" />
               ) : (
                 <div
-                  className="font-mono text-[14px] font-medium text-white/80 break-all leading-relaxed"
+                  className="font-mono text-[11px] font-medium text-white/80 truncate"
                   data-testid="text-wallet-address"
                 >
                   {walletAddr}
