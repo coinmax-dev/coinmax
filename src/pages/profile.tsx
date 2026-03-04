@@ -28,6 +28,11 @@ const MENU_ITEMS = [
   { labelKey: "profile.settings", icon: Settings, path: "/profile/settings", descKey: "profile.settingsDesc" },
 ];
 
+const cardBorder = "1px solid rgba(255, 255, 255, 0.15)";
+const cardBg = "#111";
+const innerBorder = "1px solid rgba(255, 255, 255, 0.1)";
+const innerBg = "#1a1a1a";
+
 export default function ProfilePage() {
   const { t } = useTranslation();
   const account = useActiveAccount();
@@ -136,9 +141,6 @@ export default function ProfilePage() {
     }
   };
 
-  const cardBorder = "1px solid rgba(74, 222, 128, 0.15)";
-  const cardBg = "rgba(10, 15, 10, 0.6)";
-
   return (
     <div className="space-y-4 pb-24" data-testid="page-profile">
       <div className="px-4 pt-3" style={{ animation: "fadeSlideIn 0.4s ease-out" }}>
@@ -148,7 +150,7 @@ export default function ProfilePage() {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="text-[12px] text-white/40 mb-1.5">{t("profile.connectedWallet")}</div>
+              <div className="text-[12px] text-white/50 mb-1.5">{t("profile.connectedWallet")}</div>
               {!isConnected ? (
                 <div className="font-mono text-[14px] text-white/30" data-testid="text-wallet-address">{t("common.notConnected")}</div>
               ) : profileLoading ? (
@@ -165,10 +167,10 @@ export default function ProfilePage() {
             {isConnected && (
               <button
                 onClick={() => copyToClipboard(walletAddr)}
-                className="shrink-0 mt-1 p-2 rounded-lg transition-colors hover:bg-white/5"
+                className="shrink-0 mt-1 p-2 rounded-lg transition-colors hover:bg-white/10"
                 data-testid="button-copy-address"
               >
-                <Copy className="h-5 w-5 text-white/50" />
+                <Copy className="h-5 w-5 text-white/60" />
               </button>
             )}
           </div>
@@ -176,15 +178,15 @@ export default function ProfilePage() {
             {isConnected && profile ? (
               <>
                 <span
-                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/70"
-                  style={{ border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)" }}
+                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/80"
+                  style={{ border: innerBorder, background: innerBg }}
                   data-testid="badge-rank"
                 >
                   {t("common.rank")}: {profile.rank}
                 </span>
                 <span
-                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/70"
-                  style={{ border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)" }}
+                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/80"
+                  style={{ border: innerBorder, background: innerBg }}
                   data-testid="badge-node-type"
                 >
                   {t("common.node")}: {profile.nodeType}
@@ -192,7 +194,7 @@ export default function ProfilePage() {
                 {profile.isVip && (
                   <span
                     className="text-[12px] px-3 py-1 rounded-md font-medium text-primary"
-                    style={{ border: "1px solid rgba(74, 222, 128, 0.3)", background: "rgba(74, 222, 128, 0.08)" }}
+                    style={{ border: "1px solid rgba(74, 222, 128, 0.4)", background: "rgba(74, 222, 128, 0.1)" }}
                     data-testid="badge-vip"
                   >
                     VIP
@@ -202,14 +204,14 @@ export default function ProfilePage() {
             ) : (
               <>
                 <span
-                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/40"
-                  style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}
+                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/50"
+                  style={{ border: innerBorder, background: innerBg }}
                 >
                   {t("common.rank")}: --
                 </span>
                 <span
-                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/40"
-                  style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}
+                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/50"
+                  style={{ border: innerBorder, background: innerBg }}
                 >
                   {t("common.node")}: --
                 </span>
@@ -219,25 +221,30 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="gradient-green-dark px-4 py-4 rounded-2xl mx-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.08s both" }}>
-        <h2 className="text-[15px] font-bold mb-3" data-testid="text-profile-title">{t("profile.assetsOverview")}</h2>
+      <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.08s both" }}>
         <div
-          className="rounded-xl p-4"
-          style={{ border: cardBorder, background: "rgba(5,10,5,0.4)" }}
+          className="rounded-2xl p-4"
+          style={{ border: cardBorder, background: cardBg }}
         >
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[12px] text-white/40 mb-1">{t("profile.totalAssets")}</div>
-              {!isConnected ? (
-                <div className="text-2xl font-bold text-white/30" data-testid="text-net-assets">--</div>
-              ) : profileLoading ? (
-                <Skeleton className="h-8 w-24" />
-              ) : (
-                <div className="text-2xl font-bold text-neon-value" data-testid="text-net-assets">{formatMA(net)}</div>
-              )}
-            </div>
-            <div className="h-10 w-10 rounded-full flex items-center justify-center" style={{ background: "rgba(74, 222, 128, 0.12)" }}>
-              <Wallet className="h-5 w-5 text-primary" />
+          <h2 className="text-[15px] font-bold mb-3 text-white" data-testid="text-profile-title">{t("profile.assetsOverview")}</h2>
+          <div
+            className="rounded-xl p-4"
+            style={{ border: innerBorder, background: innerBg }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[12px] text-white/50 mb-1">{t("profile.totalAssets")}</div>
+                {!isConnected ? (
+                  <div className="text-2xl font-bold text-white/30" data-testid="text-net-assets">--</div>
+                ) : profileLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <div className="text-2xl font-bold text-white" data-testid="text-net-assets">{formatMA(net)}</div>
+                )}
+              </div>
+              <div className="h-10 w-10 rounded-full flex items-center justify-center" style={{ background: "rgba(74, 222, 128, 0.15)" }}>
+                <Wallet className="h-5 w-5 text-primary" />
+              </div>
             </div>
           </div>
         </div>
@@ -251,15 +258,15 @@ export default function ProfilePage() {
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(74, 222, 128, 0.12)" }}>
+                <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(74, 222, 128, 0.15)" }}>
                   <TrendingUp className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div className="text-[12px] text-white/40 mb-0.5">{t("profile.totalEarningsLabel")}</div>
+                  <div className="text-[12px] text-white/50 mb-0.5">{t("profile.totalEarningsLabel")}</div>
                   {profileLoading ? (
                     <Skeleton className="h-6 w-20" />
                   ) : (
-                    <div className="text-lg font-bold text-neon-value" data-testid="text-total-earnings">
+                    <div className="text-lg font-bold text-white" data-testid="text-total-earnings">
                       {formatMA(totalEarnings)}
                     </div>
                   )}
@@ -277,17 +284,17 @@ export default function ProfilePage() {
               </Button>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg p-2" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(5,10,5,0.4)" }}>
-                <div className="text-[11px] text-white/35">{t("profile.nodeEarningsLabel")}</div>
-                <div className="text-xs font-bold text-neon-value">{formatCompactMA(nodeEarnings)}</div>
+              <div className="rounded-lg p-2" style={{ border: innerBorder, background: innerBg }}>
+                <div className="text-[11px] text-white/50">{t("profile.nodeEarningsLabel")}</div>
+                <div className="text-xs font-bold text-white/90">{formatCompactMA(nodeEarnings)}</div>
               </div>
-              <div className="rounded-lg p-2" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(5,10,5,0.4)" }}>
-                <div className="text-[11px] text-white/35">{t("profile.vaultEarningsLabel")}</div>
-                <div className="text-xs font-bold text-neon-value">{formatCompactMA(vaultYield)}</div>
+              <div className="rounded-lg p-2" style={{ border: innerBorder, background: innerBg }}>
+                <div className="text-[11px] text-white/50">{t("profile.vaultEarningsLabel")}</div>
+                <div className="text-xs font-bold text-white/90">{formatCompactMA(vaultYield)}</div>
               </div>
-              <div className="rounded-lg p-2" style={{ border: "1px solid rgba(255,255,255,0.06)", background: "rgba(5,10,5,0.4)" }}>
-                <div className="text-[11px] text-white/35">{t("profile.brokerEarningsLabel")}</div>
-                <div className="text-xs font-bold text-neon-value">{formatCompactMA(referralEarnings)}</div>
+              <div className="rounded-lg p-2" style={{ border: innerBorder, background: innerBg }}>
+                <div className="text-[11px] text-white/50">{t("profile.brokerEarningsLabel")}</div>
+                <div className="text-xs font-bold text-white/90">{formatCompactMA(referralEarnings)}</div>
               </div>
             </div>
           </div>
@@ -296,9 +303,9 @@ export default function ProfilePage() {
 
       {!isConnected && (
         <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.1s both" }}>
-          <div className="rounded-2xl p-6 text-center" style={{ border: "1px dashed rgba(255,255,255,0.1)", background: cardBg }}>
-            <WalletCards className="h-8 w-8 text-white/20 mx-auto mb-2" />
-            <p className="text-[13px] text-white/30" data-testid="text-connect-prompt">
+          <div className="rounded-2xl p-6 text-center" style={{ border: "1px dashed rgba(255,255,255,0.15)", background: cardBg }}>
+            <WalletCards className="h-8 w-8 text-white/30 mx-auto mb-2" />
+            <p className="text-[13px] text-white/40" data-testid="text-connect-prompt">
               {t("common.connectWalletPrompt")}
             </p>
           </div>
@@ -309,10 +316,7 @@ export default function ProfilePage() {
         <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.13s both" }}>
           <div
             className="rounded-2xl p-4"
-            style={{
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-              background: "#111",
-            }}
+            style={{ border: cardBorder, background: cardBg }}
           >
             <div className="flex items-center gap-2 mb-3">
               <Link2 className="h-4 w-4 text-white/80" />
@@ -321,14 +325,14 @@ export default function ProfilePage() {
             <div className="flex items-center gap-2">
               <div
                 className="flex-1 min-w-0 rounded-lg px-3 py-2.5 font-mono text-[11px] text-white/60 truncate"
-                style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)" }}
+                style={{ background: innerBg, border: innerBorder }}
               >
                 {referralLink}
               </div>
               <button
                 onClick={() => copyToClipboard(referralLink)}
                 className="shrink-0 px-3 py-2.5 rounded-lg text-[12px] font-medium text-white/90 transition-all hover:bg-white/10 active:scale-95"
-                style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.15)" }}
+                style={{ background: innerBg, border: innerBorder }}
               >
                 <Copy className="h-4 w-4" />
               </button>
@@ -340,7 +344,7 @@ export default function ProfilePage() {
                 <Share2 className="h-4 w-4" />
               </button>
             </div>
-            <div className="mt-2.5 text-[11px] text-white/40">{t("profile.inviteFriendsDesc")}</div>
+            <div className="mt-2.5 text-[11px] text-white/45">{t("profile.inviteFriendsDesc")}</div>
           </div>
         </div>
       )}
@@ -353,7 +357,7 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
               <Crown className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-[13px] font-semibold text-white/80">
+              <span className="text-[13px] font-semibold text-white/90">
                 {isConnected && profile?.isVip ? t("profile.vipActive") : t("profile.upgradeToVip")}
               </span>
             </div>
@@ -368,8 +372,8 @@ export default function ProfilePage() {
             )}
             {!isConnected && (
               <span
-                className="text-[12px] px-3 py-1 rounded-md text-white/40"
-                style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}
+                className="text-[12px] px-3 py-1 rounded-md text-white/50"
+                style={{ border: innerBorder, background: innerBg }}
               >
                 {t("common.connectToUnlock")}
               </span>
@@ -387,8 +391,8 @@ export default function ProfilePage() {
                     key={planKey}
                     className="rounded-xl p-3 flex items-center justify-between gap-3 transition-all cursor-pointer"
                     style={{
-                      border: isSelected ? "1px solid rgba(74, 222, 128, 0.5)" : "1px solid rgba(255,255,255,0.08)",
-                      background: isSelected ? "rgba(74, 222, 128, 0.05)" : "rgba(255,255,255,0.02)",
+                      border: isSelected ? "1px solid rgba(74, 222, 128, 0.5)" : innerBorder,
+                      background: isSelected ? "rgba(74, 222, 128, 0.08)" : innerBg,
                     }}
                     onClick={() => !vipMutation.isPending && setSelectedVipPlan(planKey)}
                   >
@@ -396,7 +400,7 @@ export default function ProfilePage() {
                       <div className="text-[13px] font-semibold text-white/90">
                         {t(`profile.vipPlan_${planKey}`)}
                       </div>
-                      <div className="text-[11px] text-white/40 mt-0.5">
+                      <div className="text-[11px] text-white/50 mt-0.5">
                         {plan.period}
                       </div>
                     </div>
@@ -440,7 +444,7 @@ export default function ProfilePage() {
       </div>
 
       <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.2s both" }}>
-        <h3 className="text-[13px] font-bold mb-3 text-white/60">{t("profile.menu")}</h3>
+        <h3 className="text-[13px] font-bold mb-3 text-white/70">{t("profile.menu")}</h3>
         <div
           className="rounded-2xl overflow-hidden"
           style={{ border: cardBorder, background: cardBg }}
@@ -448,21 +452,21 @@ export default function ProfilePage() {
           {MENU_ITEMS.map((item, idx) => (
             <button
               key={item.path}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.02] ${
+              className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04] ${
                 idx < MENU_ITEMS.length - 1 ? "border-b" : ""
               }`}
-              style={{ borderColor: "rgba(255,255,255,0.05)" }}
+              style={{ borderColor: "rgba(255,255,255,0.08)" }}
               onClick={() => navigate(item.path)}
               data-testid={`menu-${item.path.split("/").pop()}`}
             >
-              <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(74, 222, 128, 0.08)" }}>
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(74, 222, 128, 0.12)" }}>
                 <item.icon className="h-4 w-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium text-white/80">{t(item.labelKey)}</div>
-                <div className="text-[11px] text-white/30">{t(item.descKey)}</div>
+                <div className="text-[13px] font-medium text-white/90">{t(item.labelKey)}</div>
+                <div className="text-[11px] text-white/40">{t(item.descKey)}</div>
               </div>
-              <ChevronRight className="h-4 w-4 text-white/20 shrink-0" />
+              <ChevronRight className="h-4 w-4 text-white/30 shrink-0" />
             </button>
           ))}
         </div>
