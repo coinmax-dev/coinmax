@@ -1,10 +1,8 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveAccount } from "thirdweb/react";
 import { useMaPrice } from "@/hooks/use-ma-price";
-import { Copy, Crown, WalletCards, Wallet, ArrowUpFromLine, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp, Share2, Link2, ArrowLeftRight } from "lucide-react";
+import { Copy, Crown, WalletCards, Wallet, ArrowUpFromLine, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp, Share2, Link2, ArrowLeftRight, User, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -27,11 +25,6 @@ const MENU_ITEMS = [
   { labelKey: "profile.notifications", icon: Bell, path: "/profile/notifications", descKey: "profile.notificationsDesc" },
   { labelKey: "profile.settings", icon: Settings, path: "/profile/settings", descKey: "profile.settingsDesc" },
 ];
-
-const cardBorder = "1px solid rgba(255, 255, 255, 0.15)";
-const cardBg = "#111";
-const innerBorder = "1px solid rgba(255, 255, 255, 0.1)";
-const innerBg = "#1a1a1a";
 
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -141,60 +134,65 @@ export default function ProfilePage() {
     }
   };
 
+  const shortAddr = walletAddr ? `${walletAddr.slice(0, 6)}...${walletAddr.slice(-4)}` : "";
+
   return (
-    <div className="space-y-4 pb-24" data-testid="page-profile">
-      <div className="px-4 pt-3" style={{ animation: "fadeSlideIn 0.4s ease-out" }}>
-        <div
-          className="rounded-2xl p-4"
-          style={{ border: cardBorder, background: cardBg }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] text-white/50 mb-1.5">{t("profile.connectedWallet")}</div>
+    <div className="pb-24" data-testid="page-profile" style={{ background: "#060606" }}>
+
+      <div className="relative overflow-hidden" style={{ background: "linear-gradient(180deg, #0d1f12 0%, #060606 100%)" }}>
+        <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(74,222,128,0.15) 0%, transparent 70%)" }} />
+        <div className="relative px-4 pt-6 pb-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="h-12 w-12 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)", boxShadow: "0 0 20px rgba(74,222,128,0.25)" }}
+            >
+              <User className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
               {!isConnected ? (
-                <div className="font-mono text-[14px] text-white/30" data-testid="text-wallet-address">{t("common.notConnected")}</div>
+                <div className="text-[15px] font-bold text-white/40" data-testid="text-wallet-address">{t("common.notConnected")}</div>
               ) : profileLoading ? (
-                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-5 w-32" />
               ) : (
-                <div
-                  className="font-mono text-[11px] font-medium text-white/80 truncate"
-                  data-testid="text-wallet-address"
-                >
-                  {walletAddr}
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[15px] font-bold text-white" data-testid="text-wallet-address">{shortAddr}</span>
+                    <button
+                      onClick={() => copyToClipboard(walletAddr)}
+                      className="p-1 rounded-md transition-colors hover:bg-white/10"
+                      data-testid="button-copy-address"
+                    >
+                      <Copy className="h-3.5 w-3.5 text-white/50" />
+                    </button>
+                  </div>
+                  <div className="font-mono text-[10px] text-white/35 mt-0.5 truncate">{walletAddr}</div>
+                </>
               )}
             </div>
-            {isConnected && (
-              <button
-                onClick={() => copyToClipboard(walletAddr)}
-                className="shrink-0 mt-1 p-2 rounded-lg transition-colors hover:bg-white/10"
-                data-testid="button-copy-address"
-              >
-                <Copy className="h-5 w-5 text-white/60" />
-              </button>
-            )}
           </div>
-          <div className="mt-3 flex items-center gap-2 flex-wrap">
+
+          <div className="flex items-center gap-2 flex-wrap">
             {isConnected && profile ? (
               <>
                 <span
-                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/80"
-                  style={{ border: innerBorder, background: innerBg }}
+                  className="text-[11px] px-2.5 py-1 rounded-full font-semibold text-white/90"
+                  style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(8px)" }}
                   data-testid="badge-rank"
                 >
                   {t("common.rank")}: {profile.rank}
                 </span>
                 <span
-                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/80"
-                  style={{ border: innerBorder, background: innerBg }}
+                  className="text-[11px] px-2.5 py-1 rounded-full font-semibold text-white/90"
+                  style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(8px)" }}
                   data-testid="badge-node-type"
                 >
                   {t("common.node")}: {profile.nodeType}
                 </span>
                 {profile.isVip && (
                   <span
-                    className="text-[12px] px-3 py-1 rounded-md font-medium text-primary"
-                    style={{ border: "1px solid rgba(74, 222, 128, 0.4)", background: "rgba(74, 222, 128, 0.1)" }}
+                    className="text-[11px] px-2.5 py-1 rounded-full font-bold text-yellow-300"
+                    style={{ background: "rgba(234,179,8,0.15)", border: "1px solid rgba(234,179,8,0.3)" }}
                     data-testid="badge-vip"
                   >
                     VIP
@@ -203,16 +201,10 @@ export default function ProfilePage() {
               </>
             ) : (
               <>
-                <span
-                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/50"
-                  style={{ border: innerBorder, background: innerBg }}
-                >
+                <span className="text-[11px] px-2.5 py-1 rounded-full font-medium text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>
                   {t("common.rank")}: --
                 </span>
-                <span
-                  className="text-[12px] px-3 py-1 rounded-md font-medium text-white/50"
-                  style={{ border: innerBorder, background: innerBg }}
-                >
+                <span className="text-[11px] px-2.5 py-1 rounded-full font-medium text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>
                   {t("common.node")}: --
                 </span>
               </>
@@ -221,52 +213,52 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.08s both" }}>
+      <div className="px-4 -mt-1 space-y-3">
+
         <div
-          className="rounded-2xl p-4"
-          style={{ border: cardBorder, background: cardBg }}
+          className="rounded-2xl p-4 relative overflow-hidden"
+          style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)" }}
         >
-          <h2 className="text-[15px] font-bold mb-3 text-white" data-testid="text-profile-title">{t("profile.assetsOverview")}</h2>
-          <div
-            className="rounded-xl p-4"
-            style={{ border: innerBorder, background: innerBg }}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <div className="text-[12px] text-white/50 mb-1">{t("profile.totalAssets")}</div>
-                {!isConnected ? (
-                  <div className="text-2xl font-bold text-white/30" data-testid="text-net-assets">--</div>
-                ) : profileLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold text-white" data-testid="text-net-assets">{formatMA(net)}</div>
-                )}
-              </div>
-              <div className="h-10 w-10 rounded-full flex items-center justify-center" style={{ background: "rgba(74, 222, 128, 0.15)" }}>
-                <Wallet className="h-5 w-5 text-primary" />
-              </div>
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-[0.03]" style={{ background: "radial-gradient(circle, #4ade80, transparent 70%)" }} />
+          <div className="flex items-center justify-between gap-3 relative">
+            <div>
+              <div className="text-[11px] text-white/45 font-medium uppercase tracking-wider mb-1">{t("profile.totalAssets")}</div>
+              {!isConnected ? (
+                <div className="text-[28px] font-black text-white/20 leading-tight" data-testid="text-net-assets">--</div>
+              ) : profileLoading ? (
+                <Skeleton className="h-9 w-28" />
+              ) : (
+                <div className="text-[28px] font-black text-white leading-tight" data-testid="text-net-assets">{formatMA(net)}</div>
+              )}
+            </div>
+            <div
+              className="h-11 w-11 rounded-2xl flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, rgba(74,222,128,0.2), rgba(74,222,128,0.05))", border: "1px solid rgba(74,222,128,0.15)" }}
+            >
+              <Wallet className="h-5 w-5 text-primary" />
             </div>
           </div>
         </div>
-      </div>
 
-      {isConnected && (
-        <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.1s both" }}>
+        {isConnected && (
           <div
             className="rounded-2xl p-4"
-            style={{ border: cardBorder, background: cardBg }}
+            style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)" }}
           >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(74, 222, 128, 0.15)" }}>
-                  <TrendingUp className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: "linear-gradient(135deg, rgba(74,222,128,0.2), rgba(74,222,128,0.05))", border: "1px solid rgba(74,222,128,0.15)" }}
+                >
+                  <TrendingUp className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <div className="text-[12px] text-white/50 mb-0.5">{t("profile.totalEarningsLabel")}</div>
+                  <div className="text-[11px] text-white/45 font-medium">{t("profile.totalEarningsLabel")}</div>
                   {profileLoading ? (
-                    <Skeleton className="h-6 w-20" />
+                    <Skeleton className="h-5 w-20" />
                   ) : (
-                    <div className="text-lg font-bold text-white" data-testid="text-total-earnings">
+                    <div className="text-[18px] font-bold text-white" data-testid="text-total-earnings">
                       {formatMA(totalEarnings)}
                     </div>
                   )}
@@ -274,6 +266,7 @@ export default function ProfilePage() {
               </div>
               <Button
                 size="sm"
+                className="rounded-xl text-[12px] h-8"
                 onClick={() => {
                   toast({ title: t("profile.withdrawEarnings"), description: t("profile.withdrawEarningsDesc") });
                 }}
@@ -283,131 +276,129 @@ export default function ProfilePage() {
                 <ArrowUpFromLine className="mr-1 h-3 w-3" /> {t("common.withdraw")}
               </Button>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg p-2" style={{ border: innerBorder, background: innerBg }}>
-                <div className="text-[11px] text-white/50">{t("profile.nodeEarningsLabel")}</div>
-                <div className="text-xs font-bold text-white/90">{formatCompactMA(nodeEarnings)}</div>
-              </div>
-              <div className="rounded-lg p-2" style={{ border: innerBorder, background: innerBg }}>
-                <div className="text-[11px] text-white/50">{t("profile.vaultEarningsLabel")}</div>
-                <div className="text-xs font-bold text-white/90">{formatCompactMA(vaultYield)}</div>
-              </div>
-              <div className="rounded-lg p-2" style={{ border: innerBorder, background: innerBg }}>
-                <div className="text-[11px] text-white/50">{t("profile.brokerEarningsLabel")}</div>
-                <div className="text-xs font-bold text-white/90">{formatCompactMA(referralEarnings)}</div>
-              </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[
+                { label: t("profile.nodeEarningsLabel"), value: formatCompactMA(nodeEarnings) },
+                { label: t("profile.vaultEarningsLabel"), value: formatCompactMA(vaultYield) },
+                { label: t("profile.brokerEarningsLabel"), value: formatCompactMA(referralEarnings) },
+              ].map((item, i) => (
+                <div key={i} className="rounded-xl p-2.5" style={{ background: "#161616" }}>
+                  <div className="text-[10px] text-white/40 mb-0.5">{item.label}</div>
+                  <div className="text-[13px] font-bold text-white/90">{item.value}</div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!isConnected && (
-        <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.1s both" }}>
-          <div className="rounded-2xl p-6 text-center" style={{ border: "1px dashed rgba(255,255,255,0.15)", background: cardBg }}>
-            <WalletCards className="h-8 w-8 text-white/30 mx-auto mb-2" />
-            <p className="text-[13px] text-white/40" data-testid="text-connect-prompt">
+        {!isConnected && (
+          <div
+            className="rounded-2xl p-8 text-center"
+            style={{ background: "#0f0f0f", border: "1px dashed rgba(255,255,255,0.12)" }}
+          >
+            <WalletCards className="h-8 w-8 text-white/20 mx-auto mb-3" />
+            <p className="text-[13px] text-white/35" data-testid="text-connect-prompt">
               {t("common.connectWalletPrompt")}
             </p>
           </div>
-        </div>
-      )}
+        )}
 
-      {isConnected && referralLink && (
-        <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.13s both" }}>
+        {isConnected && referralLink && (
           <div
             className="rounded-2xl p-4"
-            style={{ border: cardBorder, background: cardBg }}
+            style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)" }}
           >
             <div className="flex items-center gap-2 mb-3">
-              <Link2 className="h-4 w-4 text-white/80" />
+              <div
+                className="h-7 w-7 rounded-lg flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, rgba(74,222,128,0.2), rgba(74,222,128,0.05))", border: "1px solid rgba(74,222,128,0.15)" }}
+              >
+                <Link2 className="h-3.5 w-3.5 text-primary" />
+              </div>
               <span className="text-[14px] font-bold text-white">{t("profile.inviteFriends")}</span>
             </div>
             <div className="flex items-center gap-2">
               <div
-                className="flex-1 min-w-0 rounded-lg px-3 py-2.5 font-mono text-[11px] text-white/60 truncate"
-                style={{ background: innerBg, border: innerBorder }}
+                className="flex-1 min-w-0 rounded-xl px-3 py-2.5 font-mono text-[11px] text-white/55 truncate"
+                style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.08)" }}
               >
                 {referralLink}
               </div>
               <button
                 onClick={() => copyToClipboard(referralLink)}
-                className="shrink-0 px-3 py-2.5 rounded-lg text-[12px] font-medium text-white/90 transition-all hover:bg-white/10 active:scale-95"
-                style={{ background: innerBg, border: innerBorder }}
+                className="shrink-0 px-3 py-2.5 rounded-xl text-white/80 transition-all hover:bg-white/10 active:scale-95"
+                style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.08)" }}
               >
                 <Copy className="h-4 w-4" />
               </button>
               <button
                 onClick={shareReferralLink}
-                className="shrink-0 px-3 py-2.5 rounded-lg text-[12px] font-medium text-black transition-all hover:brightness-110 active:scale-95"
-                style={{ background: "#4ade80" }}
+                className="shrink-0 px-3.5 py-2.5 rounded-xl text-black font-medium transition-all hover:brightness-110 active:scale-95"
+                style={{ background: "linear-gradient(135deg, #4ade80, #22c55e)", boxShadow: "0 2px 8px rgba(74,222,128,0.25)" }}
               >
                 <Share2 className="h-4 w-4" />
               </button>
             </div>
-            <div className="mt-2.5 text-[11px] text-white/45">{t("profile.inviteFriendsDesc")}</div>
+            <div className="mt-2 text-[10px] text-white/35">{t("profile.inviteFriendsDesc")}</div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.15s both" }}>
         <div
-          className="rounded-2xl p-4"
-          style={{ border: cardBorder, background: cardBg }}
+          className="rounded-2xl overflow-hidden"
+          style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)" }}
         >
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Crown className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-[13px] font-semibold text-white/90">
+          <div className="p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Crown className="h-4 w-4 text-yellow-400" />
+              <span className="text-[14px] font-bold text-white">
                 {isConnected && profile?.isVip ? t("profile.vipActive") : t("profile.upgradeToVip")}
               </span>
             </div>
             {isConnected && !profile?.isVip && !showVipPlans && (
-              <Button
-                size="sm"
+              <button
+                className="px-4 py-1.5 rounded-full text-[12px] font-bold text-black transition-all hover:brightness-110 active:scale-95"
+                style={{ background: "linear-gradient(135deg, #facc15, #eab308)", boxShadow: "0 2px 8px rgba(234,179,8,0.2)" }}
                 onClick={() => setShowVipPlans(true)}
                 data-testid="button-subscribe-vip"
               >
                 {t("profile.subscribeVip")}
-              </Button>
+              </button>
             )}
             {!isConnected && (
-              <span
-                className="text-[12px] px-3 py-1 rounded-md text-white/50"
-                style={{ border: innerBorder, background: innerBg }}
-              >
+              <span className="text-[11px] px-3 py-1 rounded-full text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>
                 {t("common.connectToUnlock")}
               </span>
             )}
           </div>
 
           {isConnected && !profile?.isVip && showVipPlans && (
-            <div className="mt-4 space-y-3">
+            <div className="px-4 pb-4 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="pt-3" />
               {(Object.keys(VIP_PLANS) as Array<keyof typeof VIP_PLANS>).map((planKey) => {
                 const plan = VIP_PLANS[planKey];
                 const isSelected = selectedVipPlan === planKey;
-                const isPaying = vipMutation.isPending && isSelected;
                 return (
                   <div
                     key={planKey}
-                    className="rounded-xl p-3 flex items-center justify-between gap-3 transition-all cursor-pointer"
+                    className="rounded-xl p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer"
                     style={{
-                      border: isSelected ? "1px solid rgba(74, 222, 128, 0.5)" : innerBorder,
-                      background: isSelected ? "rgba(74, 222, 128, 0.08)" : innerBg,
+                      border: isSelected ? "1px solid rgba(234,179,8,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                      background: isSelected ? "rgba(234,179,8,0.06)" : "#161616",
                     }}
                     onClick={() => !vipMutation.isPending && setSelectedVipPlan(planKey)}
                   >
                     <div>
-                      <div className="text-[13px] font-semibold text-white/90">
+                      <div className="text-[13px] font-bold text-white">
                         {t(`profile.vipPlan_${planKey}`)}
                       </div>
-                      <div className="text-[11px] text-white/50 mt-0.5">
+                      <div className="text-[11px] text-white/40 mt-0.5">
                         {plan.period}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[15px] font-bold text-primary">${plan.price}</div>
+                      <div className="text-[16px] font-black text-yellow-400">${plan.price}</div>
                       {planKey === "semiannual" && (
-                        <div className="text-[10px] text-emerald-400/70 mt-0.5">
+                        <div className="text-[10px] text-emerald-400/80 mt-0.5 font-medium">
                           {t("profile.vipSave")} ${(VIP_PLANS.monthly.price * 6) - VIP_PLANS.semiannual.price}
                         </div>
                       )}
@@ -419,15 +410,15 @@ export default function ProfilePage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="flex-1 text-[12px]"
+                  className="flex-1 text-[12px] rounded-xl h-9"
                   onClick={() => { setShowVipPlans(false); setSelectedVipPlan(null); }}
                   disabled={vipMutation.isPending}
                 >
                   {t("common.cancel")}
                 </Button>
-                <Button
-                  size="sm"
-                  className="flex-1 text-[12px]"
+                <button
+                  className="flex-1 h-9 rounded-xl text-[12px] font-bold text-black transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #facc15, #eab308)" }}
                   onClick={() => selectedVipPlan && vipMutation.mutate(selectedVipPlan)}
                   disabled={!selectedVipPlan || vipMutation.isPending}
                 >
@@ -436,39 +427,39 @@ export default function ProfilePage() {
                   ) : (
                     t("profile.payNow")
                   )}
-                </Button>
+                </button>
               </div>
             </div>
           )}
         </div>
-      </div>
 
-      <div className="px-4" style={{ animation: "fadeSlideIn 0.4s ease-out 0.2s both" }}>
-        <h3 className="text-[13px] font-bold mb-3 text-white/70">{t("profile.menu")}</h3>
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{ border: cardBorder, background: cardBg }}
-        >
-          {MENU_ITEMS.map((item, idx) => (
-            <button
-              key={item.path}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04] ${
-                idx < MENU_ITEMS.length - 1 ? "border-b" : ""
-              }`}
-              style={{ borderColor: "rgba(255,255,255,0.08)" }}
-              onClick={() => navigate(item.path)}
-              data-testid={`menu-${item.path.split("/").pop()}`}
-            >
-              <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(74, 222, 128, 0.12)" }}>
-                <item.icon className="h-4 w-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium text-white/90">{t(item.labelKey)}</div>
-                <div className="text-[11px] text-white/40">{t(item.descKey)}</div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-white/30 shrink-0" />
-            </button>
-          ))}
+        <div className="pt-1">
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            {MENU_ITEMS.map((item, idx) => (
+              <button
+                key={item.path}
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all hover:bg-white/[0.03] active:bg-white/[0.05]"
+                style={{ borderBottom: idx < MENU_ITEMS.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}
+                onClick={() => navigate(item.path)}
+                data-testid={`menu-${item.path.split("/").pop()}`}
+              >
+                <div
+                  className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  <item.icon className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold text-white/90">{t(item.labelKey)}</div>
+                  <div className="text-[10px] text-white/35 mt-0.5">{t(item.descKey)}</div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-white/20 shrink-0" />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
