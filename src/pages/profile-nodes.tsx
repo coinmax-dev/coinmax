@@ -11,6 +11,7 @@ import type { NodeOverview, NodeEarningsRecord, NodeMembership } from "@shared/t
 import { NODE_PLANS, NODE_MILESTONES } from "@/lib/data";
 import { useTranslation } from "react-i18next";
 import { useMaPrice } from "@/hooks/use-ma-price";
+import { NodePurchaseDialog } from "@/components/nodes/node-purchase-section";
 
 type TabKey = "purchase" | "earnings" | "detail";
 
@@ -30,6 +31,8 @@ export default function ProfileNodesPage() {
   const isConnected = !!walletAddr;
   const [activeTab, setActiveTab] = useState<TabKey>("purchase");
   const { formatMA, formatCompactMA } = useMaPrice();
+  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
+  const [purchaseNodeType, setPurchaseNodeType] = useState<"MAX" | "MINI">("MAX");
   const [showRequirementDialog, setShowRequirementDialog] = useState(false);
   const [requirementDialogData, setRequirementDialogData] = useState<{
     rank: string;
@@ -273,7 +276,7 @@ export default function ProfileNodesPage() {
               <button
                 className="rounded-xl py-2.5 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.97]"
                 style={{ background: "linear-gradient(135deg, rgba(74,222,128,0.12), rgba(74,222,128,0.04))", border: "1px solid rgba(74,222,128,0.2)" }}
-                onClick={() => navigate("/profile/nodes")}
+                onClick={() => { setPurchaseNodeType("MAX"); setPurchaseDialogOpen(true); }}
               >
                 <span className="text-[12px] font-bold text-white/90">{t("profile.applyLargeNode")}</span>
                 <ArrowUpRight className="h-3 w-3 text-primary/70" />
@@ -281,7 +284,7 @@ export default function ProfileNodesPage() {
               <button
                 className="rounded-xl py-2.5 px-3 flex items-center justify-center gap-1.5 transition-all active:scale-[0.97]"
                 style={{ background: "linear-gradient(135deg, rgba(74,222,128,0.12), rgba(74,222,128,0.04))", border: "1px solid rgba(74,222,128,0.2)" }}
-                onClick={() => navigate("/profile/nodes")}
+                onClick={() => { setPurchaseNodeType("MINI"); setPurchaseDialogOpen(true); }}
               >
                 <span className="text-[12px] font-bold text-white/90">{t("profile.applySmallNode")}</span>
                 <ArrowUpRight className="h-3 w-3 text-primary/70" />
@@ -591,6 +594,13 @@ export default function ProfileNodesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <NodePurchaseDialog
+        open={purchaseDialogOpen}
+        onOpenChange={setPurchaseDialogOpen}
+        nodeType={purchaseNodeType}
+        walletAddr={walletAddr}
+      />
     </div>
   );
 }

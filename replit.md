@@ -62,11 +62,13 @@ A cryptocurrency trading and portfolio management web application built with Rea
 
 ## Node System
 
-- **Large Node**: $600 contribution (10%, non-refundable) + $6,000 USDC frozen. Daily 0.9% MA earnings. 120-day program with V1→V6 milestones (days 15/30/45/60/90/120). Success at V6 unlocks frozen funds as withdrawable balance.
-- **Small Node**: $100 contribution (10%, non-refundable) + $1,000 USDC frozen. Daily 0.5% MA earnings (locked until milestone met). Day 15: V2 unlocks earnings. Day 90: V4 unlocks frozen amount withdrawal.
+- **Large Node (MAX)**: $600 contribution + $6,000 USDC frozen. Daily 0.9% MA earnings. 120-day program with V1→V6 milestones (days 15/30/45/60/90/120). V5=800U holding. Success at V6 unlocks frozen funds.
+- **Small Node (MINI)**: $100 contribution + $1,000 USDC frozen. Daily 0.5% MA earnings. Day 15: V2 unlocks earnings. Day 90: V4 unlocks frozen amount.
+- **Large Node Purchase Flow**: Multi-step dialog triggered by "Apply Large Node" button. Step 1: Select rank level (V2-V6). Step 2: System checks vault holding + referral requirements with progress bars; if not met, shows CTA to vault/referral page. Step 3: Confirm payment. Small Node skips rank selection.
 - Failure to meet milestones: earnings stopped, frozen funds reclaimed, node qualification cancelled.
 - On-chain payment = contribution + frozen amount (MINI: $1,100, MAX: $6,600)
 - Node data columns: `contribution_amount`, `frozen_amount`, `daily_rate`, `locked_earnings`, `released_earnings`, `available_balance`
+- `NodePurchaseDialog` component in `src/components/nodes/node-purchase-section.tsx` handles both MAX and MINI purchase flows
 
 ## Running
 
