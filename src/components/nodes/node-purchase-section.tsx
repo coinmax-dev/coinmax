@@ -125,6 +125,9 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
           border: "1px solid rgba(255,255,255,0.45)",
           borderRadius: 24,
           boxShadow: "0 25px 60px rgba(0,0,0,0.7), 0 0 40px rgba(74,222,128,0.08)",
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column" as const,
         }}
       >
         <VisuallyHidden.Root>
@@ -218,67 +221,41 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
           )}
         </div>
 
-        <div className="px-5 pb-5 pt-3">
+        <div className="px-5 pb-5 pt-3 overflow-y-auto flex-1" style={{ minHeight: 0 }}>
           {isMAX && step === "select_rank" && (
-            <div className="space-y-2">
-              {MAX_PURCHASABLE_MILESTONES.map((ms, idx) => {
-                const hOk = vaultDeposited >= ms.requiredHolding;
-                const rOk = ms.requiredReferrals === 0 || directNodeReferrals >= ms.requiredReferrals;
-                const ok = hOk && rOk;
-
-                return (
-                  <button
-                    key={ms.rank}
-                    className="w-full rounded-2xl p-3.5 flex items-center gap-3 text-left transition-all active:scale-[0.97] group"
+            <div className="space-y-2.5">
+              {MAX_PURCHASABLE_MILESTONES.map((ms) => (
+                <button
+                  key={ms.rank}
+                  className="w-full rounded-2xl p-3.5 flex items-center gap-3 text-left transition-all active:scale-[0.97] group"
+                  style={{
+                    background: "#1a1a1a",
+                    border: "1px solid rgba(255,255,255,0.4)",
+                  }}
+                  onClick={() => handleRankSelect(ms.rank)}
+                >
+                  <div
+                    className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-[14px] font-black"
                     style={{
-                      background: ok
-                        ? "linear-gradient(135deg, rgba(74,222,128,0.06), rgba(74,222,128,0.02))"
-                        : "#141414",
-                      border: ok
-                        ? "1px solid rgba(74,222,128,0.2)"
-                        : "1px solid rgba(255,255,255,0.06)",
+                      background: "linear-gradient(135deg, #222, #2a2a2a)",
+                      color: "rgba(255,255,255,0.7)",
+                      border: "1px solid rgba(255,255,255,0.15)",
                     }}
-                    onClick={() => handleRankSelect(ms.rank)}
                   >
-                    <div
-                      className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-[14px] font-black transition-all"
-                      style={{
-                        background: ok
-                          ? "linear-gradient(135deg, #166534, #15803d)"
-                          : "linear-gradient(135deg, #1a1a1a, #222)",
-                        boxShadow: ok ? "0 4px 12px rgba(22,101,52,0.3)" : "none",
-                        color: ok ? "#bbf7d0" : "rgba(255,255,255,0.25)",
-                      }}
-                    >
-                      {ms.rank}
+                    {ms.rank}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold text-white group-hover:text-white/90 transition-colors">{ms.desc}</div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Clock className="h-2.5 w-2.5 text-white/35" />
+                      <span className="text-[10px] text-white/45 font-medium">{ms.days}d</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-white/90 group-hover:text-white transition-colors">{ms.desc}</div>
-                      <div className="flex items-center gap-2.5 mt-1">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-2.5 w-2.5 text-white/25" />
-                          <span className="text-[10px] text-white/30">{ms.days}d</span>
-                        </div>
-                        {ms.requiredHolding > 0 && (
-                          <span className={`text-[10px] flex items-center gap-0.5 font-medium ${hOk ? "text-green-400/80" : "text-red-400/70"}`}>
-                            {hOk ? <CheckCircle2 className="h-2.5 w-2.5" /> : <XCircle className="h-2.5 w-2.5" />}
-                            {ms.requiredHolding}U
-                          </span>
-                        )}
-                        {ms.requiredReferrals > 0 && (
-                          <span className={`text-[10px] flex items-center gap-0.5 font-medium ${rOk ? "text-green-400/80" : "text-red-400/70"}`}>
-                            {rOk ? <CheckCircle2 className="h-2.5 w-2.5" /> : <XCircle className="h-2.5 w-2.5" />}
-                            {ms.requiredReferrals} {t("profile.referralsShort")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ background: "rgba(255,255,255,0.04)" }}>
-                      <ChevronRight className="h-3.5 w-3.5 text-white/25 group-hover:text-white/50 transition-colors" />
-                    </div>
-                  </button>
-                );
-              })}
+                  </div>
+                  <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                    <ChevronRight className="h-3.5 w-3.5 text-white/40 group-hover:text-white/70 transition-colors" />
+                  </div>
+                </button>
+              ))}
             </div>
           )}
 
