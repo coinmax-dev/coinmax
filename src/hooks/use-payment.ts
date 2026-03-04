@@ -1,22 +1,21 @@
 import { useState, useCallback } from "react";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
-import { approve } from "thirdweb/extensions/erc20";
+import { approve, transfer } from "thirdweb/extensions/erc20";
 import { prepareContractCall, waitForReceipt } from "thirdweb";
 import { useThirdwebClient } from "./use-thirdweb";
 import {
   getUsdcContract,
   getVaultContract,
   getNodeContract,
-  getVIPContract,
   usdToUsdcUnits,
   VAULT_CONTRACT_ADDRESS,
   NODE_CONTRACT_ADDRESS,
-  VIP_CONTRACT_ADDRESS,
+  VIP_RECEIVER_ADDRESS,
   VAULT_ABI,
   NODE_ABI,
-  VIP_ABI,
   BASE_CHAIN,
 } from "@/lib/contracts";
+import { VIP_PLANS } from "@/lib/data";
 
 export type PaymentStatus =
   | "idle"
@@ -151,22 +150,52 @@ export function usePayment() {
     [client, _executePayment],
   );
 
-  // ── VIP subscribe ──
+  // ── VIP subscribe (x402 direct USDC transfer) ──
   const payVIPSubscribe = useCallback(
-    async (planLabel: string): Promise<string> => {
-      if (!VIP_CONTRACT_ADDRESS) throw new Error("VIP contract not configured");
+    async (planKey: keyof typeof VIP_PLANS): Promise<string> => {
+      if (!VIP_RECEIVER_ADDRESS) throw new Error("VIP receiver address not configured");
       if (!client) throw new Error("Thirdweb client not ready");
-      const prices: Record<string, number> = { monthly: 69, yearly: 899 };
-      const amountUsd = prices[planLabel] || 69;
-      return _executePayment(VIP_CONTRACT_ADDRESS, amountUsd, () =>
-        prepareContractCall({
-          contract: getVIPContract(client),
-          method: VIP_ABI[0],
-          params: [planLabel],
-        }),
-      );
+      if (!account) throw new Error("Wallet not connected");
+
+      const plan = VIP_PLANS[planKey];
+      if (!plan) throw new Error("Invalid VIP plan");
+
+      setStatus("paying");
+      setError(null);
+      setTxHash(null);
+
+      try {
+        const usdcContract = getUsdcContract(client);
+        const tx = transfer({
+          contract: usdcContract,
+          to: VIP_RECEIVER_ADDRESS,
+          amount: plan.price,
+        });
+        const payResult = await sendTransaction(tx);
+
+        setStatus("confirming");
+        const receipt = await waitForReceipt({
+          client,
+          chain: BASE_CHAIN,
+          transactionHash: payResult.transactionHash,
+        });
+
+        if (receipt.status === "reverted") {
+          throw new Error("Transaction reverted");
+        }
+
+        const confirmedHash = receipt.transactionHash;
+        setTxHash(confirmedHash);
+        setStatus("recording");
+        return confirmedHash;
+      } catch (err: any) {
+        const message = err?.message || "Payment failed";
+        setError(message);
+        setStatus("error");
+        throw err;
+      }
     },
-    [client, _executePayment],
+    [account, client, sendTransaction],
   );
 
   return {

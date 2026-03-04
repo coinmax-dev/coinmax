@@ -12,6 +12,7 @@ export const BASE_CHAIN = baseSepolia;
 export const VAULT_CONTRACT_ADDRESS = import.meta.env.VITE_VAULT_CONTRACT_ADDRESS || "";
 export const NODE_CONTRACT_ADDRESS = import.meta.env.VITE_NODE_CONTRACT_ADDRESS || "";
 export const VIP_CONTRACT_ADDRESS = import.meta.env.VITE_VIP_CONTRACT_ADDRESS || "";
+export const VIP_RECEIVER_ADDRESS = import.meta.env.VITE_VIP_RECEIVER_ADDRESS || "";
 
 // Convert USD amount to USDC units (6 decimals)
 export function usdToUsdcUnits(amount: number): bigint {

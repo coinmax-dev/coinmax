@@ -6,13 +6,13 @@ import { useActiveAccount } from "thirdweb/react";
 import { useMaPrice } from "@/hooks/use-ma-price";
 import { Copy, Crown, WalletCards, Wallet, ArrowUpFromLine, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp, Share2, Link2, ArrowLeftRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getProfile, getNodeOverview, getVaultPositions, subscribeVip } from "@/lib/api";
 import type { NodeOverview } from "@shared/types";
 import { queryClient } from "@/lib/queryClient";
 import { usePayment, getPaymentStatusLabel } from "@/hooks/use-payment";
-import { VIP_CONTRACT_ADDRESS } from "@/lib/contracts";
+import { VIP_RECEIVER_ADDRESS } from "@/lib/contracts";
 import { VIP_PLANS } from "@/lib/data";
 import type { Profile } from "@shared/types";
 
@@ -70,14 +70,16 @@ export default function ProfilePage() {
   }, [vaultPositions]);
 
   const payment = usePayment();
+  const [showVipPlans, setShowVipPlans] = useState(false);
+  const [selectedVipPlan, setSelectedVipPlan] = useState<"monthly" | "semiannual" | null>(null);
 
   const vipMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (planKey: "monthly" | "semiannual") => {
       let txHash: string | undefined;
-      if (VIP_CONTRACT_ADDRESS) {
-        txHash = await payment.payVIPSubscribe("monthly");
+      if (VIP_RECEIVER_ADDRESS) {
+        txHash = await payment.payVIPSubscribe(planKey);
       }
-      const result = await subscribeVip(walletAddr, txHash, "monthly");
+      const result = await subscribeVip(walletAddr, txHash, planKey);
       payment.markSuccess();
       return result;
     },
@@ -85,6 +87,8 @@ export default function ProfilePage() {
       toast({ title: t("strategy.vipActivated"), description: t("strategy.vipActivatedDesc") });
       queryClient.invalidateQueries({ queryKey: ["profile", walletAddr] });
       payment.reset();
+      setShowVipPlans(false);
+      setSelectedVipPlan(null);
     },
     onError: (err: Error) => {
       const failedTxHash = payment.txHash;
@@ -93,6 +97,7 @@ export default function ProfilePage() {
         : err.message;
       toast({ title: "Error", description: desc, variant: "destructive" });
       payment.reset();
+      setSelectedVipPlan(null);
     },
   });
 
@@ -349,18 +354,13 @@ export default function ProfilePage() {
                 {isConnected && profile?.isVip ? t("profile.vipActive") : t("profile.upgradeToVip")}
               </span>
             </div>
-            {isConnected && !profile?.isVip && (
+            {isConnected && !profile?.isVip && !showVipPlans && (
               <Button
                 size="sm"
-                onClick={() => vipMutation.mutate()}
-                disabled={vipMutation.isPending}
+                onClick={() => setShowVipPlans(true)}
                 data-testid="button-subscribe-vip"
               >
-                {vipMutation.isPending ? (
-                  <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> {getPaymentStatusLabel(payment.status) || t("common.processing")}</>
-                ) : (
-                  <>{t("profile.subscribeVip")} (${VIP_PLANS.monthly.price})</>
-                )}
+                {t("profile.subscribeVip")}
               </Button>
             )}
             {!isConnected && (
@@ -372,6 +372,67 @@ export default function ProfilePage() {
               </span>
             )}
           </div>
+
+          {isConnected && !profile?.isVip && showVipPlans && (
+            <div className="mt-4 space-y-3">
+              {(Object.keys(VIP_PLANS) as Array<keyof typeof VIP_PLANS>).map((planKey) => {
+                const plan = VIP_PLANS[planKey];
+                const isSelected = selectedVipPlan === planKey;
+                const isPaying = vipMutation.isPending && isSelected;
+                return (
+                  <div
+                    key={planKey}
+                    className="rounded-xl p-3 flex items-center justify-between gap-3 transition-all cursor-pointer"
+                    style={{
+                      border: isSelected ? "1px solid rgba(74, 222, 128, 0.5)" : "1px solid rgba(255,255,255,0.08)",
+                      background: isSelected ? "rgba(74, 222, 128, 0.05)" : "rgba(255,255,255,0.02)",
+                    }}
+                    onClick={() => !vipMutation.isPending && setSelectedVipPlan(planKey)}
+                  >
+                    <div>
+                      <div className="text-[13px] font-semibold text-white/90">
+                        {t(`profile.vipPlan_${planKey}`)}
+                      </div>
+                      <div className="text-[11px] text-white/40 mt-0.5">
+                        {plan.period}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[15px] font-bold text-primary">${plan.price}</div>
+                      {planKey === "semiannual" && (
+                        <div className="text-[10px] text-emerald-400/70 mt-0.5">
+                          {t("profile.vipSave")} ${(VIP_PLANS.monthly.price * 6) - VIP_PLANS.semiannual.price}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 text-[12px]"
+                  onClick={() => { setShowVipPlans(false); setSelectedVipPlan(null); }}
+                  disabled={vipMutation.isPending}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  size="sm"
+                  className="flex-1 text-[12px]"
+                  onClick={() => selectedVipPlan && vipMutation.mutate(selectedVipPlan)}
+                  disabled={!selectedVipPlan || vipMutation.isPending}
+                >
+                  {vipMutation.isPending ? (
+                    <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> {getPaymentStatusLabel(payment.status) || t("common.processing")}</>
+                  ) : (
+                    t("profile.payNow")
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

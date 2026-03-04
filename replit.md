@@ -42,7 +42,15 @@ A cryptocurrency trading and portfolio management web application built with Rea
 
 - Vite dev server runs on port 5000 (host: 0.0.0.0)
 - Environment variables prefixed with `VITE_` are exposed to the frontend
-- Key env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_THIRDWEB_CLIENT_ID`, contract addresses
+- Key env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_THIRDWEB_CLIENT_ID`, contract addresses, `VITE_VIP_RECEIVER_ADDRESS`
+
+## VIP Subscription
+
+- **Monthly**: $39/month (30 days)
+- **Semi-Annual**: $169/6 months (180 days), saves $65
+- Payment: x402-style direct USDC transfer to `VITE_VIP_RECEIVER_ADDRESS` via Thirdweb SDK `transfer()` (no smart contract call needed)
+- Plan selection UI on profile page with expandable card showing both options
+- Backend RPC `subscribe_vip` records plan + tx hash
 
 ## Database (Supabase)
 

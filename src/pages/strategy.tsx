@@ -219,7 +219,7 @@ export default function StrategyPage() {
 
   const vipMutation = useMutation({
     mutationFn: async () => {
-      return subscribeVip(walletAddr);
+      return subscribeVip(walletAddr, undefined, "monthly");
     },
     onSuccess: () => {
       toast({ title: t("strategy.vipActivated"), description: t("strategy.vipActivatedDesc") });
