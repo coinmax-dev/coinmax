@@ -214,7 +214,7 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
                       <div className="flex-1 h-[2px] rounded-full transition-all duration-300" style={{ background: i < stepIndex ? "#22c55e" : "rgba(255,255,255,0.06)" }} />
                     )}
                   </div>
-                  <span className="text-[8px] text-white/25 font-medium whitespace-nowrap">{t(label)}</span>
+                  <span className="text-[9px] text-white/30 font-medium whitespace-nowrap">{t(label)}</span>
                 </div>
               ))}
             </div>
