@@ -141,7 +141,7 @@ export default function ProfileNodesPage() {
             <h1 className="text-[17px] font-bold tracking-wide text-white">{t("profile.nodeDetailsTitle")}</h1>
           </div>
 
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className="text-[14px] font-bold text-white">{t("profile.myNodesLabel")}</span>
               <span
@@ -151,13 +151,37 @@ export default function ProfileNodesPage() {
                 {activeCount} {t("common.active")}
               </span>
             </div>
-            <span
-              className="text-[12px] font-bold px-2.5 py-0.5 rounded-lg"
-              style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.8)" }}
-            >
-              {daysActive}/{totalDays || 0} Day
+            <span className="text-[11px] font-bold text-white/60">
+              {daysActive}/{totalDays || 0} {t("profile.dayUnit")}
             </span>
           </div>
+
+          {totalDays > 0 && (
+            <div className="mb-2">
+              <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                <div
+                  className="h-full rounded-full transition-all duration-700 relative overflow-hidden"
+                  style={{
+                    width: `${Math.min(Math.max((daysActive / totalDays) * 100, 1), 100)}%`,
+                    background: "linear-gradient(90deg, #22c55e, #4ade80)",
+                    boxShadow: "0 0 8px rgba(74,222,128,0.3)",
+                  }}
+                >
+                  <div
+                    className="absolute inset-0 opacity-40"
+                    style={{
+                      background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
+                      animation: "shimmer 2s ease-in-out infinite",
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className="text-[9px] text-white/30">{t("profile.dayZero")}</span>
+                <span className="text-[9px] text-white/30">{totalDays}{t("profile.dayUnit")}</span>
+              </div>
+            </div>
+          )}
 
           {activeNodes.length > 0 && milestones.length > 0 && (
             <div className="mt-3">
