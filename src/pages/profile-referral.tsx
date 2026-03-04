@@ -153,9 +153,9 @@ export default function ProfileReferralPage() {
                   <text x={p.x} y={p.y - 10} textAnchor="middle" fill="rgba(255,255,255,0.7)" fontSize="9" fontWeight="600">{p.label}</text>
                 </g>
               ))}
-              <text x="280" y="58" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V5 Reward 30,000 CRS</text>
-              <text x="320" y="35" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V6 Reward 100,000 CRS</text>
-              <text x="350" y="7" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V7 Reward 300,000 CRS</text>
+              <text x="280" y="58" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V5 Reward 30,000 CMX</text>
+              <text x="320" y="35" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V6 Reward 100,000 CMX</text>
+              <text x="350" y="7" textAnchor="start" fill="rgba(255,255,255,0.3)" fontSize="7">V7 Reward 300,000 CMX</text>
               <text x="350" y="50" fill="rgba(255,255,255,0.2)" fontSize="7">50 people</text>
               <text x="370" y="30" fill="rgba(255,255,255,0.2)" fontSize="7">200 people</text>
             </svg>
