@@ -60,17 +60,17 @@ const CHART_TYPES: { key: ChartType; icon: any; label: string }[] = [
 ];
 
 function getVisibleBars(tf?: ChartTimeframe): number {
-  if (!tf) return 60;
+  if (!tf) return 30;
   switch (tf) {
-    case "1m": return 40;
-    case "5m": return 50;
-    case "15m": return 50;
-    case "30m": return 60;
-    case "1H": return 60;
-    case "4H": return 60;
-    case "1D": return 80;
-    case "1W": return 52;
-    default: return 60;
+    case "1m": return 25;
+    case "5m": return 28;
+    case "15m": return 30;
+    case "30m": return 32;
+    case "1H": return 35;
+    case "4H": return 35;
+    case "1D": return 40;
+    case "1W": return 30;
+    default: return 30;
   }
 }
 
@@ -107,6 +107,7 @@ export function PriceChart({
   const [visible, setVisible] = useState(false);
   const prevChartTypeRef = useRef<ChartType>(chartType);
   const dataVersionRef = useRef(0);
+  const userScrolledRef = useRef(false);
 
   const hasOhlc = !!(ohlcData && ohlcData.length > 0);
   const hasDataNow = hasOhlc || !!(data && data.length > 0);
@@ -186,8 +187,8 @@ export function PriceChart({
         borderColor: "rgba(255, 255, 255, 0.06)",
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 5,
-        barSpacing: 12,
+        rightOffset: 8,
+        barSpacing: 14,
         fixLeftEdge: false,
         fixRightEdge: false,
       },
@@ -246,6 +247,13 @@ export function PriceChart({
       volumeSeriesRef.current = volumeSeries;
     }
 
+    userScrolledRef.current = false;
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      if (dataVersionRef.current > 1) {
+        userScrolledRef.current = true;
+      }
+    });
+
     const handleResize = () => {
       if (chartRef.current && container) {
         chartRef.current.applyOptions({ width: container.clientWidth });
@@ -258,6 +266,11 @@ export function PriceChart({
       resizeObserver.disconnect();
     };
   }, [chartType, destroyChart, hasOhlc]);
+
+  useEffect(() => {
+    userScrolledRef.current = false;
+    dataVersionRef.current = 0;
+  }, [selectedTimeframe]);
 
   useEffect(() => {
     const cleanup = createChartInstance();
@@ -450,11 +463,11 @@ export function PriceChart({
     const forecastBars = saneForecast?.forecastPoints?.length || 0;
     const totalBars = baseBars + forecastBars;
     const visibleBars = getVisibleBars(selectedTimeframe);
-    if (dataVersionRef.current <= 2) {
+    if (!userScrolledRef.current) {
       if (baseBars > visibleBars) {
         chart.timeScale().setVisibleLogicalRange({
-          from: baseBars - visibleBars,
-          to: totalBars + 5,
+          from: totalBars - visibleBars,
+          to: totalBars + 8,
         });
       } else {
         chart.timeScale().fitContent();
