@@ -46,8 +46,8 @@ serve(async (req) => {
     const [fearGreed, currentPrice] = await Promise.all([fetchFearGreedIndex(), fetchCurrentPrice(assetUp)]);
 
     const tfMaxMovePct: Record<string, number> = {
-      "5M": 0.008, "15M": 0.015, "30M": 0.025,
-      "1H": 0.04, "4H": 0.08, "1D": 0.12, "1W": 0.25,
+      "5M": 0.003, "15M": 0.005, "30M": 0.008,
+      "1H": 0.012, "4H": 0.025, "1D": 0.05, "1W": 0.10,
     };
     const maxMovePct = tfMaxMovePct[tf] || 0.05;
     const maxMove = currentPrice * maxMovePct;
@@ -63,7 +63,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You are a crypto market analyst. Analyze the market and provide a prediction in JSON format only. Response must be valid JSON with these fields: prediction (BULLISH/BEARISH/NEUTRAL), confidence (0-100), targetPrice (number), reasoning (1 sentence)." },
+          { role: "system", content: "You are a crypto market analyst. Analyze the market and provide a prediction in JSON format only. Response must be valid JSON with these fields: prediction (BULLISH/BEARISH/NEUTRAL), confidence (0-100), targetPrice (number very close to current price within allowed range), reasoning (1 sentence)." },
           { role: "user", content: `Analyze ${assetUp} at $${currentPrice}. Fear & Greed Index: ${fearGreed.value} (${fearGreed.classification}). Predict the ${tfLabel} price movement. IMPORTANT: targetPrice must be between $${priceFloor.toFixed(2)} and $${priceCeil.toFixed(2)} (max ${(maxMovePct * 100).toFixed(1)}% move for ${tfLabel} timeframe).` },
         ],
         max_tokens: 200,

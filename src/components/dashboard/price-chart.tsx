@@ -333,15 +333,15 @@ export function PriceChart({
     const currentPrice = hasOhlc && ohlcData ? ohlcData[ohlcData.length - 1].close : (data && data.length > 0 ? data[data.length - 1].price : 0);
     const maxDeviationPct = (() => {
       switch (selectedTimeframe) {
-        case "1m": return 0.005;
-        case "5m": return 0.01;
-        case "15m": return 0.02;
-        case "30m": return 0.03;
-        case "1H": return 0.05;
-        case "4H": return 0.10;
-        case "1D": return 0.15;
-        case "1W": return 0.30;
-        default: return 0.10;
+        case "1m": return 0.002;
+        case "5m": return 0.005;
+        case "15m": return 0.008;
+        case "30m": return 0.012;
+        case "1H": return 0.015;
+        case "4H": return 0.03;
+        case "1D": return 0.06;
+        case "1W": return 0.12;
+        default: return 0.03;
       }
     })();
     const maxDeviation = currentPrice * maxDeviationPct;
