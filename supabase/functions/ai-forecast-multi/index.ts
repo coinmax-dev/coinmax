@@ -46,12 +46,14 @@ const tfMinutes: Record<string, number> = {
 
 const SYSTEM_PROMPT =
   "You are a crypto market analyst. Return ONLY a JSON object. " +
-  'Format: {"prediction":"BULLISH","confidence":70,"targetPrice":67000,"reasoning":"one sentence"} ' +
-  "prediction must be BULLISH, BEARISH, or NEUTRAL. confidence 0-100. No markdown, no explanation.";
+  'Format: {"prediction":"BULLISH","confidence":70,"targetPrice":NUMBER,"reasoning":"one sentence"} ' +
+  "prediction must be BULLISH, BEARISH, or NEUTRAL. confidence 0-100. " +
+  "targetPrice MUST be extremely close to the current price — within the allowed range provided. " +
+  "No markdown, no explanation.";
 
 const TF_MAX_MOVE_PCT: Record<string, number> = {
-  "1m": 0.003, "5m": 0.008, "15m": 0.015, "30m": 0.025,
-  "1H": 0.04, "4H": 0.08, "1D": 0.12, "1W": 0.25,
+  "1m": 0.001, "5m": 0.003, "15m": 0.005, "30m": 0.008,
+  "1H": 0.012, "4H": 0.025, "1D": 0.05, "1W": 0.10,
 };
 
 // ── Model definitions ───────────────────────────────
