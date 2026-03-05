@@ -45,6 +45,15 @@ serve(async (req) => {
 
     const [fearGreed, currentPrice] = await Promise.all([fetchFearGreedIndex(), fetchCurrentPrice(assetUp)]);
 
+    const tfMaxMovePct: Record<string, number> = {
+      "5M": 0.008, "15M": 0.015, "30M": 0.025,
+      "1H": 0.04, "4H": 0.08, "1D": 0.12, "1W": 0.25,
+    };
+    const maxMovePct = tfMaxMovePct[tf] || 0.05;
+    const maxMove = currentPrice * maxMovePct;
+    const priceFloor = Math.max(0, currentPrice - maxMove);
+    const priceCeil = currentPrice + maxMove;
+
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
@@ -55,7 +64,7 @@ serve(async (req) => {
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: "You are a crypto market analyst. Analyze the market and provide a prediction in JSON format only. Response must be valid JSON with these fields: prediction (BULLISH/BEARISH/NEUTRAL), confidence (0-100), targetPrice (number), reasoning (1 sentence)." },
-          { role: "user", content: `Analyze ${assetUp} at $${currentPrice}. Fear & Greed Index: ${fearGreed.value} (${fearGreed.classification}). Predict the ${tfLabel} price movement for timeframe ${tf}.` },
+          { role: "user", content: `Analyze ${assetUp} at $${currentPrice}. Fear & Greed Index: ${fearGreed.value} (${fearGreed.classification}). Predict the ${tfLabel} price movement. IMPORTANT: targetPrice must be between $${priceFloor.toFixed(2)} and $${priceCeil.toFixed(2)} (max ${(maxMovePct * 100).toFixed(1)}% move for ${tfLabel} timeframe).` },
         ],
         max_tokens: 200,
         response_format: { type: "json_object" },
@@ -66,11 +75,14 @@ serve(async (req) => {
     const content = result.choices?.[0]?.message?.content || "{}";
     const parsed = JSON.parse(content);
 
+    let targetPrice = Number(parsed.targetPrice) || currentPrice;
+    targetPrice = Math.max(priceFloor, Math.min(priceCeil, targetPrice));
+
     const prediction = {
       asset: assetUp,
       prediction: parsed.prediction || "NEUTRAL",
       confidence: String(parsed.confidence || 50),
-      targetPrice: String(parsed.targetPrice || currentPrice),
+      targetPrice: String(targetPrice),
       currentPrice: String(currentPrice),
       fearGreedIndex: fearGreed.value,
       fearGreedLabel: fearGreed.classification,

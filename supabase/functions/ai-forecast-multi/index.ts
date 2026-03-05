@@ -49,6 +49,11 @@ const SYSTEM_PROMPT =
   'Format: {"prediction":"BULLISH","confidence":70,"targetPrice":67000,"reasoning":"one sentence"} ' +
   "prediction must be BULLISH, BEARISH, or NEUTRAL. confidence 0-100. No markdown, no explanation.";
 
+const TF_MAX_MOVE_PCT: Record<string, number> = {
+  "1m": 0.003, "5m": 0.008, "15m": 0.015, "30m": 0.025,
+  "1H": 0.04, "4H": 0.08, "1D": 0.12, "1W": 0.25,
+};
+
 // ── Model definitions ───────────────────────────────
 
 interface ModelDef {
@@ -196,7 +201,11 @@ serve(async (req) => {
     if (!gatewayBase) throw new Error("CF_AI_GATEWAY_URL must be set");
 
     const [fearGreed, currentPrice] = await Promise.all([fetchFearGreedIndex(), fetchCurrentPrice(assetUp)]);
-    const userPrompt = `Analyze ${assetUp}/USDT at $${currentPrice.toLocaleString()}. Fear & Greed Index: ${fearGreed.value} (${fearGreed.classification}). Predict the ${tfLabel} movement.`;
+    const maxMovePct = TF_MAX_MOVE_PCT[tf] || 0.05;
+    const maxMove = currentPrice * maxMovePct;
+    const priceFloor = Math.max(0, currentPrice - maxMove);
+    const priceCeil = currentPrice + maxMove;
+    const userPrompt = `Analyze ${assetUp}/USDT at $${currentPrice.toLocaleString()}. Fear & Greed Index: ${fearGreed.value} (${fearGreed.classification}). Predict the ${tfLabel} movement. IMPORTANT: targetPrice must be between $${priceFloor.toFixed(2)} and $${priceCeil.toFixed(2)} (max ${(maxMovePct * 100).toFixed(1)}% move for ${tfLabel} timeframe).`;
 
     const activeModels = MODELS.filter(m => m.type !== "openai" || openaiKey);
 
@@ -213,7 +222,13 @@ serve(async (req) => {
       .map(r => {
         const m = r.value;
         if (!m.reasoning && m.prediction === "NEUTRAL" && m.confidence === 50) return null;
-        const target = m.targetPrice > 0 ? m.targetPrice : currentPrice;
+        let target = m.targetPrice > 0 ? m.targetPrice : currentPrice;
+        target = Math.max(priceFloor, Math.min(priceCeil, target));
+        if (target === currentPrice) {
+          const nudge = currentPrice * maxMovePct * 0.3;
+          if (m.prediction === "BULLISH") target = currentPrice + nudge;
+          else if (m.prediction === "BEARISH") target = currentPrice - nudge;
+        }
         return {
           model: m.model,
           asset: assetUp,
@@ -221,7 +236,7 @@ serve(async (req) => {
           direction: m.prediction,
           confidence: m.confidence,
           currentPrice,
-          targetPrice: target,
+          targetPrice: parseFloat(target.toFixed(currentPrice < 1 ? 6 : 2)),
           reasoning: m.reasoning,
           forecastPoints: generateForecastPoints(currentPrice, target, tf),
         };

@@ -46,6 +46,15 @@ serve(async (req) => {
 
     const [fearGreed, currentPrice] = await Promise.all([fetchFearGreedIndex(), fetchCurrentPrice(assetUp)]);
 
+    const tfMaxMovePct: Record<string, number> = {
+      "1m": 0.003, "5m": 0.008, "15m": 0.015, "30m": 0.025,
+      "1H": 0.04, "4H": 0.08, "1D": 0.12, "1W": 0.25,
+    };
+    const maxMovePct = tfMaxMovePct[tf] || 0.05;
+    const maxMove = currentPrice * maxMovePct;
+    const priceFloor = Math.max(0, currentPrice - maxMove);
+    const priceCeil = currentPrice + maxMove;
+
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
@@ -56,7 +65,7 @@ serve(async (req) => {
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: "You are a crypto market analyst. Provide a prediction in JSON: prediction (BULLISH/BEARISH/NEUTRAL), confidence (0-100), targetPrice (number), reasoning (1 sentence)." },
-          { role: "user", content: `Analyze ${assetUp} at $${currentPrice}. FGI: ${fearGreed.value} (${fearGreed.classification}). Predict ${tfLabel} movement.` },
+          { role: "user", content: `Analyze ${assetUp} at $${currentPrice}. FGI: ${fearGreed.value} (${fearGreed.classification}). Predict ${tfLabel} movement. IMPORTANT: targetPrice must be between $${priceFloor.toFixed(2)} and $${priceCeil.toFixed(2)} (max ${(maxMovePct * 100).toFixed(1)}% move for ${tfLabel} timeframe).` },
         ],
         max_tokens: 200,
         response_format: { type: "json_object" },
@@ -67,9 +76,15 @@ serve(async (req) => {
     const content = result.choices?.[0]?.message?.content || "{}";
     const parsed = JSON.parse(content);
 
-    const targetPrice = Number(parsed.targetPrice) || currentPrice;
+    let targetPrice = Number(parsed.targetPrice) || currentPrice;
+    targetPrice = Math.max(priceFloor, Math.min(priceCeil, targetPrice));
     const direction = parsed.prediction || "NEUTRAL";
     const confidence = Number(parsed.confidence) || 50;
+    if (targetPrice === currentPrice) {
+      const nudge = currentPrice * maxMovePct * 0.3;
+      if (direction === "BULLISH") targetPrice = currentPrice + nudge;
+      else if (direction === "BEARISH") targetPrice = currentPrice - nudge;
+    }
 
     const tfMinutes: Record<string, number> = {
       "1m": 1, "5m": 5, "10m": 10, "15m": 15, "30m": 30, "1H": 60, "4H": 240, "1D": 1440, "1W": 10080, "7D": 10080,
