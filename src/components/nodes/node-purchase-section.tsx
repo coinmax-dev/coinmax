@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { Loader2, Zap, ShieldCheck } from "lucide-react";
-import { NODE_PLANS, NODE_MILESTONES } from "@/lib/data";
+import { NODE_PLANS } from "@/lib/data";
 import { usePayment, getPaymentStatusLabel } from "@/hooks/use-payment";
 import { purchaseNode } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
@@ -25,7 +25,6 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
   const plan = NODE_PLANS[nodeType];
   const isMAX = nodeType === "MAX";
   const dailyRate = isMAX ? "0.9%" : "0.5%";
-  const milestones = NODE_MILESTONES[nodeType];
 
   const purchaseMutation = useMutation({
     mutationFn: async () => {
@@ -147,44 +146,6 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
           </div>
 
           <div className="text-[9px] text-green-400/50 text-center mb-4 font-medium">{t("profile.releaseByMA")}</div>
-
-          <div
-            className="rounded-xl p-4 mb-4"
-            style={{ background: "#222", border: "1px solid rgba(255,255,255,0.08)" }}
-          >
-            <div className="text-[10px] text-white/45 font-semibold uppercase tracking-wider mb-3">{t("profile.milestoneSchedule")}</div>
-            <div className="relative">
-              <div
-                className="absolute left-[6px] top-1 bottom-1 w-[2px] rounded-full"
-                style={{ background: "linear-gradient(180deg, #22c55e, rgba(34,197,94,0.15))" }}
-              />
-              <div className="space-y-2.5">
-                {milestones.map((m, i) => (
-                  <div key={i} className="flex items-center gap-3 relative pl-0">
-                    <div
-                      className="w-[14px] h-[14px] rounded-full shrink-0 flex items-center justify-center relative z-10"
-                      style={{
-                        background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                        boxShadow: "0 0 8px rgba(34,197,94,0.3)",
-                      }}
-                    >
-                      <div className="w-[5px] h-[5px] rounded-full bg-white" />
-                    </div>
-                    <div className="flex items-center gap-2 flex-1">
-                      <span
-                        className="text-[11px] font-bold px-2 py-0.5 rounded-md"
-                        style={{ background: "rgba(74,222,128,0.1)", color: "#4ade80" }}
-                      >
-                        {t("profile.dayN", { n: m.days })}
-                      </span>
-                      <span className="text-[11px] text-white/50">→</span>
-                      <span className="text-[12px] font-bold text-white/80">{m.rank}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
 
           <div
             className="rounded-xl p-3.5 mb-4 flex items-center justify-between"
