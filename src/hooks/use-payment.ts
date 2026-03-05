@@ -13,7 +13,8 @@ import {
   VIP_RECEIVER_ADDRESS,
   VAULT_ABI,
   NODE_ABI,
-  BASE_CHAIN,
+  OPBNB_CHAIN,
+  USDT_ADDRESS,
 } from "@/lib/contracts";
 import { VIP_PLANS } from "@/lib/data";
 
@@ -77,7 +78,7 @@ export function usePayment() {
         const approveResult = await sendTransaction(approveTx);
         await waitForReceipt({
           client,
-          chain: BASE_CHAIN,
+          chain: OPBNB_CHAIN,
           transactionHash: approveResult.transactionHash,
         });
 
@@ -90,7 +91,7 @@ export function usePayment() {
         setStatus("confirming");
         const receipt = await waitForReceipt({
           client,
-          chain: BASE_CHAIN,
+          chain: OPBNB_CHAIN,
           transactionHash: payResult.transactionHash,
         });
 
@@ -140,7 +141,7 @@ export function usePayment() {
         prepareContractCall({
           contract: getNodeContract(client),
           method: NODE_ABI[0],
-          params: [nodeType],
+          params: [nodeType, USDT_ADDRESS],
         }),
       );
     },
@@ -173,7 +174,7 @@ export function usePayment() {
         setStatus("confirming");
         const receipt = await waitForReceipt({
           client,
-          chain: BASE_CHAIN,
+          chain: OPBNB_CHAIN,
           transactionHash: payResult.transactionHash,
         });
 

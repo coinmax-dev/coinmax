@@ -5,21 +5,21 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/// @title CoinMax Node Payment
-/// @notice Accepts USDC payments for node memberships (MINI / MAX). Reward logic is off-chain.
-contract CoinMaxNodePayment is Ownable, ReentrancyGuard {
+/// @title CoinMax VIP
+/// @notice Accepts USDC payments for VIP subscriptions (monthly / yearly). Status tracking is off-chain.
+contract CoinMaxVIP is Ownable, ReentrancyGuard {
     IERC20 public immutable usdc;
 
-    struct NodePlan {
+    struct VIPPlan {
         uint256 price; // USDC (6 decimals)
         bool active;
     }
 
-    mapping(string => NodePlan) public nodePlans;
+    mapping(string => VIPPlan) public vipPlans;
 
-    event NodePurchased(
+    event VIPSubscribed(
         address indexed payer,
-        string nodeType,
+        string planLabel,
         uint256 amount,
         uint256 timestamp
     );
@@ -29,23 +29,23 @@ contract CoinMaxNodePayment is Ownable, ReentrancyGuard {
         require(_usdc != address(0), "Invalid USDC");
         usdc = IERC20(_usdc);
 
-        // Initialize node plans
-        nodePlans["MINI"] = NodePlan(1000 * 1e6, true);  // $1,000
-        nodePlans["MAX"]  = NodePlan(6000 * 1e6, true);   // $6,000
+        // Initialize VIP plans
+        vipPlans["monthly"] = VIPPlan(69 * 1e6, true);   // $69/month
+        vipPlans["yearly"]  = VIPPlan(899 * 1e6, true);   // $899/year
     }
 
-    /// @notice Purchase a node membership
-    /// @param nodeType "MINI" or "MAX"
-    function purchaseNode(string calldata nodeType) external nonReentrant {
-        NodePlan storage plan = nodePlans[nodeType];
-        require(plan.price > 0 && plan.active, "Invalid node type");
+    /// @notice Subscribe to VIP
+    /// @param planLabel "monthly" or "yearly"
+    function subscribe(string calldata planLabel) external nonReentrant {
+        VIPPlan storage plan = vipPlans[planLabel];
+        require(plan.price > 0 && plan.active, "Invalid VIP plan");
         require(usdc.transferFrom(msg.sender, address(this), plan.price), "Transfer failed");
-        emit NodePurchased(msg.sender, nodeType, plan.price, block.timestamp);
+        emit VIPSubscribed(msg.sender, planLabel, plan.price, block.timestamp);
     }
 
-    /// @notice Owner updates a node plan price
-    function setPlan(string calldata nodeType, uint256 price, bool active) external onlyOwner {
-        nodePlans[nodeType] = NodePlan(price, active);
+    /// @notice Owner updates a VIP plan price
+    function setPlan(string calldata planLabel, uint256 price, bool active) external onlyOwner {
+        vipPlans[planLabel] = VIPPlan(price, active);
     }
 
     /// @notice Owner withdraws funds

@@ -1,16 +1,18 @@
 import { getContract } from "thirdweb";
-import { baseSepolia } from "thirdweb/chains";
+import { defineChain } from "thirdweb/chains";
 import type { ThirdwebClient } from "thirdweb";
 
-// USDC on Base Sepolia testnet (6 decimals)
-export const USDC_ADDRESS = "0x4dd80edd423658408B99950f85Bc3c98BcFcDfac";
+// opBNB Mainnet
+export const OPBNB_CHAIN = defineChain(204);
+
+// USDT on opBNB (6 decimals)
+export const USDT_ADDRESS = import.meta.env.VITE_USDT_ADDRESS || "0xD23D95445fe424b653b384e063ef47Bf95850dcb";
+export const USDC_ADDRESS = import.meta.env.VITE_USDC_ADDRESS || "0xD23D95445fe424b653b384e063ef47Bf95850dcb";
 export const USDC_DECIMALS = 6;
 
-export const BASE_CHAIN = baseSepolia;
-
-// ── Contract addresses (set via env after deploying each contract) ──
+// ── Contract addresses ──
 export const VAULT_CONTRACT_ADDRESS = import.meta.env.VITE_VAULT_CONTRACT_ADDRESS || "";
-export const NODE_CONTRACT_ADDRESS = import.meta.env.VITE_NODE_CONTRACT_ADDRESS || "";
+export const NODE_CONTRACT_ADDRESS = import.meta.env.VITE_NODE_CONTRACT_ADDRESS || "0x941C3A9459cEe89644996d48A640544DA202ae35";
 export const VIP_CONTRACT_ADDRESS = import.meta.env.VITE_VIP_CONTRACT_ADDRESS || "";
 export const VIP_RECEIVER_ADDRESS = import.meta.env.VITE_VIP_RECEIVER_ADDRESS || "";
 
@@ -20,22 +22,22 @@ export function usdToUsdcUnits(amount: number): bigint {
 }
 
 export function getUsdcContract(client: ThirdwebClient) {
-  return getContract({ client, chain: BASE_CHAIN, address: USDC_ADDRESS });
+  return getContract({ client, chain: OPBNB_CHAIN, address: USDC_ADDRESS });
 }
 
 export function getVaultContract(client: ThirdwebClient) {
   if (!VAULT_CONTRACT_ADDRESS) throw new Error("Vault contract not configured");
-  return getContract({ client, chain: BASE_CHAIN, address: VAULT_CONTRACT_ADDRESS });
+  return getContract({ client, chain: OPBNB_CHAIN, address: VAULT_CONTRACT_ADDRESS });
 }
 
 export function getNodeContract(client: ThirdwebClient) {
   if (!NODE_CONTRACT_ADDRESS) throw new Error("Node contract not configured");
-  return getContract({ client, chain: BASE_CHAIN, address: NODE_CONTRACT_ADDRESS });
+  return getContract({ client, chain: OPBNB_CHAIN, address: NODE_CONTRACT_ADDRESS });
 }
 
 export function getVIPContract(client: ThirdwebClient) {
   if (!VIP_CONTRACT_ADDRESS) throw new Error("VIP contract not configured");
-  return getContract({ client, chain: BASE_CHAIN, address: VIP_CONTRACT_ADDRESS });
+  return getContract({ client, chain: OPBNB_CHAIN, address: VIP_CONTRACT_ADDRESS });
 }
 
 // ── ABIs (minimal, only the pay functions) ──
@@ -59,6 +61,7 @@ export const NODE_ABI = [
     name: "purchaseNode",
     inputs: [
       { name: "nodeType", type: "string", internalType: "string" },
+      { name: "token", type: "address", internalType: "address" },
     ],
     outputs: [],
     stateMutability: "nonpayable",
