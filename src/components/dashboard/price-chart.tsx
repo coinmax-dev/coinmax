@@ -317,10 +317,25 @@ export function PriceChart({
       mainSeries.setData(lineData);
     }
 
-    if (forecast?.forecastPoints?.length && hasOhlc && ohlcData) {
+    const currentPrice = hasOhlc && ohlcData ? ohlcData[ohlcData.length - 1].close : (data && data.length > 0 ? data[data.length - 1].price : 0);
+    const saneForecast = forecast?.forecastPoints?.length && currentPrice > 0
+      ? (() => {
+          const maxDeviation = currentPrice * 0.5;
+          const sanePoints = forecast.forecastPoints.filter(fp =>
+            Math.abs(fp.price - currentPrice) <= maxDeviation
+          );
+          if (sanePoints.length === 0) return null;
+          return { ...forecast, forecastPoints: sanePoints };
+        })()
+      : forecast;
+    const saneTargetPrice = targetPrice && currentPrice > 0 && Math.abs(targetPrice - currentPrice) <= currentPrice * 0.5
+      ? targetPrice
+      : null;
+
+    if (saneForecast?.forecastPoints?.length && hasOhlc && ohlcData) {
       const lastCandle = ohlcData[ohlcData.length - 1];
       const prevPrice = lastCandle.close;
-      const priceSeq = [prevPrice, ...forecast.forecastPoints.map(fp => fp.price)];
+      const priceSeq = [prevPrice, ...saneForecast.forecastPoints.map(fp => fp.price)];
       const isCandleMode = chartType === "candle" || chartType === "bar";
 
       if (isCandleMode) {
