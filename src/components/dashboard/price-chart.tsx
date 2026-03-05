@@ -351,7 +351,7 @@ export function PriceChart({
           wickDownColor: fcBorder,
         });
 
-        const forecastCandles: CandlestickData[] = forecast.forecastPoints.map((fp, i) => {
+        const forecastCandles: CandlestickData[] = saneForecast.forecastPoints.map((fp, i) => {
           const openPrice = priceSeq[i];
           const closePrice = fp.price;
           const diff = Math.abs(closePrice - openPrice);
@@ -371,7 +371,7 @@ export function PriceChart({
 
         forecastCandleSeries.setMarkers([
           {
-            time: toUTC(forecast.forecastPoints[0].timestamp) as UTCTimestamp,
+            time: toUTC(saneForecast.forecastPoints[0].timestamp) as UTCTimestamp,
             position: "aboveBar" as const,
             color: forecastLineColor,
             shape: "arrowDown" as const,
@@ -379,11 +379,11 @@ export function PriceChart({
             size: 1,
           },
           {
-            time: toUTC(forecast.forecastPoints[forecast.forecastPoints.length - 1].timestamp) as UTCTimestamp,
+            time: toUTC(saneForecast.forecastPoints[saneForecast.forecastPoints.length - 1].timestamp) as UTCTimestamp,
             position: "aboveBar" as const,
             color: forecastLineColor,
             shape: "circle" as const,
-            text: formatUSD(forecast.forecastPoints[forecast.forecastPoints.length - 1].price),
+            text: formatUSD(saneForecast.forecastPoints[saneForecast.forecastPoints.length - 1].price),
             size: 1.5,
           },
         ]);
@@ -401,7 +401,7 @@ export function PriceChart({
 
         const fPoints: LineData[] = [
           { time: toUTC(lastCandle.timestamp), value: lastCandle.close },
-          ...forecast.forecastPoints.map(fp => ({
+          ...saneForecast.forecastPoints.map(fp => ({
             time: toUTC(fp.timestamp),
             value: fp.price,
           })),
@@ -410,21 +410,21 @@ export function PriceChart({
         forecastSeriesRef.current = forecastLineSeries;
 
         forecastLineSeries.setMarkers(
-          forecast.forecastPoints.map((fp, i) => ({
+          saneForecast.forecastPoints.map((fp, i) => ({
             time: toUTC(fp.timestamp) as UTCTimestamp,
             position: "aboveBar" as const,
             color: forecastLineColor,
             shape: "circle" as const,
-            text: i === forecast.forecastPoints.length - 1 ? formatUSD(fp.price) : "",
-            size: i === forecast.forecastPoints.length - 1 ? 1.5 : 0.5,
+            text: i === saneForecast.forecastPoints.length - 1 ? formatUSD(fp.price) : "",
+            size: i === saneForecast.forecastPoints.length - 1 ? 1.5 : 0.5,
           })),
         );
       }
     }
 
-    if (targetPrice && mainSeries) {
+    if (saneTargetPrice && mainSeries) {
       forecastPriceLineRef.current = mainSeries.createPriceLine({
-        price: targetPrice,
+        price: saneTargetPrice,
         color: forecastLineColor,
         lineWidth: 1,
         lineStyle: LineStyle.SparseDotted,
@@ -434,7 +434,7 @@ export function PriceChart({
     }
 
     const baseBars = hasOhlc ? ohlcData!.length : (data?.length || 0);
-    const forecastBars = forecast?.forecastPoints?.length || 0;
+    const forecastBars = saneForecast?.forecastPoints?.length || 0;
     const totalBars = baseBars + forecastBars;
     const visibleBars = getVisibleBars(selectedTimeframe);
     if (dataVersionRef.current <= 2) {
