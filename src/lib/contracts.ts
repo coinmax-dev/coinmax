@@ -7,8 +7,7 @@ export const OPBNB_CHAIN = defineChain(204);
 
 // USDT on opBNB (6 decimals)
 export const USDT_ADDRESS = import.meta.env.VITE_USDT_ADDRESS || "0xD23D95445fe424b653b384e063ef47Bf95850dcb";
-export const USDC_ADDRESS = import.meta.env.VITE_USDC_ADDRESS || "0xD23D95445fe424b653b384e063ef47Bf95850dcb";
-export const USDC_DECIMALS = 6;
+export const USDT_DECIMALS = 6;
 
 // ── Contract addresses ──
 export const VAULT_CONTRACT_ADDRESS = import.meta.env.VITE_VAULT_CONTRACT_ADDRESS || "";
@@ -16,13 +15,13 @@ export const NODE_CONTRACT_ADDRESS = import.meta.env.VITE_NODE_CONTRACT_ADDRESS 
 export const VIP_CONTRACT_ADDRESS = import.meta.env.VITE_VIP_CONTRACT_ADDRESS || "";
 export const VIP_RECEIVER_ADDRESS = import.meta.env.VITE_VIP_RECEIVER_ADDRESS || "";
 
-// Convert USD amount to USDC units (6 decimals)
-export function usdToUsdcUnits(amount: number): bigint {
-  return BigInt(Math.round(amount * 10 ** USDC_DECIMALS));
+// Convert USD amount to USDT units (6 decimals)
+export function usdToUsdtUnits(amount: number): bigint {
+  return BigInt(Math.round(amount * 10 ** USDT_DECIMALS));
 }
 
-export function getUsdcContract(client: ThirdwebClient) {
-  return getContract({ client, chain: OPBNB_CHAIN, address: USDC_ADDRESS });
+export function getUsdtContract(client: ThirdwebClient) {
+  return getContract({ client, chain: OPBNB_CHAIN, address: USDT_ADDRESS });
 }
 
 export function getVaultContract(client: ThirdwebClient) {

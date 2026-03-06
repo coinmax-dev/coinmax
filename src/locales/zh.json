@@ -548,7 +548,7 @@
     "rankDescUnlockAll": "{{amount}}U 持仓，解锁全部",
     "directRefs": "直推推荐",
     "milestoneV2Mini": "解锁每日0.5%收益",
-    "milestoneV4Mini": "提取1000 USDC等值MA",
+    "milestoneV4Mini": "提取1000 USDT等值MA",
     "dayUnit": "天",
     "dayZero": "第0天",
     "nodeTotal": "节点总额",

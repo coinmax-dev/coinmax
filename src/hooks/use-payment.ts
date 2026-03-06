@@ -4,10 +4,10 @@ import { approve, transfer } from "thirdweb/extensions/erc20";
 import { prepareContractCall, waitForReceipt } from "thirdweb";
 import { useThirdwebClient } from "./use-thirdweb";
 import {
-  getUsdcContract,
+  getUsdtContract,
   getVaultContract,
   getNodeContract,
-  usdToUsdcUnits,
+  usdToUsdtUnits,
   VAULT_CONTRACT_ADDRESS,
   NODE_CONTRACT_ADDRESS,
   VIP_RECEIVER_ADDRESS,
@@ -49,7 +49,7 @@ export function usePayment() {
   /**
    * Shared approve + call + confirm flow.
    * @param contractAddress - The payment contract to call
-   * @param spenderAddress - Address to approve USDC to
+   * @param spenderAddress - Address to approve USDT to
    * @param amountUsd - USD amount for approval
    * @param prepareTx - Function that prepares the contract call transaction
    */
@@ -67,11 +67,11 @@ export function usePayment() {
       setTxHash(null);
 
       try {
-        const usdcContract = getUsdcContract(client);
+        const usdtContract = getUsdtContract(client);
 
-        // Step 1: Approve USDC spend
+        // Step 1: Approve USDT spend
         const approveTx = approve({
-          contract: usdcContract,
+          contract: usdtContract,
           spender: spenderAddress,
           amount: amountUsd,
         });
@@ -118,7 +118,7 @@ export function usePayment() {
     async (amountUsd: number, planType: string): Promise<string> => {
       if (!VAULT_CONTRACT_ADDRESS) throw new Error("Vault contract not configured");
       if (!client) throw new Error("Thirdweb client not ready");
-      const amount = usdToUsdcUnits(amountUsd);
+      const amount = usdToUsdtUnits(amountUsd);
       return _executePayment(VAULT_CONTRACT_ADDRESS, amountUsd, () =>
         prepareContractCall({
           contract: getVaultContract(client),
@@ -148,7 +148,7 @@ export function usePayment() {
     [client, _executePayment],
   );
 
-  // ── VIP subscribe (x402 direct USDC transfer) ──
+  // ── VIP subscribe (x402 direct USDT transfer) ──
   const payVIPSubscribe = useCallback(
     async (planKey: keyof typeof VIP_PLANS): Promise<string> => {
       if (!VIP_RECEIVER_ADDRESS) throw new Error("VIP receiver address not configured");
@@ -163,9 +163,9 @@ export function usePayment() {
       setTxHash(null);
 
       try {
-        const usdcContract = getUsdcContract(client);
+        const usdtContract = getUsdtContract(client);
         const tx = transfer({
-          contract: usdcContract,
+          contract: usdtContract,
           to: VIP_RECEIVER_ADDRESS,
           amount: plan.price,
         });
@@ -211,7 +211,7 @@ export function usePayment() {
 /** Status label helper for UI */
 export function getPaymentStatusLabel(status: PaymentStatus): string {
   switch (status) {
-    case "approving":  return "Approving USDC...";
+    case "approving":  return "Approving USDT...";
     case "paying":     return "Sending payment...";
     case "confirming": return "Confirming on-chain...";
     case "recording":  return "Recording to database...";

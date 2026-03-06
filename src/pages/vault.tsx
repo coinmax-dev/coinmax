@@ -155,7 +155,7 @@ export default function Vault() {
 
   const depositMutation = useMutation({
     mutationFn: async (data: { walletAddress: string; planType: string; amount: number }) => {
-      // Step 1: On-chain USDC payment (if vault contract is deployed)
+      // Step 1: On-chain USDT payment (if vault contract is deployed)
       let txHash: string | undefined;
       if (VAULT_CONTRACT_ADDRESS) {
         txHash = await payment.payVaultDeposit(data.amount, data.planType);
@@ -212,7 +212,7 @@ export default function Vault() {
     const amount = parseFloat(depositAmount);
     const minAmount = VAULT_PLANS[selectedPlan as keyof typeof VAULT_PLANS]?.minAmount || 50;
     if (!walletAddress || !selectedPlan || isNaN(amount) || amount < minAmount) {
-      toast({ title: t("vault.invalidInput"), description: `Minimum deposit is $${minAmount} USDC`, variant: "destructive" });
+      toast({ title: t("vault.invalidInput"), description: `Minimum deposit is $${minAmount} USDT`, variant: "destructive" });
       return;
     }
     depositMutation.mutate({ walletAddress, planType: selectedPlan, amount });

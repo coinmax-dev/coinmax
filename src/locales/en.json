@@ -548,7 +548,7 @@
     "rankDescUnlockAll": "{{amount}}U holding, unlock all",
     "directRefs": "direct referrals",
     "milestoneV2Mini": "Unlock daily 0.5% earnings",
-    "milestoneV4Mini": "Withdraw 1000 USDC equivalent MA",
+    "milestoneV4Mini": "Withdraw 1000 USDT equivalent MA",
     "dayUnit": " Days",
     "dayZero": "Day 0",
     "nodeTotal": "Node Total",
