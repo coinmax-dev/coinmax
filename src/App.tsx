@@ -29,6 +29,7 @@ import NotFound from "@/pages/not-found";
 
 const wallets = [
   inAppWallet(),
+  createWallet("pro.tokenpocket"),
   createWallet("io.metamask"),
   createWallet("com.coinbase.wallet"),
   createWallet("me.rainbow"),
