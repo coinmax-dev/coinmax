@@ -558,7 +558,8 @@
     "statusActive": "Active",
     "statusPendingMilestones": "Pending Milestones",
     "statusCancelled": "Cancelled",
-    "statusExpired": "Expired"
+    "statusExpired": "Expired",
+    "statusNotStarted": "Not Started"
   },
   "market": {
     "marketAnalysis": "Market Analysis",

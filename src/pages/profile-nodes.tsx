@@ -79,7 +79,7 @@ export default function ProfileNodesPage() {
 
   const releaseStatus = activeNodes.length > 0
     ? activeNodes.some((n) => n.status === "ACTIVE") ? t("profile.releasing") : t("profile.pending")
-    : "--";
+    : t("profile.statusNotStarted");
 
   const getStatusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -356,9 +356,9 @@ export default function ProfileNodesPage() {
                 <span className="text-[11px] sm:text-xs text-white/40 font-medium uppercase tracking-wider">{t("profile.releaseStatus")}</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className={`w-2.5 h-2.5 rounded-full ${releaseStatus !== "--" ? "animate-pulse" : ""}`} style={{
-                  background: releaseStatus !== "--" ? tiffany : "rgba(255,255,255,0.2)",
-                  boxShadow: releaseStatus !== "--" ? `0 0 6px rgba(10,186,181,0.5)` : "none",
+                <div className={`w-2.5 h-2.5 rounded-full ${activeNodes.length > 0 ? "animate-pulse" : ""}`} style={{
+                  background: activeNodes.length > 0 ? tiffany : "rgba(255,255,255,0.2)",
+                  boxShadow: activeNodes.length > 0 ? `0 0 6px rgba(10,186,181,0.5)` : "none",
                 }} />
                 <span className="text-base sm:text-lg font-bold text-white/90">{releaseStatus}</span>
               </div>

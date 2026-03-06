@@ -558,7 +558,8 @@
     "statusActive": "活跃中",
     "statusPendingMilestones": "待达标",
     "statusCancelled": "已取消",
-    "statusExpired": "已过期"
+    "statusExpired": "已过期",
+    "statusNotStarted": "尚未开启"
   },
   "market": {
     "marketAnalysis": "市场分析",
