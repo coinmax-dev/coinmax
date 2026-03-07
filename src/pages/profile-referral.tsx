@@ -405,7 +405,7 @@ export default function ProfileReferralPage() {
                               </div>
                             </div>
                             <span
-                              className="text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0"
+                              className="text-[11px] px-2 py-0.5 rounded font-bold shrink-0"
                               style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)" }}
                             >
                               {sub.rank}

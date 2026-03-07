@@ -772,12 +772,12 @@ export default function MarketPage() {
                           />
                         </span>
                         {isLowest && (
-                          <Badge className="text-[8px] px-1 py-0 h-3.5 bg-emerald-500/20 text-emerald-400 border-emerald-500/30 no-default-hover-elevate no-default-active-elevate">
+                          <Badge className="text-[10px] px-1.5 py-0 h-4 bg-emerald-500/20 text-emerald-400 border-emerald-500/30 no-default-hover-elevate no-default-active-elevate">
                             LOW
                           </Badge>
                         )}
                         {isHighest && (
-                          <Badge className="text-[8px] px-1 py-0 h-3.5 bg-amber-500/20 text-amber-400 border-amber-500/30 no-default-hover-elevate no-default-active-elevate">
+                          <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/20 text-amber-400 border-amber-500/30 no-default-hover-elevate no-default-active-elevate">
                             HIGH
                           </Badge>
                         )}

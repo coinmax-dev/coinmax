@@ -257,7 +257,7 @@ export default function Vault() {
               <div>
                 <div className="text-[12px] text-muted-foreground">{t("vault.accumulatedYield")}</div>
                 <div className="text-2xl font-bold text-neon-value" data-testid="text-my-yield">
-                  {walletAddress ? formatMA(totalYield) : "0.00 AR"}
+                  {walletAddress ? formatMA(totalYield) : "0.00 MA"}
                 </div>
               </div>
             </div>

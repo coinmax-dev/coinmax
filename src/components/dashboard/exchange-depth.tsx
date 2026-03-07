@@ -97,7 +97,7 @@ function DepthBarRow({ ex, mounted, index }: { ex: ExchangeRow; mounted: boolean
       }}
     >
       <span className="w-[60px] shrink-0 text-[11px] font-medium text-foreground/80 truncate">{ex.name}</span>
-      <span className="w-[14px] shrink-0 text-[9px] text-emerald-400/70 font-medium">{t("dashboard.buyLabel")}</span>
+      <span className="w-[18px] shrink-0 text-[11px] text-emerald-400/70 font-medium">{t("dashboard.buyLabel")}</span>
       <span className="w-[36px] shrink-0 text-right"><JitterPercent value={ex.buy} color="#34d399" /></span>
 
       <div className="flex-1 relative h-[18px] min-w-0">
@@ -121,7 +121,7 @@ function DepthBarRow({ ex, mounted, index }: { ex: ExchangeRow; mounted: boolean
       </div>
 
       <span className="w-[36px] shrink-0"><JitterPercent value={ex.sell} color="#f87171" /></span>
-      <span className="w-[14px] shrink-0 text-[9px] text-red-400/70 font-medium text-right">{t("dashboard.sellLabel")}</span>
+      <span className="w-[18px] shrink-0 text-[11px] text-red-400/70 font-medium text-right">{t("dashboard.sellLabel")}</span>
     </div>
   );
 }

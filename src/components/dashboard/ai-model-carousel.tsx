@@ -105,7 +105,7 @@ function MiniGauge({ value, accent, glow }: { value: number; accent: string; glo
           style={{ filter: `drop-shadow(0 0 4px rgba(${glow},0.5))` }}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold tabular-nums" style={{ color: accent }}>{value}</span>
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tabular-nums" style={{ color: accent }}>{value}</span>
     </div>
   );
 }
@@ -211,7 +211,7 @@ function FeaturedCard({
 
             <div className="flex items-center gap-1.5">
               <Target className="h-3 w-3 text-muted-foreground/60" />
-              <span className="text-[9px] text-muted-foreground/60 font-medium">{t("dashboard.target")}</span>
+              <span className="text-[11px] text-muted-foreground/60 font-medium">{t("dashboard.target")}</span>
               <span className="font-mono font-bold text-foreground text-[15px] tracking-tight">
                 {formatUSD(forecast.targetPrice)}
               </span>
@@ -231,7 +231,7 @@ function FeaturedCard({
                 <Sparkles className="inline h-2.5 w-2.5 mr-1 text-amber-400/70 ai-sparkle-icon" />
                 {forecast.reasoning}
               </p>
-              <span className="text-[9px] text-primary/50 mt-1 inline-block font-semibold tracking-wide uppercase">
+              <span className="text-[11px] text-primary/50 mt-1 inline-block font-semibold tracking-wide uppercase">
                 {reasonExpanded ? t("dashboard.showLess") : t("dashboard.readMore")}
               </span>
             </div>
@@ -286,7 +286,7 @@ function CompactModelPill({
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
             <div
-              className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-black shrink-0"
+              className="h-5 w-5 rounded flex items-center justify-center text-[10px] font-black shrink-0"
               style={{
                 background: isActive
                   ? `linear-gradient(135deg, ${meta.accent}, rgba(${meta.glow},0.5))`
@@ -312,11 +312,11 @@ function CompactModelPill({
             ) : (
               <Minus className="h-2.5 w-2.5" style={{ color: dirColor }} />
             )}
-            <span className="text-[8px] font-bold" style={{ color: dirColor }}>
+            <span className="text-[10px] font-bold" style={{ color: dirColor }}>
               {dirLabel}
             </span>
           </div>
-          <span className={`text-[9px] font-mono font-bold ${priceDiff >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
+          <span className={`text-[11px] font-mono font-bold ${priceDiff >= 0 ? "text-[#00e7a0]" : "text-[#ff4976]"}`}>
             {priceDiff >= 0 ? "+" : ""}{priceDiff.toFixed(2)}%
           </span>
         </div>
@@ -448,7 +448,7 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
             <span className="text-[10px] font-extrabold" style={{ color: consensusColor }}>
               {consensusLabel}
             </span>
-            <span className="text-[9px] font-bold text-muted-foreground/50 ml-0.5">{bullCount}/{sorted.length}</span>
+            <span className="text-[11px] font-bold text-muted-foreground/50 ml-0.5">{bullCount}/{sorted.length}</span>
           </div>
         </div>
       </div>

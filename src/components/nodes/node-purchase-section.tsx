@@ -132,20 +132,20 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
         <div className="px-5 pb-5 pt-4 flex-1 node-dialog-scroll" style={{ minHeight: 0, overflowY: "auto" }}>
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="rounded-xl p-3 text-center" style={{ background: "#222", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="text-[9px] text-white/40 mb-1 font-medium">{t("profile.contribution")}</div>
+              <div className="text-[11px] text-white/40 mb-1 font-medium">{t("profile.contribution")}</div>
               <div className="text-[15px] font-bold text-white">${plan.price}</div>
             </div>
             <div className="rounded-xl p-3 text-center" style={{ background: "#222", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="text-[9px] text-white/40 mb-1 font-medium">{t("profile.nodeTotal")}</div>
+              <div className="text-[11px] text-white/40 mb-1 font-medium">{t("profile.nodeTotal")}</div>
               <div className="text-[15px] font-bold text-white">${plan.frozenAmount.toLocaleString()}</div>
             </div>
             <div className="rounded-xl p-3 text-center" style={{ background: "#222", border: "1px solid rgba(74,222,128,0.12)" }}>
-              <div className="text-[9px] text-white/40 mb-1 font-medium">{t("profile.dailyRelease")}</div>
+              <div className="text-[11px] text-white/40 mb-1 font-medium">{t("profile.dailyRelease")}</div>
               <div className="text-[15px] font-bold text-green-400">{dailyRate}</div>
             </div>
           </div>
 
-          <div className="text-[9px] text-green-400/50 text-center mb-4 font-medium">{t("profile.releaseByMA")}</div>
+          <div className="text-[11px] text-green-400/50 text-center mb-4 font-medium">{t("profile.releaseByMA")}</div>
 
           <div
             className="rounded-xl p-3.5 mb-4 flex items-center justify-between"
