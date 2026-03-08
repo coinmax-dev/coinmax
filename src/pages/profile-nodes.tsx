@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveAccount } from "thirdweb/react";
-import { ArrowLeft, ArrowUpRight, WalletCards, Zap, ShieldCheck, ChevronRight, TrendingUp, Lock, Unlock, Award, KeyRound, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, WalletCards, Zap, ShieldCheck, ChevronRight, TrendingUp, Lock, Unlock, Award, KeyRound, Loader2, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { getNodeOverview, getNodeEarningsRecords, getNodeMemberships, getNodeMilestoneRequirements, validateAuthCode } from "@/lib/api";
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { NodePurchaseDialog } from "@/components/nodes/node-purchase-section";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-type TabKey = "purchase" | "earnings" | "detail";
+type TabKey = "purchase" | "earnings";
 
 function getMilestoneDaysLeft(startDate: string | null, deadlineDays: number): number {
   if (!startDate) return deadlineDays;
@@ -103,7 +103,6 @@ export default function ProfileNodesPage() {
   const hasMINI = hasAnyNode;
   const activeCount = activeNodes.length;
   const totalEarnings = Number(overview?.rewards?.totalEarnings || 0);
-  const nodeFrozenTotal = firstNode ? Number((firstNode as any).price || (firstNode as any).frozenAmount || NODE_PLANS[nodeType]?.frozenAmount || 0) : 0;
   const releasedEarnings = Number(overview?.releasedEarnings || overview?.rewards?.fixedYield || 0);
   const availableBalance = Number(overview?.availableBalance || 0);
   const lockedEarnings = Number(overview?.lockedEarnings || 0);
@@ -113,6 +112,7 @@ export default function ProfileNodesPage() {
     ? Math.floor((Date.now() - new Date(firstNode.startDate).getTime()) / (1000 * 60 * 60 * 24))
     : 0;
   const nodeType = (firstNode?.nodeType || "MINI") as keyof typeof NODE_PLANS;
+  const nodeFrozenTotal = firstNode ? Number((firstNode as any).price || NODE_PLANS[nodeType]?.frozenAmount || 0) : 0;
   const totalDays = firstNode ? (NODE_PLANS[nodeType]?.durationDays || 0) : 0;
   const milestones = NODE_MILESTONES[nodeType] || [];
 
@@ -499,7 +499,6 @@ export default function ProfileNodesPage() {
             {([
               { key: "purchase" as TabKey, label: t("profile.purchaseRecords") },
               { key: "earnings" as TabKey, label: t("profile.earningsDetailTab") },
-              { key: "detail" as TabKey, label: t("profile.myDetailTab") },
             ]).map((tab) => (
               <button
                 key={tab.key}
@@ -526,54 +525,77 @@ export default function ProfileNodesPage() {
                   {t("profile.noData")}
                 </div>
               ) : (
-                allMemberships.map((m) => (
+                allMemberships.map((m: any) => (
                   <div
                     key={m.id}
-                    className="rounded-xl p-4 space-y-2.5"
-                    style={{ background: "#0e1216", border: `1px solid ${m.nodeType === "MAX" ? "rgba(10,186,181,0.12)" : "rgba(255,255,255,0.08)"}` }}
+                    className="rounded-xl p-4 space-y-3"
+                    style={{ background: "#0e1216", border: `1px solid ${m.nodeType === "MAX" ? "rgba(10,186,181,0.12)" : "rgba(129,140,248,0.12)"}` }}
                   >
+                    {/* Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: m.nodeType === "MAX" ? "rgba(10,186,181,0.15)" : "rgba(255,255,255,0.06)" }}>
-                          {m.nodeType === "MAX" ? <Zap className="h-4 w-4" style={{ color: tiffanyLight }} /> : <ShieldCheck className="h-4 w-4 text-white/50" />}
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{
+                          background: m.nodeType === "MAX"
+                            ? "linear-gradient(135deg, rgba(10,186,181,0.2), rgba(10,186,181,0.08))"
+                            : "linear-gradient(135deg, rgba(129,140,248,0.2), rgba(129,140,248,0.08))",
+                        }}>
+                          {m.nodeType === "MAX" ? <Zap className="h-4 w-4" style={{ color: tiffanyLight }} /> : <ShieldCheck className="h-4 w-4" style={{ color: "#a5b4fc" }} />}
                         </div>
-                        <span className="text-sm font-bold text-white">
-                          {m.nodeType === "MAX" ? t("profile.applyLargeNode") : t("profile.applySmallNode")}
-                        </span>
+                        <div>
+                          <span className="text-[14px] font-bold text-white">
+                            {m.nodeType === "MAX" ? t("profile.applyLargeNode") : t("profile.applySmallNode")}
+                          </span>
+                          <div className="text-[11px] text-white/30 mt-0.5">{formatDate(m.startDate)}</div>
+                        </div>
                       </div>
-                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold`} style={{
-                        color: m.status === "ACTIVE" ? tiffanyLight :
-                        m.status === "PENDING_MILESTONES" ? "#fde047" :
-                        m.status === "CANCELLED" ? "#f87171" : "rgba(255,255,255,0.35)",
-                        background: m.status === "ACTIVE" ? "rgba(10,186,181,0.12)" :
-                        m.status === "PENDING_MILESTONES" ? "rgba(250,204,21,0.1)" :
-                        m.status === "CANCELLED" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)",
+                      <span className="text-[11px] px-2.5 py-1 rounded-full font-bold" style={{
+                        color: "#fbbf24",
+                        background: "rgba(251,191,36,0.1)",
+                        border: "1px solid rgba(251,191,36,0.2)",
                       }}>
-                        {getStatusLabel(m.status)}
+                        {t("profile.vaultNotActive")}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5 text-xs text-white/45">
-                      <span>{t("profile.contribution")}: {Number(m.contributionAmount || m.depositAmount || 0)} USDT</span>
-                      <span>{t("profile.frozenFunds")}: {Number(m.frozenAmount || 0).toLocaleString()} USDT</span>
-                      <span>{t("profile.startDate")}: {formatDate(m.startDate)}</span>
-                      <span>{t("profile.endDate")}: {formatDate(m.endDate)}</span>
+
+                    {/* Details grid */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div className="text-[10px] text-white/30 mb-0.5">{t("profile.contribution")}</div>
+                        <div className="text-[13px] font-bold text-white">{m.nodeType === "MAX" ? "600" : "100"} USDT</div>
+                      </div>
+                      <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div className="text-[10px] text-white/30 mb-0.5">{t("profile.nodeTotal")}</div>
+                        <div className="text-[13px] font-bold text-white">${Number(m.price || 0).toLocaleString()}</div>
+                      </div>
+                      <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div className="text-[10px] text-white/30 mb-0.5">{t("profile.dailyRelease")}</div>
+                        <div className="text-[13px] font-bold" style={{ color: accentGreen }}>{m.nodeType === "MAX" ? "0.9%" : "0.5%"}</div>
+                      </div>
+                      <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div className="text-[10px] text-white/30 mb-0.5">{t("profile.nodeStatus")}</div>
+                        <div className="text-[13px] font-bold text-amber-400">{t("profile.vaultNotActive")}</div>
+                      </div>
                     </div>
-                    {m.milestones && m.milestones.length > 0 && (
-                      <div className="flex gap-1.5 flex-wrap">
-                        {m.milestones.map((ms, i) => (
-                          <span
-                            key={i}
-                            className="text-[11px] px-2.5 py-1 rounded-md font-bold"
-                            style={{
-                              background: ms.status === "ACHIEVED" ? "rgba(10,186,181,0.12)" :
-                                ms.status === "FAILED" ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.04)",
-                              color: ms.status === "ACHIEVED" ? tiffanyLight :
-                                ms.status === "FAILED" ? "#f87171" : "rgba(255,255,255,0.3)",
-                            }}
+
+                    {/* Tx hash */}
+                    {m.txHash && (
+                      <div className="rounded-lg p-2.5" style={{ background: "rgba(10,186,181,0.04)", border: "1px solid rgba(10,186,181,0.1)" }}>
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[10px] text-white/30 mb-0.5">{t("profile.txHash")}</div>
+                            <div className="text-[11px] font-mono text-white/50 truncate">{m.txHash}</div>
+                          </div>
+                          <a
+                            href={`https://opbnbscan.com/tx/${m.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 ml-2 flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all active:scale-95"
+                            style={{ background: "rgba(10,186,181,0.1)", border: "1px solid rgba(10,186,181,0.2)", color: tiffanyLight }}
                           >
-                            {ms.requiredRank} ({ms.deadlineDays}d)
-                          </span>
-                        ))}
+                            <ExternalLink className="h-3 w-3" />
+                            {t("profile.viewOnChain")}
+                          </a>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -615,69 +637,6 @@ export default function ProfileNodesPage() {
             </div>
           )}
 
-          {/* Detail tab */}
-          {activeTab === "detail" && (
-            <div className="space-y-2">
-              {activeNodes.length === 0 ? (
-                <div className="text-center py-16 text-white/30 text-sm">
-                  {t("profile.noData")}
-                </div>
-              ) : (
-                activeNodes.map((n) => (
-                  <div
-                    key={n.id}
-                    className="rounded-xl p-4 space-y-3"
-                    style={{ background: "#0e1216", border: `1px solid ${n.nodeType === "MAX" ? "rgba(10,186,181,0.12)" : "rgba(255,255,255,0.08)"}` }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: n.nodeType === "MAX" ? "rgba(10,186,181,0.15)" : "rgba(255,255,255,0.06)" }}>
-                          {n.nodeType === "MAX" ? <Zap className="h-4 w-4" style={{ color: tiffanyLight }} /> : <ShieldCheck className="h-4 w-4 text-white/50" />}
-                        </div>
-                        <span className="text-sm font-bold text-white">
-                          {n.nodeType === "MAX" ? t("profile.applyLargeNode") : t("profile.applySmallNode")}
-                        </span>
-                      </div>
-                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold`} style={{
-                        color: n.status === "ACTIVE" ? tiffanyLight : "#fde047",
-                        background: n.status === "ACTIVE" ? "rgba(10,186,181,0.12)" : "rgba(250,204,21,0.1)",
-                      }}>
-                        {getStatusLabel(n.status)}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div className="rounded-lg p-3 text-center" style={{ background: "rgba(10,186,181,0.04)", border: "1px solid rgba(10,186,181,0.08)" }}>
-                        <div className="text-[11px] sm:text-xs text-white/35">{t("profile.frozenFunds")}</div>
-                        <div className="text-base sm:text-lg font-bold text-white">{Number(n.frozenAmount || 0).toLocaleString()}</div>
-                      </div>
-                      <div className="rounded-lg p-3 text-center" style={{ background: "rgba(52,211,153,0.04)", border: "1px solid rgba(52,211,153,0.08)" }}>
-                        <div className="text-[11px] sm:text-xs text-white/35">{t("profile.dailyEarnings")}</div>
-                        <div className="text-base sm:text-lg font-bold" style={{ color: accentGreen }}>{(Number(n.dailyRate || 0) * 100).toFixed(1)}%</div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] sm:text-xs text-white/35">{t("profile.milestoneSchedule")}</span>
-                        <span className="text-xs font-bold text-white/60">{n.milestoneStage}/{n.totalMilestones}</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${n.totalMilestones > 0 ? (n.milestoneStage / n.totalMilestones) * 100 : 0}%`,
-                            background: `linear-gradient(90deg, ${tiffany}, ${accentGreen})`,
-                            boxShadow: `0 0 6px rgba(10,186,181,0.3)`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
         </div>
       )}
 

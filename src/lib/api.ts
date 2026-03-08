@@ -206,7 +206,21 @@ export async function getNodeMemberships(walletAddress: string) {
     .eq("user_id", profile.id)
     .order("start_date", { ascending: false });
   if (error) throw error;
-  return toCamel(data ?? []);
+  const memberships = toCamel(data ?? []);
+
+  // Fetch tx hashes from transactions
+  const { data: txData } = await supabase
+    .from("transactions")
+    .select("tx_hash, created_at")
+    .eq("user_id", profile.id)
+    .eq("type", "NODE_PURCHASE")
+    .order("created_at", { ascending: false });
+  const txRecords = toCamel(txData ?? []);
+
+  return memberships.map((m: any, i: number) => ({
+    ...m,
+    txHash: txRecords[i]?.txHash || null,
+  }));
 }
 
 export async function getNodeOverview(walletAddress: string) {
