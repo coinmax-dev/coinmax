@@ -1,29 +1,37 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, BarChart3, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useGrowingStats } from "@/hooks/use-growing-stats";
 
-function useFloatingValue(min: number, max: number, intervalMs = 2000) {
-  const [value, setValue] = useState(() => min + Math.random() * (max - min));
-  const ref = useRef<ReturnType<typeof setTimeout>>();
+// Deterministic value per hour, changes once per hour
+function seededRandom(seed: number) {
+  const x = Math.sin(seed * 9301 + 49297) * 49297;
+  return x - Math.floor(x);
+}
+
+function getHourlyValue(min: number, max: number, salt: number) {
+  const hourSeed = Math.floor(Date.now() / (1000 * 60 * 60)); // changes every hour
+  return min + seededRandom(hourSeed + salt) * (max - min);
+}
+
+function useHourlyValue(min: number, max: number, salt: number) {
+  const [value, setValue] = useState(() => getHourlyValue(min, max, salt));
   useEffect(() => {
-    const tick = () => {
-      setValue(min + Math.random() * (max - min));
-      ref.current = setTimeout(tick, intervalMs + Math.random() * intervalMs * 0.5);
-    };
-    ref.current = setTimeout(tick, intervalMs);
-    return () => clearTimeout(ref.current);
-  }, [min, max, intervalMs]);
+    // Check every minute if the hour changed
+    const interval = setInterval(() => {
+      setValue(getHourlyValue(min, max, salt));
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [min, max, salt]);
   return value;
 }
 
 export function StrategyHeader() {
   const { t } = useTranslation();
   const { tvlFormatted } = useGrowingStats();
-  const floatingWinRate = useFloatingValue(80, 85, 3000);
-  const floatingMonthlyReturn = useFloatingValue(18, 28, 4000);
+  const floatingWinRate = useHourlyValue(80, 85, 100);
+  const floatingMonthlyReturn = useHourlyValue(25, 35, 200);
 
   return (
     <div className="gradient-green-dark p-4 pt-2 rounded-b-2xl" style={{ animation: "fadeSlideIn 0.4s ease-out" }}>
