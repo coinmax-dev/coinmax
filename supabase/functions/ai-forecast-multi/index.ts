@@ -26,7 +26,10 @@ const PRICE_CACHE_TTL = 30 * 1000; // 30 seconds
 async function fetchFearGreedIndex() {
   if (fgiCache && Date.now() < fgiCache.expiresAt) return fgiCache.data;
   try {
-    const res = await fetch("https://api.alternative.me/fng/?limit=1");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch("https://api.alternative.me/fng/?limit=1", { signal: controller.signal });
+    clearTimeout(timer);
     const data = await res.json();
     const result = { value: parseInt(data.data[0].value), classification: data.data[0].value_classification };
     fgiCache = { data: result, expiresAt: Date.now() + FGI_CACHE_TTL };
@@ -243,32 +246,52 @@ serve(async (req) => {
     const userPrompt = `Analyze ${assetUp}/USDT at $${currentPrice.toLocaleString()}. Fear & Greed Index: ${fearGreed.value} (${fearGreed.classification}). Predict the ${tfLabel} movement. IMPORTANT: targetPrice must be between $${priceFloor.toFixed(2)} and $${priceCeil.toFixed(2)} (max ${(maxMovePct * 100).toFixed(1)}% move for ${tfLabel} timeframe).`;
 
     const activeModels = MODELS.filter(m => m.type !== "openai" || openaiKey);
+    const MIN_MODELS = 3;
 
-    // Per-model timeout — don't let one slow model block everything
-    const MODEL_TIMEOUT = 8000;
-    function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-      return Promise.race([
-        promise,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
-      ]);
+    // Collect results as they arrive — resolve once we have enough
+    function raceForN(promises: Promise<ModelResult>[], minCount: number): Promise<ModelResult[]> {
+      return new Promise((resolve) => {
+        const results: ModelResult[] = [];
+        let settled = 0;
+        const total = promises.length;
+        const needed = Math.min(minCount, total);
+        let resolved = false;
+
+        // Hard deadline: return whatever we have after 10s
+        const deadline = setTimeout(() => {
+          if (!resolved) { resolved = true; resolve(results); }
+        }, 10000);
+
+        for (const p of promises) {
+          p.then((r) => {
+            if (resolved) return;
+            if (r.reasoning && !(r.prediction === "NEUTRAL" && r.confidence === 50)) {
+              results.push(r);
+            }
+            settled++;
+            if (results.length >= needed || settled >= total) {
+              resolved = true; clearTimeout(deadline); resolve(results);
+            }
+          }).catch(() => {
+            settled++;
+            if (!resolved && settled >= total) {
+              resolved = true; clearTimeout(deadline); resolve(results);
+            }
+          });
+        }
+      });
     }
 
-    const results = await Promise.allSettled(
-      activeModels.map(def =>
-        withTimeout(
-          def.type === "openai"
-            ? callOpenAI(gatewayBase, cfToken, openaiKey, def, userPrompt)
-            : callWorkersAI(gatewayBase, cfToken, def, userPrompt),
-          MODEL_TIMEOUT
-        )
-      )
+    const modelPromises = activeModels.map(def =>
+      def.type === "openai"
+        ? callOpenAI(gatewayBase, cfToken, openaiKey, def, userPrompt)
+        : callWorkersAI(gatewayBase, cfToken, def, userPrompt)
     );
 
-    const forecasts = results
-      .filter((r): r is PromiseFulfilledResult<ModelResult> => r.status === "fulfilled")
-      .map(r => {
-        const m = r.value;
-        if (!m.reasoning && m.prediction === "NEUTRAL" && m.confidence === 50) return null;
+    const successResults = await raceForN(modelPromises, MIN_MODELS);
+
+    const forecasts = successResults
+      .map(m => {
         let target = m.targetPrice > 0 ? m.targetPrice : currentPrice;
         target = Math.max(priceFloor, Math.min(priceCeil, target));
         if (target === currentPrice) {
@@ -287,8 +310,7 @@ serve(async (req) => {
           reasoning: m.reasoning,
           forecastPoints: generateForecastPoints(currentPrice, target, tf),
         };
-      })
-      .filter(Boolean);
+      });
 
     if (forecasts.length === 0) throw new Error("All AI models failed");
     forecasts.sort((a, b) => (b?.confidence || 0) - (a?.confidence || 0));
