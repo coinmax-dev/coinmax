@@ -267,7 +267,10 @@ function Header() {
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-4 lg:px-8 py-2.5 lg:py-3 border-b border-border/40 bg-background/90 backdrop-blur-xl">
       <Link href="/" className="flex items-center cursor-pointer" data-testid="link-logo-home">
-        <img src="/LOGO.png" alt="Logo" className="h-8 lg:h-9" style={{ mixBlendMode: "screen" }} />
+        <img src="/logo-rmbg.png" alt="Logo" className="h-8 lg:h-9" />
+        <span className="font-display text-sm lg:text-base font-bold tracking-widest text-foreground ml-1.5">
+          Coin<span className="text-primary">Max</span>
+        </span>
       </Link>
 
       {isLoading || !client ? (
