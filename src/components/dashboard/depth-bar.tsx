@@ -38,15 +38,16 @@ function AnimatedPercent({ value, color, suffix = "%" }: { value: number; color:
 
   useEffect(() => {
     const tick = () => {
-      setDisplay(prev => {
-        const jitter = (Math.random() - 0.5) * 0.6;
-        return Math.max(0, Math.min(100, prev + jitter));
+      setDisplay(() => {
+        // Big random swings around the real value, ±8 range
+        const swing = (Math.random() - 0.5) * 16;
+        return Math.max(5, Math.min(95, value + swing));
       });
-      tickRef.current = setTimeout(tick, 30 + Math.random() * 50);
+      tickRef.current = setTimeout(tick, 80 + Math.random() * 150);
     };
-    tickRef.current = setTimeout(tick, 30 + Math.random() * 50);
+    tickRef.current = setTimeout(tick, 80 + Math.random() * 150);
     return () => clearTimeout(tickRef.current);
-  }, []);
+  }, [value]);
 
   return (
     <span className="font-mono font-bold tabular-nums transition-colors duration-300" style={{ color }}>
@@ -112,12 +113,13 @@ export function DepthBar({ buyPercent, sellPercent, isLoading, fearGreedIndex, f
   useEffect(() => {
     const oscillate = () => {
       setBuyWidth(() => {
-        const jitter = (Math.random() - 0.5) * 1.8;
-        return Math.max(0.5, Math.min(99.5, buyNum + jitter));
+        // Wide swings ±8% around real value for dramatic movement
+        const swing = (Math.random() - 0.5) * 16;
+        return Math.max(10, Math.min(90, buyNum + swing));
       });
-      tickRef.current = setTimeout(oscillate, 30 + Math.random() * 50);
+      tickRef.current = setTimeout(oscillate, 100 + Math.random() * 200);
     };
-    tickRef.current = setTimeout(oscillate, 30 + Math.random() * 50);
+    tickRef.current = setTimeout(oscillate, 100 + Math.random() * 200);
     return () => clearTimeout(tickRef.current);
   }, [buyNum]);
 
