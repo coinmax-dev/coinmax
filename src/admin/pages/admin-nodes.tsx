@@ -45,7 +45,7 @@ export default function AdminNodes() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [batchCount, setBatchCount] = useState("10");
   const [batchPrefix, setBatchPrefix] = useState("");
-  const [batchNodeType, setBatchNodeType] = useState("light");
+  const [batchNodeType, setBatchNodeType] = useState("MAX");
 
   const { data: nodeData, isLoading: nodesLoading } = useQuery({
     queryKey: ["admin", "node-memberships", nodePage],
@@ -71,7 +71,7 @@ export default function AdminNodes() {
       queryClient.invalidateQueries({ queryKey: ["admin", "auth-codes"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "auth-code-stats"] });
       setDialogOpen(false);
-      setBatchCount("10"); setBatchPrefix(""); setBatchNodeType("light");
+      setBatchCount("10"); setBatchPrefix(""); setBatchNodeType("MAX");
     },
   });
 
@@ -138,7 +138,7 @@ export default function AdminNodes() {
                   {memberships.length === 0 ? (
                     <TableRow><TableCell colSpan={6} className="text-center text-foreground/40 py-8">暂无数据</TableCell></TableRow>
                   ) : memberships.map((n: any) => (
-                    <TableRow key={n.id} className="border-border/10">
+                    <TableRow key={n.id} className="border-border/10 hover:bg-white/[0.015]">
                       <TableCell className="font-mono text-xs text-foreground/70">{shortenAddress(n.userWallet ?? n.userId)}</TableCell>
                       <TableCell><Badge variant="outline" className="text-xs capitalize">{n.nodeType}</Badge></TableCell>
                       <TableCell className="text-foreground/70">{formatUSD(Number(n.price))}</TableCell>
@@ -240,7 +240,7 @@ export default function AdminNodes() {
                   {codes.length === 0 ? (
                     <TableRow><TableCell colSpan={7} className="text-center text-foreground/40 py-8">暂无授权码</TableCell></TableRow>
                   ) : codes.map((c: any) => (
-                    <TableRow key={c.id} className="border-border/10">
+                    <TableRow key={c.id} className="border-border/10 hover:bg-white/[0.015]">
                       <TableCell className="font-mono text-xs text-foreground/70 font-semibold">{c.code}</TableCell>
                       <TableCell><Badge variant="outline" className="text-xs capitalize">{c.nodeType}</Badge></TableCell>
                       <TableCell>{codeBadge(c.status)}</TableCell>
@@ -293,9 +293,7 @@ export default function AdminNodes() {
               <Select value={batchNodeType} onValueChange={setBatchNodeType}>
                 <SelectTrigger className="bg-background/50 border-border/30"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="light">Light</SelectItem>
-                  <SelectItem value="standard">Standard</SelectItem>
-                  <SelectItem value="super">Super</SelectItem>
+                  <SelectItem value="MAX">大节点 (MAX)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
