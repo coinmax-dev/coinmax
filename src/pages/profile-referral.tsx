@@ -374,6 +374,9 @@ export default function ProfileReferralPage() {
                         <div className="text-[12px] font-mono text-white/80 truncate">
                           {shortenAddress(ref.walletAddress)}
                         </div>
+                        <div className="text-[10px] text-white/35 mt-0.5">
+                          {t("profile.teamPerformance")}: {formatCompact(Number(ref.totalDeposited || 0))}
+                        </div>
                       </div>
                       <span
                         className="text-[10px] px-2 py-0.5 rounded-md font-bold shrink-0"
@@ -402,6 +405,9 @@ export default function ProfileReferralPage() {
                             <div className="flex-1 min-w-0">
                               <div className="text-[11px] font-mono text-white/60 truncate">
                                 {shortenAddress(sub.walletAddress)}
+                              </div>
+                              <div className="text-[10px] text-white/25 mt-0.5">
+                                {formatCompact(Number(sub.totalDeposited || 0))}
                               </div>
                             </div>
                             <span
