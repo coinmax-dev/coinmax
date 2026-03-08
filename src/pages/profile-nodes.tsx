@@ -103,6 +103,7 @@ export default function ProfileNodesPage() {
   const hasMINI = hasAnyNode;
   const activeCount = activeNodes.length;
   const totalEarnings = Number(overview?.rewards?.totalEarnings || 0);
+  const nodeFrozenTotal = firstNode ? Number((firstNode as any).price || (firstNode as any).frozenAmount || NODE_PLANS[nodeType]?.frozenAmount || 0) : 0;
   const releasedEarnings = Number(overview?.releasedEarnings || overview?.rewards?.fixedYield || 0);
   const availableBalance = Number(overview?.availableBalance || 0);
   const lockedEarnings = Number(overview?.lockedEarnings || 0);
@@ -446,7 +447,7 @@ export default function ProfileNodesPage() {
                 <TrendingUp className="h-4 w-4" style={{ color: tiffanyLight }} />
                 <span className="text-[11px] sm:text-xs text-white/40 font-medium uppercase tracking-wider">{t("profile.nodeTotalAmount")}</span>
               </div>
-              <div className="text-xl sm:text-2xl font-black text-white">${totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-xl sm:text-2xl font-black text-white">${nodeFrozenTotal.toLocaleString()}</div>
             </div>
 
             <div className="rounded-2xl p-4 sm:p-5 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0e1a18, #0e1216)", border: `1px solid rgba(52,211,153,0.12)` }}>
