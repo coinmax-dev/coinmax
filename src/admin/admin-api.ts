@@ -368,13 +368,9 @@ export async function adminCreateAuthCode(
   return toCamel(data);
 }
 
-function generateRandomCode(prefix: string, length = 8): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let result = prefix ? `${prefix}-` : "";
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+function generateRandomCode(_prefix: string): string {
+  // 6-digit pure numeric code
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 export async function adminBatchCreateAuthCodes(

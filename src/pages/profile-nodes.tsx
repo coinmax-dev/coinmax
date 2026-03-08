@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveAccount } from "thirdweb/react";
-import { ArrowLeft, ArrowUpRight, WalletCards, Zap, ShieldCheck, ChevronRight, TrendingUp, Lock, Unlock, Award } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, WalletCards, Zap, ShieldCheck, ChevronRight, TrendingUp, Lock, Unlock, Award, KeyRound, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { getNodeOverview, getNodeEarningsRecords, getNodeMemberships, getNodeMilestoneRequirements } from "@/lib/api";
+import { getNodeOverview, getNodeEarningsRecords, getNodeMemberships, getNodeMilestoneRequirements, validateAuthCode } from "@/lib/api";
 import type { NodeOverview, NodeEarningsRecord, NodeMembership } from "@shared/types";
 import { NODE_PLANS, NODE_MILESTONES } from "@/lib/data";
 import { useTranslation } from "react-i18next";
 import { useMaPrice } from "@/hooks/use-ma-price";
 import { useToast } from "@/hooks/use-toast";
 import { NodePurchaseDialog } from "@/components/nodes/node-purchase-section";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 type TabKey = "purchase" | "earnings" | "detail";
 
@@ -33,6 +34,40 @@ export default function ProfileNodesPage() {
   const { formatMA, formatCompactMA } = useMaPrice();
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
   const [purchaseNodeType, setPurchaseNodeType] = useState<"MAX" | "MINI">("MAX");
+
+  // Auth code step for MAX nodes
+  const [authCodeDialogOpen, setAuthCodeDialogOpen] = useState(false);
+  const [authCodeInput, setAuthCodeInput] = useState("");
+  const [authCodeError, setAuthCodeError] = useState("");
+  const [authCodeLoading, setAuthCodeLoading] = useState(false);
+  const [validatedAuthCode, setValidatedAuthCode] = useState("");
+
+  const handleMaxNodeClick = () => {
+    setAuthCodeInput("");
+    setAuthCodeError("");
+    setAuthCodeDialogOpen(true);
+  };
+
+  const handleAuthCodeSubmit = async () => {
+    if (authCodeInput.length !== 6) return;
+    setAuthCodeLoading(true);
+    setAuthCodeError("");
+    try {
+      const valid = await validateAuthCode(authCodeInput);
+      if (valid) {
+        setValidatedAuthCode(authCodeInput);
+        setAuthCodeDialogOpen(false);
+        setPurchaseNodeType("MAX");
+        setPurchaseDialogOpen(true);
+      } else {
+        setAuthCodeError(t("profile.authCodeInvalid"));
+      }
+    } catch {
+      setAuthCodeError(t("profile.authCodeInvalid"));
+    } finally {
+      setAuthCodeLoading(false);
+    }
+  };
 
   const { data: overview, isLoading } = useQuery<NodeOverview>({
     queryKey: ["node-overview", walletAddr],
@@ -295,7 +330,7 @@ export default function ProfileNodesPage() {
                 border: "2px solid rgba(255,255,255,0.5)",
                 boxShadow: "0 6px 0 #0a4f4a, 0 8px 20px rgba(13,148,136,0.4), 0 0 30px rgba(20,184,166,0.2), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.2)",
               }}
-              onClick={() => { setPurchaseNodeType("MAX"); setPurchaseDialogOpen(true); }}
+              onClick={handleMaxNodeClick}
             >
               {/* Glow */}
               <div className="node-btn-glow absolute -top-6 -right-6 w-32 h-32" style={{ background: "radial-gradient(circle, rgba(94,234,212,0.5), transparent 60%)", filter: "blur(20px)" }} />
@@ -614,11 +649,74 @@ export default function ProfileNodesPage() {
         </div>
       )}
 
+      {/* Auth code dialog for MAX nodes */}
+      <Dialog open={authCodeDialogOpen} onOpenChange={setAuthCodeDialogOpen}>
+        <DialogContent
+          className="w-[calc(100vw-32px)] max-w-[340px] p-0 overflow-hidden"
+          style={{
+            background: "#1a1a1a",
+            border: "1px solid rgba(10,186,181,0.3)",
+            borderRadius: 20,
+            boxShadow: "0 25px 60px rgba(0,0,0,0.7), 0 0 40px rgba(10,186,181,0.1)",
+          }}
+        >
+          <DialogTitle className="sr-only">{t("profile.authCodeLabel")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("profile.authCodeRequired")}</DialogDescription>
+          <div className="px-5 pt-6 pb-2">
+            <div className="text-center mb-4">
+              <div
+                className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #0abab5, #34d399)", boxShadow: "0 4px 15px rgba(10,186,181,0.4)" }}
+              >
+                <KeyRound className="h-5 w-5 text-white" />
+              </div>
+              <h3 className="text-[16px] font-bold text-white">{t("profile.authCodeLabel")}</h3>
+              <p className="text-[11px] text-white/40 mt-1">{t("profile.authCodeRequired")}</p>
+            </div>
+          </div>
+          <div className="px-5 pb-6 space-y-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={authCodeInput}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                setAuthCodeInput(v);
+                setAuthCodeError("");
+              }}
+              placeholder="000000"
+              className="w-full h-14 rounded-xl px-4 text-[24px] font-mono font-bold text-white placeholder:text-white/15 outline-none text-center tracking-[0.5em]"
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: authCodeError ? "2px solid rgba(239,68,68,0.6)" : "2px solid rgba(10,186,181,0.25)",
+                boxShadow: authCodeError ? "0 0 12px rgba(239,68,68,0.1)" : "0 0 12px rgba(10,186,181,0.08)",
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleAuthCodeSubmit()}
+              autoFocus
+            />
+            {authCodeError && <p className="text-[12px] text-red-400 text-center">{authCodeError}</p>}
+            <button
+              onClick={handleAuthCodeSubmit}
+              disabled={authCodeLoading || authCodeInput.length !== 6}
+              className="w-full h-12 rounded-xl text-[14px] font-bold text-white transition-all active:scale-[0.97] disabled:opacity-40"
+              style={{
+                background: "linear-gradient(135deg, #0abab5, #34d399)",
+                boxShadow: "0 4px 15px rgba(10,186,181,0.3)",
+              }}
+            >
+              {authCodeLoading ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : t("common.confirm")}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <NodePurchaseDialog
         open={purchaseDialogOpen}
         onOpenChange={setPurchaseDialogOpen}
         nodeType={purchaseNodeType}
         walletAddr={walletAddr}
+        authCode={validatedAuthCode}
       />
     </div>
   );

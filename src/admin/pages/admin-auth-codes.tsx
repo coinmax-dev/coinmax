@@ -220,16 +220,12 @@ export default function AdminAuthCodes() {
         <DialogContent className="max-w-[340px] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>批量生成授权码</DialogTitle>
-            <DialogDescription>生成格式: 前缀 + 8位随机字符</DialogDescription>
+            <DialogDescription>生成6位纯数字授权码</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground/70">数量</label>
               <Input type="number" min={1} max={100} value={batchCount} onChange={(e) => setBatchCount(e.target.value)} placeholder="10" className="bg-background/50 border-border/30" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground/70">前缀 <span className="text-foreground/30">(可选)</span></label>
-              <Input value={batchPrefix} onChange={(e) => setBatchPrefix(e.target.value.toUpperCase())} placeholder="例如 AX" className="bg-background/50 border-border/30" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground/70">节点类型</label>
