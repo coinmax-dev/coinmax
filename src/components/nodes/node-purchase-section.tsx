@@ -180,15 +180,15 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
             className="rounded-xl p-3.5 mb-4 space-y-2"
             style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.12)" }}
           >
-            <div className="text-[12px] font-bold text-white/60 mb-2">{isMAX ? "大节点权益" : "小节点权益"}</div>
+            <div className="text-[12px] font-bold text-white/60 mb-2">{t("profile.nodeBenefitsTitle", { type: isMAX ? t("profile.applyLargeNode") : t("profile.applySmallNode") })}</div>
             {(isMAX ? [
-              "直升V6节点资格",
-              "入会推送6,000 USDT收益资金",
-              "每日收益约0.9%，自动转入可用余额",
+              t("profile.maxBenefit1"),
+              t("profile.maxBenefit2"),
+              t("profile.maxBenefit3"),
             ] : [
-              "直升V4节点资格",
-              "入会推送1,000 USDT收益资金",
-              "每日收益约0.9%，自动转入可用余额",
+              t("profile.miniBenefit1"),
+              t("profile.miniBenefit2"),
+              t("profile.miniBenefit3"),
             ]).map((text, i) => (
               <div key={i} className="flex items-start gap-2">
                 <div className="w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0 mt-px" style={{ background: "rgba(74,222,128,0.15)" }}>
