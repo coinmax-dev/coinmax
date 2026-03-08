@@ -924,6 +924,16 @@ export async function getAiForecastMulti(asset: string, timeframe: string, lang?
   return data;
 }
 
+export async function getAiForecastSingle(asset: string, timeframe: string, model: string, lang?: string) {
+  const { data, error } = await supabase.functions.invoke("ai-forecast-multi", {
+    body: { asset, timeframe, model, lang: lang || "en" },
+  });
+  if (error) throw error;
+  return data;
+}
+
+export const AI_MODEL_LABELS = ["GPT-4o", "DeepSeek", "Llama 3.1", "Gemini", "Grok"] as const;
+
 export async function getAiFearGreed() {
   const { data, error } = await supabase.functions.invoke("ai-fear-greed");
   if (error) throw error;

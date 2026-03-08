@@ -1,9 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
-import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { ASSET_IDS } from "@/lib/constants";
-import { fetchExchangeDepth, getAiForecastMulti } from "@/lib/api";
+import { fetchExchangeDepth, getAiForecastSingle, AI_MODEL_LABELS } from "@/lib/api";
 import { useCryptoPrices, useBinanceKlines, useOrderBook } from "@/hooks/use-crypto-price";
 import type { ChartTimeframe } from "@/hooks/use-crypto-price";
 import { PriceHeader } from "@/components/dashboard/price-header";
@@ -39,7 +38,6 @@ export default function Dashboard() {
   const [selectedAsset, setSelectedAsset] = useState("BTC");
   const [selectedTimeframe, setSelectedTimeframe] = useState<ChartTimeframe>("1H");
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  const coinId = ASSET_IDS[selectedAsset] || "bitcoin";
 
   const { data: prices, isLoading: pricesLoading } = useCryptoPrices();
   const { data: klineData, isLoading: chartLoading } = useBinanceKlines(selectedAsset, selectedTimeframe);
@@ -73,46 +71,43 @@ export default function Dashboard() {
 
   const queryClient = useQueryClient();
 
-  const forecastCacheKey = `forecast:${selectedAsset}:${selectedTimeframe}`;
-
-  const { data: multiResult, isLoading: forecastLoading } = useQuery<MultiForecastResponse>({
-    queryKey: ["ai-forecast-multi", selectedAsset, selectedTimeframe, lang],
-    queryFn: async () => {
-      const result = await getAiForecastMulti(selectedAsset, selectedTimeframe, lang);
-      // Persist to localStorage for instant display on next visit
-      try { localStorage.setItem(forecastCacheKey, JSON.stringify(result)); } catch {}
-      return result;
-    },
-    staleTime: 3 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
-    placeholderData: (prev) => {
-      if (prev) return prev;
-      // Restore from localStorage on first load
-      try {
-        const cached = localStorage.getItem(forecastCacheKey);
-        if (cached) return JSON.parse(cached);
-      } catch {}
-      return undefined;
-    },
-    retry: 1,
+  // Fire parallel per-model queries — each model shows as soon as it returns
+  const modelQueries = useQueries({
+    queries: AI_MODEL_LABELS.map((modelLabel) => {
+      const lsCacheKey = `forecast:${selectedAsset}:${selectedTimeframe}:${modelLabel}`;
+      return {
+        queryKey: ["ai-forecast-single", selectedAsset, selectedTimeframe, modelLabel, lang],
+        queryFn: async () => {
+          const result = await getAiForecastSingle(selectedAsset, selectedTimeframe, modelLabel, lang);
+          const forecast = result?.forecasts?.[0] || null;
+          if (forecast) try { localStorage.setItem(lsCacheKey, JSON.stringify(forecast)); } catch {}
+          return forecast as ForecastResponse | null;
+        },
+        staleTime: 3 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchInterval: 5 * 60 * 1000,
+        placeholderData: (prev: ForecastResponse | null | undefined) => {
+          if (prev) return prev;
+          try {
+            const cached = localStorage.getItem(lsCacheKey);
+            if (cached) return JSON.parse(cached) as ForecastResponse;
+          } catch {}
+          return undefined;
+        },
+        retry: 1,
+      };
+    }),
   });
 
-  // Prefetch adjacent timeframes for instant switching
-  const TIMEFRAMES: ChartTimeframe[] = ["1m", "5m", "15m", "30m", "1H", "4H", "1D", "1W"];
-  useEffect(() => {
-    const idx = TIMEFRAMES.indexOf(selectedTimeframe);
-    const adjacent = [TIMEFRAMES[idx - 1], TIMEFRAMES[idx + 1]].filter(Boolean) as ChartTimeframe[];
-    for (const tf of adjacent) {
-      queryClient.prefetchQuery({
-        queryKey: ["ai-forecast-multi", selectedAsset, tf, lang],
-        queryFn: () => getAiForecastMulti(selectedAsset, tf, lang),
-        staleTime: 3 * 60 * 1000,
-      });
-    }
-  }, [selectedAsset, selectedTimeframe, lang]);
+  // Merge all resolved forecasts into a single list (updates progressively)
+  const allForecasts = useMemo(() => {
+    return modelQueries
+      .map(q => q.data)
+      .filter((f): f is ForecastResponse => !!f && !!f.model)
+      .sort((a, b) => b.confidence - a.confidence);
+  }, [modelQueries.map(q => q.data)]);
 
-  const allForecasts = multiResult?.forecasts || [];
+  const forecastLoading = modelQueries.every(q => q.isLoading);
 
   // Determine which forecast to display on chart
   const activeForecast = useMemo(() => {

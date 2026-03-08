@@ -1,4 +1,4 @@
-import { Switch, Route, Link } from "wouter";
+import { Switch, Route, Link, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { authWallet, getProfile, getProfileByRefCode } from "./lib/api";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -26,6 +26,7 @@ import ProfileNodesPage from "@/pages/profile-nodes";
 import ProfileNodeEarningsPage from "@/pages/profile-node-earnings";
 import ProfileSwapPage from "@/pages/profile-swap";
 import MarketPage from "@/pages/market";
+import AdminApp from "@/admin/admin-app";
 import NotFound from "@/pages/not-found";
 
 const wallets = [
@@ -345,27 +346,40 @@ function AppMain() {
   );
 }
 
-function App() {
+function MainApp() {
   return (
     <ThirdwebProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            <Header />
-            <div className="flex">
-              {/* Desktop sidebar - hidden on mobile */}
-              <DesktopSidebar />
-              {/* Main content */}
-              <AppMain />
-            </div>
-            {/* Mobile bottom nav - hidden on desktop */}
-            <BottomNav />
-            <WalletSync />
-          </div>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <div className="min-h-screen bg-background text-foreground">
+        <Header />
+        <div className="flex">
+          <DesktopSidebar />
+          <AppMain />
+        </div>
+        <BottomNav />
+        <WalletSync />
+      </div>
     </ThirdwebProvider>
+  );
+}
+
+function RootRouter() {
+  const [location] = useLocation();
+
+  if (location.startsWith("/admin")) {
+    return <AdminApp />;
+  }
+
+  return <MainApp />;
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <RootRouter />
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 

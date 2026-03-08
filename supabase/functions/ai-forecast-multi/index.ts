@@ -214,13 +214,14 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { asset, timeframe } = await req.json();
+    const { asset, timeframe, model: modelLabel } = await req.json();
     const assetUp = (asset || "BTC").toUpperCase();
     const tf = timeframe || "1H";
     const tfLabel = TIMEFRAME_LABELS[tf] || tf;
+    const singleMode = !!modelLabel;
 
     // Check forecast cache
-    const cacheKey = `${assetUp}:${tf}`;
+    const cacheKey = singleMode ? `${assetUp}:${tf}:${modelLabel}` : `${assetUp}:${tf}`;
     const cached = forecastCache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
       return new Response(JSON.stringify(cached.data), {
@@ -245,10 +246,49 @@ serve(async (req) => {
     const priceCeil = currentPrice + maxMove;
     const userPrompt = `Analyze ${assetUp}/USDT at $${currentPrice.toLocaleString()}. Fear & Greed Index: ${fearGreed.value} (${fearGreed.classification}). Predict the ${tfLabel} movement. IMPORTANT: targetPrice must be between $${priceFloor.toFixed(2)} and $${priceCeil.toFixed(2)} (max ${(maxMovePct * 100).toFixed(1)}% move for ${tfLabel} timeframe).`;
 
-    const activeModels = MODELS.filter(m => m.type !== "openai" || openaiKey);
-    const MIN_MODELS = 3;
+    // Single model mode — call one model and return immediately
+    const targetModels = singleMode
+      ? MODELS.filter(m => m.label === modelLabel && (m.type !== "openai" || openaiKey))
+      : MODELS.filter(m => m.type !== "openai" || openaiKey);
 
-    // Collect results as they arrive — resolve once we have enough
+    if (targetModels.length === 0) throw new Error(`Model "${modelLabel}" not found`);
+
+    function buildForecast(m: ModelResult) {
+      let target = m.targetPrice > 0 ? m.targetPrice : currentPrice;
+      target = Math.max(priceFloor, Math.min(priceCeil, target));
+      if (target === currentPrice) {
+        const nudge = currentPrice * maxMovePct * 0.3;
+        if (m.prediction === "BULLISH") target = currentPrice + nudge;
+        else if (m.prediction === "BEARISH") target = currentPrice - nudge;
+      }
+      return {
+        model: m.model,
+        asset: assetUp,
+        timeframe: tf,
+        direction: m.prediction,
+        confidence: m.confidence,
+        currentPrice,
+        targetPrice: parseFloat(target.toFixed(currentPrice < 1 ? 6 : 2)),
+        reasoning: m.reasoning,
+        forecastPoints: generateForecastPoints(currentPrice, target, tf),
+      };
+    }
+
+    if (singleMode) {
+      const def = targetModels[0];
+      const result = await (def.type === "openai"
+        ? callOpenAI(gatewayBase, cfToken, openaiKey, def, userPrompt)
+        : callWorkersAI(gatewayBase, cfToken, def, userPrompt));
+      const forecast = buildForecast(result);
+      const responseData = { forecasts: [forecast] };
+      forecastCache.set(cacheKey, { data: responseData, expiresAt: Date.now() + FORECAST_CACHE_TTL });
+      return new Response(JSON.stringify(responseData), {
+        headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS" },
+      });
+    }
+
+    // Multi mode — race for 3 results
+    const MIN_MODELS = 3;
     function raceForN(promises: Promise<ModelResult>[], minCount: number): Promise<ModelResult[]> {
       return new Promise((resolve) => {
         const results: ModelResult[] = [];
@@ -256,61 +296,25 @@ serve(async (req) => {
         const total = promises.length;
         const needed = Math.min(minCount, total);
         let resolved = false;
-
-        // Hard deadline: return whatever we have after 10s
-        const deadline = setTimeout(() => {
-          if (!resolved) { resolved = true; resolve(results); }
-        }, 10000);
-
+        const deadline = setTimeout(() => { if (!resolved) { resolved = true; resolve(results); } }, 10000);
         for (const p of promises) {
           p.then((r) => {
             if (resolved) return;
-            if (r.reasoning && !(r.prediction === "NEUTRAL" && r.confidence === 50)) {
-              results.push(r);
-            }
+            if (r.reasoning && !(r.prediction === "NEUTRAL" && r.confidence === 50)) results.push(r);
             settled++;
-            if (results.length >= needed || settled >= total) {
-              resolved = true; clearTimeout(deadline); resolve(results);
-            }
-          }).catch(() => {
-            settled++;
-            if (!resolved && settled >= total) {
-              resolved = true; clearTimeout(deadline); resolve(results);
-            }
-          });
+            if (results.length >= needed || settled >= total) { resolved = true; clearTimeout(deadline); resolve(results); }
+          }).catch(() => { settled++; if (!resolved && settled >= total) { resolved = true; clearTimeout(deadline); resolve(results); } });
         }
       });
     }
 
-    const modelPromises = activeModels.map(def =>
+    const modelPromises = targetModels.map(def =>
       def.type === "openai"
         ? callOpenAI(gatewayBase, cfToken, openaiKey, def, userPrompt)
         : callWorkersAI(gatewayBase, cfToken, def, userPrompt)
     );
-
     const successResults = await raceForN(modelPromises, MIN_MODELS);
-
-    const forecasts = successResults
-      .map(m => {
-        let target = m.targetPrice > 0 ? m.targetPrice : currentPrice;
-        target = Math.max(priceFloor, Math.min(priceCeil, target));
-        if (target === currentPrice) {
-          const nudge = currentPrice * maxMovePct * 0.3;
-          if (m.prediction === "BULLISH") target = currentPrice + nudge;
-          else if (m.prediction === "BEARISH") target = currentPrice - nudge;
-        }
-        return {
-          model: m.model,
-          asset: assetUp,
-          timeframe: tf,
-          direction: m.prediction,
-          confidence: m.confidence,
-          currentPrice,
-          targetPrice: parseFloat(target.toFixed(currentPrice < 1 ? 6 : 2)),
-          reasoning: m.reasoning,
-          forecastPoints: generateForecastPoints(currentPrice, target, tf),
-        };
-      });
+    const forecasts = successResults.map(buildForecast);
 
     if (forecasts.length === 0) throw new Error("All AI models failed");
     forecasts.sort((a, b) => (b?.confidence || 0) - (a?.confidence || 0));
