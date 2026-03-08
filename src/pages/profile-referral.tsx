@@ -26,6 +26,7 @@ interface ReferralData {
       nodeType: string;
       totalDeposited: string;
       level: number;
+      subCount?: number;
     }>;
   }>;
   teamSize: number;
@@ -364,7 +365,7 @@ export default function ProfileReferralPage() {
               <div className="space-y-2">
                 {teamData.referrals.map((ref) => {
                   const subCount = ref.subReferrals?.length || 0;
-                  const teamDeposits = Number(ref.totalDeposited || 0) + (ref.subReferrals?.reduce((s, r) => s + Number(r.totalDeposited || 0), 0) || 0);
+                  const teamDeposits = ref.subReferrals?.reduce((s, r) => s + Number(r.totalDeposited || 0), 0) || 0;
                   return (
                   <div key={ref.id}>
                     <button
@@ -411,21 +412,30 @@ export default function ProfileReferralPage() {
                     </button>
                     {ref.subReferrals && ref.subReferrals.length > 0 && (
                       <div className="ml-5 mt-1.5 space-y-1.5 border-l-2 pl-3" style={{ borderColor: "rgba(74,222,128,0.15)" }}>
-                        {ref.subReferrals.map((sub) => (
+                        {ref.subReferrals.map((sub) => {
+                          const hasTeam = (sub.subCount || 0) > 0;
+                          return (
                           <button
                             key={sub.id}
                             className="w-full rounded-lg p-2.5 flex items-center gap-2.5 text-left transition-all active:scale-[0.98]"
-                            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.15)" }}
+                            style={{
+                              background: hasTeam ? "linear-gradient(135deg, rgba(74,222,128,0.04), rgba(255,255,255,0.02))" : "rgba(255,255,255,0.03)",
+                              border: hasTeam ? "1px solid rgba(74,222,128,0.2)" : "1px solid rgba(255,255,255,0.1)",
+                            }}
                             onClick={() => drillInto(sub.walletAddress, shortenAddress(sub.walletAddress))}
                           >
-                            <div className="h-1.5 w-1.5 rounded-full shrink-0 bg-white/25" />
+                            <div className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: hasTeam ? "#4ade80" : "rgba(255,255,255,0.2)" }} />
                             <div className="flex-1 min-w-0">
                               <div className="text-[11px] font-mono text-white/60 truncate">
                                 {shortenAddress(sub.walletAddress)}
                               </div>
-                              <div className="text-[10px] text-white/25 mt-0.5">
-                                {t("profile.personalDeposit")}: {formatCompact(Number(sub.totalDeposited || 0))}
-                              </div>
+                              {hasTeam && (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: "rgba(74,222,128,0.08)", color: "rgba(74,222,128,0.7)" }}>
+                                    {t("profile.teamCount", { count: sub.subCount })}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                             <span
                               className="text-[11px] px-2 py-0.5 rounded font-bold shrink-0"
@@ -435,7 +445,8 @@ export default function ProfileReferralPage() {
                             </span>
                             <ChevronRight className="h-3 w-3 text-white/20 shrink-0" />
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

@@ -434,7 +434,7 @@ BEGIN
 END;
 $$;
 
--- get_referral_tree: recursive 2-level referral tree
+-- get_referral_tree: recursive 2-level referral tree with subCount for level 2
 CREATE OR REPLACE FUNCTION get_referral_tree(addr TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql SECURITY DEFINER
@@ -453,17 +453,25 @@ BEGIN
   WITH direct AS (
     SELECT * FROM profiles WHERE referrer_id = profile_row.id
   ),
+  sub_counts AS (
+    SELECT referrer_id, COUNT(*)::INT AS cnt
+    FROM profiles
+    WHERE referrer_id IN (SELECT id FROM profiles WHERE referrer_id IN (SELECT id FROM direct))
+    GROUP BY referrer_id
+  ),
   team AS (
     SELECT d.*, jsonb_agg(
       CASE WHEN s.id IS NOT NULL THEN
         jsonb_build_object(
           'id', s.id, 'walletAddress', s.wallet_address, 'rank', s.rank,
-          'nodeType', s.node_type, 'totalDeposited', s.total_deposited, 'level', 2
+          'nodeType', s.node_type, 'totalDeposited', s.total_deposited, 'level', 2,
+          'subCount', COALESCE(sc.cnt, 0)
         )
       ELSE NULL END
     ) FILTER (WHERE s.id IS NOT NULL) AS sub_referrals
     FROM direct d
     LEFT JOIN profiles s ON s.referrer_id = d.id
+    LEFT JOIN sub_counts sc ON sc.referrer_id = s.id
     GROUP BY d.id, d.wallet_address, d.ref_code, d.referrer_id, d.rank,
              d.node_type, d.is_vip, d.vip_expires_at, d.total_deposited,
              d.total_withdrawn, d.referral_earnings, d.created_at
