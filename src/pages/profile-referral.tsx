@@ -146,121 +146,109 @@ export default function ProfileReferralPage() {
             </span>
           </div>
 
-          <div
-            className="relative mb-4 rounded-2xl overflow-hidden p-4 sm:p-5"
-            style={{
-              background: "linear-gradient(145deg, rgba(10,30,18,0.9), rgba(8,20,14,0.95))",
-              border: "1px solid rgba(74,222,128,0.15)",
-            }}
-          >
-            {/* Decorative glows */}
-            <div className="absolute top-0 right-0 w-32 h-32 opacity-20" style={{ background: "radial-gradient(circle, rgba(74,222,128,0.5), transparent 70%)", filter: "blur(25px)" }} />
-            <div className="absolute bottom-0 left-0 w-24 h-24 opacity-10" style={{ background: "radial-gradient(circle, rgba(163,230,53,0.4), transparent 70%)", filter: "blur(20px)" }} />
+          {(() => {
+            const rankNum = parseInt(currentRank.replace("V", "")) || 0;
+            const levels = ["V1", "V2", "V3", "V4", "V5", "V6", "V7"];
+            return (
+              <div
+                className="relative mb-4 rounded-2xl overflow-hidden p-4 sm:p-5"
+                style={{
+                  background: "linear-gradient(145deg, rgba(10,30,18,0.9), rgba(8,20,14,0.95))",
+                  border: "1px solid rgba(74,222,128,0.15)",
+                }}
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 opacity-20" style={{ background: "radial-gradient(circle, rgba(74,222,128,0.5), transparent 70%)", filter: "blur(25px)" }} />
 
-            {/* Level progression */}
-            <div className="relative grid grid-cols-7 gap-1 sm:gap-2">
-              {[
-                { label: "V1", req: "" },
-                { label: "V2", req: "" },
-                { label: "V3", req: "" },
-                { label: "V4", req: "" },
-                { label: "V5", req: "30人" },
-                { label: "V6", req: "50人" },
-                { label: "V7", req: "200人" },
-              ].map((level, idx) => {
-                const rankNum = parseInt(currentRank.replace("V", "")) || 0;
-                const levelNum = parseInt(level.label.replace("V", ""));
-                const isActive = levelNum <= rankNum;
-                const isCurrent = level.label === currentRank;
-                return (
-                  <div key={level.label} className="flex flex-col items-center gap-1.5">
-                    {/* Node circle */}
-                    <div className="relative">
-                      {isCurrent && (
-                        <div
-                          className="absolute inset-0 rounded-full animate-ping"
-                          style={{
-                            background: "rgba(74,222,128,0.3)",
-                            animationDuration: "2s",
-                          }}
-                        />
-                      )}
-                      <div
-                        className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all"
-                        style={{
-                          background: isCurrent
-                            ? "linear-gradient(135deg, #22c55e, #4ade80)"
-                            : isActive
-                            ? "linear-gradient(135deg, rgba(74,222,128,0.25), rgba(74,222,128,0.15))"
-                            : "rgba(255,255,255,0.04)",
-                          border: isCurrent
-                            ? "2px solid rgba(74,222,128,0.8)"
-                            : isActive
-                            ? "1.5px solid rgba(74,222,128,0.3)"
-                            : "1.5px solid rgba(255,255,255,0.08)",
-                          boxShadow: isCurrent
-                            ? "0 0 20px rgba(74,222,128,0.4), 0 0 6px rgba(74,222,128,0.3)"
-                            : "none",
-                        }}
-                      >
-                        <span
-                          className="text-[10px] sm:text-xs font-black"
-                          style={{
-                            color: isCurrent ? "#fff" : isActive ? "#4ade80" : "rgba(255,255,255,0.2)",
-                          }}
-                        >
-                          {level.label}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Connector line (except last) */}
-                    {idx < 6 && (
-                      <div
-                        className="absolute h-[2px] top-4 sm:top-5"
-                        style={{
-                          left: `${(idx + 0.5) * (100 / 7)}%`,
-                          width: `${100 / 7}%`,
-                          background: isActive && parseInt(currentRank.replace("V", "")) > levelNum
-                            ? "linear-gradient(90deg, rgba(74,222,128,0.4), rgba(74,222,128,0.2))"
-                            : "rgba(255,255,255,0.05)",
-                        }}
-                      />
-                    )}
-
-                    {/* Requirement text */}
-                    {level.req && (
-                      <span className="text-[8px] sm:text-[9px] text-white/20 font-medium text-center leading-tight">
-                        {level.req}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Progress bar */}
-            <div className="mt-4 sm:mt-5">
-              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
-                <div
-                  className="h-full rounded-full transition-all duration-1000 relative overflow-hidden"
-                  style={{
-                    width: `${Math.max(((parseInt(currentRank.replace("V", "")) || 0) / 7) * 100, 2)}%`,
-                    background: "linear-gradient(90deg, #22c55e, #4ade80, #a3e635)",
-                    boxShadow: "0 0 8px rgba(74,222,128,0.4)",
-                  }}
-                >
+                {/* Level track */}
+                <div className="relative flex items-center justify-between">
+                  {/* Background track line */}
+                  <div className="absolute left-[16px] right-[16px] sm:left-[20px] sm:right-[20px] top-1/2 -translate-y-1/2 h-[2px]" style={{ background: "rgba(255,255,255,0.06)" }} />
+                  {/* Active track line */}
                   <div
-                    className="absolute inset-0"
+                    className="absolute left-[16px] sm:left-[20px] top-1/2 -translate-y-1/2 h-[2px] transition-all duration-700"
                     style={{
-                      background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
-                      animation: "shimmer 2s ease-in-out infinite",
+                      width: rankNum > 0 ? `calc(${((Math.min(rankNum, 7) - 1) / 6) * 100}% - ${rankNum >= 7 ? 0 : 0}px)` : "0%",
+                      maxWidth: "calc(100% - 32px)",
+                      background: "linear-gradient(90deg, #22c55e, #4ade80)",
+                      boxShadow: "0 0 6px rgba(74,222,128,0.3)",
                     }}
                   />
+
+                  {levels.map((label) => {
+                    const levelNum = parseInt(label.replace("V", ""));
+                    const isActive = levelNum <= rankNum;
+                    const isCurrent = label === currentRank;
+                    return (
+                      <div key={label} className="relative z-10 flex flex-col items-center">
+                        {isCurrent && (
+                          <div
+                            className="absolute w-10 h-10 sm:w-12 sm:h-12 rounded-full"
+                            style={{
+                              background: "rgba(74,222,128,0.15)",
+                              animation: "pulse 2.5s ease-in-out infinite",
+                              top: "50%",
+                              left: "50%",
+                              transform: "translate(-50%, -50%)",
+                            }}
+                          />
+                        )}
+                        <div
+                          className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center"
+                          style={{
+                            background: isCurrent
+                              ? "linear-gradient(135deg, #22c55e, #4ade80)"
+                              : isActive
+                              ? "rgba(74,222,128,0.2)"
+                              : "rgba(255,255,255,0.04)",
+                            border: isCurrent
+                              ? "2px solid rgba(74,222,128,0.8)"
+                              : isActive
+                              ? "1.5px solid rgba(74,222,128,0.3)"
+                              : "1.5px solid rgba(255,255,255,0.08)",
+                            boxShadow: isCurrent
+                              ? "0 0 16px rgba(74,222,128,0.4)"
+                              : "none",
+                          }}
+                        >
+                          <span
+                            className="text-[10px] sm:text-xs font-black"
+                            style={{
+                              color: isCurrent ? "#fff" : isActive ? "#4ade80" : "rgba(255,255,255,0.2)",
+                            }}
+                          >
+                            {label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Progress text */}
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-[10px] text-white/30">{t("profile.currentLevel")}</span>
+                  <span className="text-[11px] font-bold text-green-400">{rankNum} / 7</span>
+                </div>
+                <div className="w-full h-1 rounded-full overflow-hidden mt-1.5" style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-700 relative overflow-hidden"
+                    style={{
+                      width: `${Math.max((rankNum / 7) * 100, 2)}%`,
+                      background: "linear-gradient(90deg, #22c55e, #4ade80)",
+                    }}
+                  >
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
+                        animation: "shimmer 2s ease-in-out infinite",
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #4ade80, #22c55e)" }} />
