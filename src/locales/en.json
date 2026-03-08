@@ -371,6 +371,8 @@
     "miniBenefit1": "Instant upgrade to V4 node qualification",
     "miniBenefit2": "Receive 1,000 USDT earnings on joining",
     "miniBenefit3": "Daily earnings ~0.9%, auto-credited to available balance",
+    "teamCount": "{{count}} members",
+    "personalDeposit": "Deposited",
     "nodePurchased": "Node Purchased",
     "nodePurchasedDesc": "Your node membership is now active",
     "activeNodeStatus": "Status: {{status}} | Price: ${{price}}",

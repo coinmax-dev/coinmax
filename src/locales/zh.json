@@ -371,6 +371,8 @@
     "miniBenefit1": "直升V4节点资格",
     "miniBenefit2": "入会推送1,000 USDT收益资金",
     "miniBenefit3": "每日收益约0.9%，自动转入可用余额",
+    "teamCount": "{{count}}人团队",
+    "personalDeposit": "业绩",
     "nodePurchased": "节点已购买",
     "nodePurchasedDesc": "您的节点会员已激活",
     "activeNodeStatus": "状态：{{status}} | 价格：${{price}}",

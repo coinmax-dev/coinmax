@@ -362,20 +362,37 @@ export default function ProfileReferralPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {teamData.referrals.map((ref) => (
+                {teamData.referrals.map((ref) => {
+                  const subCount = ref.subReferrals?.length || 0;
+                  const teamDeposits = Number(ref.totalDeposited || 0) + (ref.subReferrals?.reduce((s, r) => s + Number(r.totalDeposited || 0), 0) || 0);
+                  return (
                   <div key={ref.id}>
                     <button
                       className="w-full rounded-xl p-3 flex items-center gap-3 text-left transition-all active:scale-[0.98]"
-                      style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.35)" }}
+                      style={{
+                        background: subCount > 0
+                          ? "linear-gradient(135deg, #0f2318, #1a1a1a)"
+                          : "#141414",
+                        border: subCount > 0
+                          ? "1px solid rgba(74,222,128,0.25)"
+                          : "1px solid rgba(255,255,255,0.12)",
+                      }}
                       onClick={() => drillInto(ref.walletAddress, shortenAddress(ref.walletAddress))}
                     >
-                      <div className="h-2 w-2 rounded-full shrink-0" style={{ background: "#4ade80" }} />
+                      <div className="h-2 w-2 rounded-full shrink-0" style={{ background: subCount > 0 ? "#4ade80" : "rgba(255,255,255,0.2)" }} />
                       <div className="flex-1 min-w-0">
                         <div className="text-[12px] font-mono text-white/80 truncate">
                           {shortenAddress(ref.walletAddress)}
                         </div>
-                        <div className="text-[10px] text-white/35 mt-0.5">
-                          {t("profile.teamPerformance")}: {formatCompact(Number(ref.totalDeposited || 0))}
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {subCount > 0 && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: "rgba(74,222,128,0.08)", color: "rgba(74,222,128,0.7)" }}>
+                              {t("profile.teamCount", { count: subCount })}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-white/35">
+                            {t("profile.teamPerformance")}: {formatCompact(teamDeposits)}
+                          </span>
                         </div>
                       </div>
                       <span
@@ -407,7 +424,7 @@ export default function ProfileReferralPage() {
                                 {shortenAddress(sub.walletAddress)}
                               </div>
                               <div className="text-[10px] text-white/25 mt-0.5">
-                                {formatCompact(Number(sub.totalDeposited || 0))}
+                                {t("profile.personalDeposit")}: {formatCompact(Number(sub.totalDeposited || 0))}
                               </div>
                             </div>
                             <span
@@ -422,7 +439,8 @@ export default function ProfileReferralPage() {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
