@@ -106,7 +106,7 @@ export function PriceChart({
   const [chartType, setChartType] = useState<ChartType>("candle");
   const prevChartTypeRef = useRef<ChartType>(chartType);
   const dataVersionRef = useRef(0);
-  const programmaticZoomUntilRef = useRef(0);
+  const zoomTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const hasOhlc = !!(ohlcData && ohlcData.length > 0);
   const hasDataNow = hasOhlc || !!(data && data.length > 0);
@@ -450,21 +450,34 @@ export function PriceChart({
     const forecastBars = saneForecast?.forecastPoints?.length || 0;
     const totalBars = baseBars + forecastBars;
     const visibleBars = getVisibleBars(selectedTimeframe);
-    // Always auto-zoom to show forecast or recent bars
-    if (forecastBars > 0) {
-      const showBars = Math.max(visibleBars, forecastBars + 20);
-      chart.timeScale().setVisibleLogicalRange({
-        from: totalBars - showBars,
-        to: totalBars + 4,
-      });
-    } else if (baseBars > visibleBars) {
-      chart.timeScale().setVisibleLogicalRange({
-        from: totalBars - visibleBars,
-        to: totalBars + 8,
-      });
-    } else {
-      chart.timeScale().fitContent();
-    }
+
+    // Clear any pending zoom
+    if (zoomTimerRef.current) clearTimeout(zoomTimerRef.current);
+
+    // Auto-zoom — use setTimeout to ensure chart has finished layout
+    const doZoom = () => {
+      if (!chartRef.current) return;
+      const ts = chartRef.current.timeScale();
+      if (forecastBars > 0) {
+        const showBars = Math.max(visibleBars, forecastBars + 20);
+        ts.setVisibleLogicalRange({
+          from: totalBars - showBars,
+          to: totalBars + 4,
+        });
+      } else if (baseBars > visibleBars) {
+        ts.setVisibleLogicalRange({
+          from: totalBars - visibleBars,
+          to: totalBars + 8,
+        });
+      } else {
+        ts.fitContent();
+      }
+    };
+
+    // Zoom immediately + again after a short delay to override any internal resets
+    doZoom();
+    zoomTimerRef.current = setTimeout(doZoom, 50);
+
     dataVersionRef.current++;
   }, [ohlcData, data, forecast, targetPrice, forecastLineColor, hasOhlc, chartType, selectedTimeframe, t]);
 
