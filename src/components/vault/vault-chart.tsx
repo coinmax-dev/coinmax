@@ -1,64 +1,34 @@
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp } from "lucide-react";
-import { formatUSD } from "@/lib/constants";
+import { TrendingUp, Users, Lock } from "lucide-react";
 import { VAULT_CHART_PERIODS, type VaultChartPeriod } from "@/lib/data";
 import { generateVaultChartData } from "@/lib/formulas";
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useActiveAccount } from "thirdweb/react";
-import type { VaultPosition } from "@shared/types";
-import { getVaultPositions } from "@/lib/api";
 import { useTranslation } from "react-i18next";
+import { useGrowingStats } from "@/hooks/use-growing-stats";
 
 export function VaultChart() {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<VaultChartPeriod>("ALL");
   const chartData = useMemo(() => generateVaultChartData(period), [period]);
-  const account = useActiveAccount();
-  const walletAddress = account?.address;
-
-  const { data: positions } = useQuery<VaultPosition[]>({
-    queryKey: ["vault-positions", walletAddress],
-    queryFn: () => getVaultPositions(walletAddress!),
-    enabled: !!walletAddress,
-  });
-
-  const { totalValue, totalYield } = useMemo(() => {
-    if (!positions || positions.length === 0) return { totalValue: 0, totalYield: 0 };
-    const now = new Date();
-    let principal = 0;
-    let yieldSum = 0;
-    for (const p of positions) {
-      if (p.status !== "ACTIVE") continue;
-      const amt = Number(p.principal || 0);
-      principal += amt;
-      const start = new Date(p.startDate!);
-      const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-      yieldSum += amt * Number(p.dailyRate || 0) * days;
-    }
-    return { totalValue: principal + yieldSum, totalYield: yieldSum };
-  }, [positions]);
-
-  const changePercent = totalValue > 0 && totalYield > 0
-    ? ((totalYield / (totalValue - totalYield)) * 100)
-    : 0;
+  const { tvlFormatted, holders, positions: posCount } = useGrowingStats();
 
   return (
     <div className="gradient-green-dark p-5 pt-2 rounded-b-2xl">
       <h2 className="text-lg font-bold mb-1" data-testid="text-vault-title">{t("vault.title")}</h2>
-      <div className="text-xs text-muted-foreground mb-2">{t("vault.pnl")}</div>
+      <div className="text-xs text-muted-foreground mb-2">{t("vault.tvl")}</div>
       <div className="flex items-baseline gap-3 flex-wrap mb-1">
         <span className="text-3xl font-bold tracking-tight" data-testid="text-vault-total">
-          {formatUSD(totalValue)}
+          {tvlFormatted}
         </span>
-        {changePercent > 0 && (
-          <Badge className="bg-primary/15 text-neon-value text-xs no-default-hover-elevate no-default-active-elevate">
-            <TrendingUp className="mr-1 h-3 w-3" />+{changePercent.toFixed(2)}%
-          </Badge>
-        )}
+        <Badge className="bg-primary/15 text-neon-value text-xs no-default-hover-elevate no-default-active-elevate">
+          <TrendingUp className="mr-1 h-3 w-3" />TVL
+        </Badge>
+      </div>
+      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-1">
+        <span className="flex items-center gap-1"><Users className="h-3 w-3" />{t("vault.holders")}: {holders}+</span>
+        <span className="flex items-center gap-1"><Lock className="h-3 w-3" />{t("vault.activePositions")}: {posCount}+</span>
       </div>
       <div className="h-36 mt-3" data-testid="chart-vault">
         <ResponsiveContainer width="100%" height="100%">
