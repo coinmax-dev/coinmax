@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, Copy, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +74,14 @@ export default function AdminAuthCodes() {
     },
   });
 
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyCode = (code: string, id: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
+
   const codes = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -121,8 +129,16 @@ export default function AdminAuthCodes() {
               <MobileDataCard
                 key={c.id}
                 header={
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-semibold text-foreground/80">{c.code}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-mono text-xs font-semibold text-foreground/80 truncate">{c.code}</span>
+                      <button
+                        onClick={() => copyCode(c.code, c.id)}
+                        className="shrink-0 p-1 rounded hover:bg-white/10 transition-colors"
+                      >
+                        {copiedId === c.id ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3 text-foreground/40" />}
+                      </button>
+                    </div>
                     {codeBadge(c.status)}
                   </div>
                 }
@@ -158,7 +174,17 @@ export default function AdminAuthCodes() {
                   <TableRow><TableCell colSpan={7} className="text-center text-foreground/40 py-8">暂无授权码</TableCell></TableRow>
                 ) : codes.map((c: any) => (
                   <TableRow key={c.id} className="border-border/10 hover:bg-white/[0.015]">
-                    <TableCell className="font-mono text-xs text-foreground/70 font-semibold">{c.code}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-foreground/70 font-semibold">{c.code}</span>
+                        <button
+                          onClick={() => copyCode(c.code, c.id)}
+                          className="p-1 rounded hover:bg-white/10 transition-colors"
+                        >
+                          {copiedId === c.id ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3 text-foreground/30 hover:text-foreground/60" />}
+                        </button>
+                      </div>
+                    </TableCell>
                     <TableCell><Badge variant="outline" className="text-xs capitalize">{c.nodeType}</Badge></TableCell>
                     <TableCell>{codeBadge(c.status)}</TableCell>
                     <TableCell className="text-foreground/50 text-xs">{c.createdBy}</TableCell>

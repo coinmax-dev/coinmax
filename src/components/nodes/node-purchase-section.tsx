@@ -219,10 +219,13 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
                 onChange={(e) => { setAuthCode(e.target.value); setAuthCodeError(""); setAuthCodeValid(false); }}
                 onBlur={handleAuthCodeBlur}
                 placeholder={t("profile.authCodePlaceholder")}
-                className="w-full rounded-xl h-11 px-4 text-[14px] font-mono text-white placeholder:text-white/25 outline-none transition-all"
+                className="w-full rounded-xl h-12 px-4 text-[15px] font-mono text-white placeholder:text-white/30 outline-none transition-all tracking-wider text-center"
                 style={{
-                  background: "#222",
-                  border: authCodeError ? "1px solid rgba(239,68,68,0.5)" : authCodeValid ? "1px solid rgba(74,222,128,0.5)" : "1px solid rgba(255,255,255,0.12)",
+                  background: "linear-gradient(180deg, #2a2a2a 0%, #1e1e1e 100%)",
+                  border: authCodeError ? "2px solid rgba(239,68,68,0.6)" : authCodeValid ? "2px solid rgba(74,222,128,0.6)" : "2px solid rgba(251,191,36,0.35)",
+                  boxShadow: authCodeError ? "0 0 12px rgba(239,68,68,0.15), inset 0 2px 4px rgba(0,0,0,0.3)"
+                    : authCodeValid ? "0 0 12px rgba(74,222,128,0.15), inset 0 2px 4px rgba(0,0,0,0.3)"
+                    : "0 0 12px rgba(251,191,36,0.08), inset 0 2px 4px rgba(0,0,0,0.3)",
                 }}
               />
               {validatingCode && (
@@ -244,14 +247,15 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr }:
           )}
 
           <button
-            className="w-full rounded-2xl h-12 flex items-center justify-center gap-2 text-[14px] font-bold text-white transition-all active:scale-[0.97] disabled:opacity-50"
+            className="w-full rounded-2xl h-12 flex items-center justify-center gap-2 text-[14px] font-bold text-white transition-all active:translate-y-[1px] active:shadow-none disabled:opacity-50 disabled:active:translate-y-0"
             style={{
-              background: purchaseMutation.isPending
-                ? "linear-gradient(135deg, #374151, #4b5563)"
-                : (isMAX && !authCodeValid)
-                ? "linear-gradient(135deg, #374151, #4b5563)"
-                : "linear-gradient(135deg, #22c55e, #16a34a)",
-              boxShadow: purchaseMutation.isPending || (isMAX && !authCodeValid) ? "none" : "0 4px 20px rgba(34,197,94,0.35)",
+              background: purchaseMutation.isPending || (isMAX && !authCodeValid)
+                ? "linear-gradient(180deg, #4b5563 0%, #374151 100%)"
+                : "linear-gradient(180deg, #22c55e 0%, #16a34a 50%, #15803d 100%)",
+              boxShadow: purchaseMutation.isPending || (isMAX && !authCodeValid)
+                ? "0 2px 0 #1f2937, 0 4px 8px rgba(0,0,0,0.3)"
+                : "0 4px 0 #166534, 0 6px 20px rgba(34,197,94,0.35), inset 0 1px 0 rgba(255,255,255,0.2)",
+              borderTop: purchaseMutation.isPending || (isMAX && !authCodeValid) ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(255,255,255,0.15)",
             }}
             onClick={handlePurchase}
             disabled={purchaseMutation.isPending || (isMAX && !authCodeValid)}
