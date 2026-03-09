@@ -497,6 +497,60 @@ export async function adminDeactivateAuthCode(id: string) {
   return toCamel(data);
 }
 
+// ─────────────────────────────────────────────
+// Admin Users Management
+// ─────────────────────────────────────────────
+
+export async function adminGetAdminUsers() {
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select("id, username, role, is_active, created_at")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return toCamel(data ?? []);
+}
+
+export async function adminCreateAdminUser(
+  username: string,
+  password: string,
+  role: string
+) {
+  const { data, error } = await supabase
+    .from("admin_users")
+    .insert({ username, password, role, is_active: true })
+    .select("id, username, role, is_active, created_at")
+    .single();
+  if (error) throw error;
+  return toCamel(data);
+}
+
+export async function adminUpdateAdminUser(
+  id: string,
+  updates: { role?: string; is_active?: boolean; password?: string }
+) {
+  const updateData: Record<string, any> = {};
+  if (updates.role !== undefined) updateData.role = updates.role;
+  if (updates.is_active !== undefined) updateData.is_active = updates.is_active;
+  if (updates.password !== undefined) updateData.password = updates.password;
+
+  const { data, error } = await supabase
+    .from("admin_users")
+    .update(updateData)
+    .eq("id", id)
+    .select("id, username, role, is_active, created_at")
+    .single();
+  if (error) throw error;
+  return toCamel(data);
+}
+
+export async function adminDeleteAdminUser(id: string) {
+  const { error } = await supabase
+    .from("admin_users")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function adminGetAuthCodeStats() {
   const { data, error } = await supabase
     .from("node_auth_codes")

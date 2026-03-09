@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Users, GitBranch, Wallet, Server, TrendingUp, KeyRound, LogOut, Menu, X, ScrollText, FileCode2 } from "lucide-react";
+import { LayoutDashboard, Users, GitBranch, Wallet, Server, TrendingUp, KeyRound, LogOut, Menu, X, ScrollText, FileCode2, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useState, createContext, useContext } from "react";
 import { useAdminAuth } from "@/admin/admin-auth";
@@ -22,6 +22,7 @@ export const navItems: NavItem[] = [
   { path: "/admin/performance", icon: TrendingUp, label: "业绩", permission: "performance" },
   { path: "/admin/contracts", icon: FileCode2, label: "合约", permission: "contracts" },
   { path: "/admin/logs", icon: ScrollText, label: "日志", permission: "logs" },
+  { path: "/admin/admins", icon: ShieldCheck, label: "管理员", permission: "admins" },
 ];
 
 const DrawerContext = createContext<{ open: boolean; setOpen: (v: boolean) => void }>({ open: false, setOpen: () => {} });

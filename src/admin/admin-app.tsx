@@ -14,6 +14,7 @@ import AdminAuthCodes from "./pages/admin-auth-codes";
 import AdminPerformance from "./pages/admin-performance";
 import AdminLogs from "./pages/admin-logs";
 import AdminContracts from "./pages/admin-contracts";
+import AdminAdmins from "./pages/admin-admins";
 
 function NoPermission() {
   return (
@@ -117,6 +118,9 @@ function AdminLayout() {
               </Route>
               <Route path="/admin/logs">
                 <ProtectedRoute permission="logs"><AdminLogs /></ProtectedRoute>
+              </Route>
+              <Route path="/admin/admins">
+                <ProtectedRoute permission="admins"><AdminAdmins /></ProtectedRoute>
               </Route>
             </Switch>
           </main>
