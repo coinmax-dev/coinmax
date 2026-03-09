@@ -100,17 +100,18 @@ export default function AdminAuthCodes() {
 
       {/* Stats */}
       {codeStats && (
-        <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="grid grid-cols-3 gap-2.5 text-center">
           {[
-            { label: "总数", value: codeStats.total ?? 0, sub: "/ 2000", color: "text-foreground" },
-            { label: "已用", value: codeStats.used ?? 0, color: "text-amber-400" },
-            { label: "可用", value: codeStats.available ?? 0, color: "text-emerald-400" },
+            { label: "总数", value: codeStats.total ?? 0, sub: "/ 2000", color: "text-foreground", accent: "#6366f1" },
+            { label: "已用", value: codeStats.used ?? 0, color: "text-amber-400", accent: "#f59e0b" },
+            { label: "可用", value: codeStats.available ?? 0, color: "text-emerald-400", accent: "#22c55e" },
           ].map((s) => (
-            <div key={s.label} className="rounded-xl border border-border/20 bg-white/[0.02] py-2 px-3">
-              <div className="text-[10px] text-foreground/40 mb-0.5">{s.label}</div>
-              <div className={`text-base font-bold ${s.color}`}>
+            <div key={s.label} className="rounded-xl border border-white/[0.06] py-2.5 px-3 relative overflow-hidden" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-6 opacity-[0.08]" style={{ background: `radial-gradient(circle, ${s.accent}, transparent 70%)`, filter: "blur(8px)" }} />
+              <div className="text-[10px] text-foreground/40 mb-1 font-medium">{s.label}</div>
+              <div className={`text-lg font-bold ${s.color}`}>
                 {s.value}
-                {s.sub && <span className="text-xs text-foreground/25 ml-0.5">{s.sub}</span>}
+                {s.sub && <span className="text-xs text-foreground/20 ml-0.5">{s.sub}</span>}
               </div>
             </div>
           ))}
@@ -161,7 +162,7 @@ export default function AdminAuthCodes() {
           </div>
 
           {/* Desktop */}
-          <div className="hidden lg:block rounded-2xl border border-border/30 backdrop-blur-sm overflow-x-auto" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)" }}>
+          <div className="hidden lg:block rounded-2xl border border-white/[0.06] overflow-x-auto" style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%)" }}>
             <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow className="border-border/20 hover:bg-transparent">

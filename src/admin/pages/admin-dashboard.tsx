@@ -31,10 +31,10 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatsCard title="总用户" value={stats?.totalUsers ?? 0} icon={Users} subtitle="注册账户" />
-          <StatsCard title="总存入" value={formatUSD(Number(stats?.totalDeposited ?? 0))} icon={Wallet} subtitle="历史总额" />
-          <StatsCard title="活跃节点" value={stats?.activeNodes ?? 0} icon={Server} subtitle="当前活跃" />
-          <StatsCard title="总佣金" value={formatUSD(Number(stats?.totalCommissions ?? 0))} icon={TrendingUp} subtitle="历史总额" />
+          <StatsCard title="总用户" value={stats?.totalUsers ?? 0} icon={Users} subtitle="注册账户" color="#6366f1" />
+          <StatsCard title="总存入" value={formatUSD(Number(stats?.totalDeposited ?? 0))} icon={Wallet} subtitle="历史总额" color="#0abab5" />
+          <StatsCard title="活跃节点" value={stats?.activeNodes ?? 0} icon={Server} subtitle="当前活跃" color="#f59e0b" />
+          <StatsCard title="总佣金" value={formatUSD(Number(stats?.totalCommissions ?? 0))} icon={TrendingUp} subtitle="历史总额" color="#22c55e" />
         </div>
       )}
     </div>

@@ -35,23 +35,16 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
     >
       <div className="w-full max-w-sm space-y-8">
         {/* Logo */}
-        <div className="text-center space-y-2">
-          <div
-            className="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(10,186,181,0.2) 0%, rgba(10,186,181,0.05) 100%)",
-              border: "1px solid rgba(10,186,181,0.3)",
-            }}
-          >
-            <Lock className="h-6 w-6" style={{ color: "#0abab5" }} />
+        <div className="text-center space-y-3">
+          <img src="/logo-glass-pure.png" alt="Logo" className="mx-auto h-16" />
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              CoinMax <span className="text-primary">Admin</span>
+            </h1>
+            <p className="text-sm text-white/35 mt-1">
+              {t("admin.loginSubtitle", "Sign in to the admin dashboard")}
+            </p>
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">
-            CoinMax Admin
-          </h1>
-          <p className="text-sm text-white/40">
-            {t("admin.loginSubtitle", "Sign in to the admin dashboard")}
-          </p>
         </div>
 
         {/* Form */}
@@ -124,10 +117,10 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
           <button
             type="submit"
             disabled={loading || !username || !password}
-            className="w-full h-11 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full h-11 rounded-xl text-sm font-semibold text-white transition-all active:translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
-              background:
-                "linear-gradient(135deg, #0abab5 0%, #088f8b 100%)",
+              background: "linear-gradient(135deg, #0abab5 0%, #088f8b 100%)",
+              boxShadow: "0 4px 15px rgba(10,186,181,0.25), inset 0 1px 0 rgba(255,255,255,0.1)",
             }}
           >
             {loading ? (

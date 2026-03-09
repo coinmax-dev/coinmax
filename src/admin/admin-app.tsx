@@ -23,8 +23,8 @@ function AdminHeader() {
   );
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-12 lg:h-14 px-4 lg:px-6 border-b border-border/30 bg-background/90 backdrop-blur-xl">
-      {/* Mobile: hamburger + logo */}
+    <header className="sticky top-0 z-30 flex items-center justify-between h-12 lg:h-14 px-4 lg:px-6 border-b border-white/[0.06] bg-background/90 backdrop-blur-xl">
+      {/* Mobile: hamburger + page name */}
       <div className="flex items-center gap-3 lg:hidden">
         <button
           onClick={() => setOpen(true)}
@@ -32,24 +32,20 @@ function AdminHeader() {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div className="flex items-center gap-1.5">
-          <div className="h-6 w-6 rounded-md bg-gradient-to-br from-primary/25 to-primary/10 flex items-center justify-center border border-primary/30">
-            <span className="font-display text-[10px] font-black text-primary">C</span>
-          </div>
-          <span className="text-xs font-semibold text-foreground/70">{current?.label ?? "Admin"}</span>
-        </div>
+        <span className="text-sm font-semibold text-foreground/80">{current?.label ?? "Admin"}</span>
       </div>
 
       {/* Desktop: section name */}
-      <h1 className="hidden lg:block text-sm font-semibold text-foreground tracking-wide">
+      <h1 className="hidden lg:block text-sm font-semibold text-foreground/80 tracking-wide">
         {current?.label ?? "Admin"}
       </h1>
 
-      <div className="flex items-center gap-2">
-        <div className="h-7 w-7 lg:h-8 lg:w-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+      <div className="flex items-center gap-2.5">
+        <div className="h-7 w-7 lg:h-8 lg:w-8 rounded-lg flex items-center justify-center"
+          style={{ background: "rgba(10,186,181,0.08)", border: "1px solid rgba(10,186,181,0.15)" }}>
           <Shield className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-primary" />
         </div>
-        <span className="text-xs font-medium text-foreground/50 hidden sm:inline">
+        <span className="text-[11px] font-semibold text-foreground/40 hidden sm:inline uppercase tracking-wider">
           {t("common.admin", "管理员")}
         </span>
       </div>
