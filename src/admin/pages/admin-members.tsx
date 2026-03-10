@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Search } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +86,7 @@ export default function AdminMembers() {
                 fields={[
                   { label: "推荐码", value: p.refCode || "-" },
                   { label: "节点", value: p.nodeType || "-" },
+                  { label: "团队", value: <span className="flex items-center gap-1"><Users className="h-3 w-3 text-primary" />{p.teamCount ?? 0}</span> },
                   { label: "总存入", value: formatUSD(Number(p.totalDeposited ?? 0)) },
                   { label: "注册时间", value: p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "-" },
                 ]}
@@ -102,6 +103,7 @@ export default function AdminMembers() {
                   <TableHead>推荐码</TableHead>
                   <TableHead>等级</TableHead>
                   <TableHead>节点</TableHead>
+                  <TableHead>团队</TableHead>
                   <TableHead>VIP</TableHead>
                   <TableHead>总存入</TableHead>
                   <TableHead>注册时间</TableHead>
@@ -109,13 +111,18 @@ export default function AdminMembers() {
               </TableHeader>
               <TableBody>
                 {profiles.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-foreground/40 py-8">{t("admin.noData", "暂无数据")}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-foreground/40 py-8">{t("admin.noData", "暂无数据")}</TableCell></TableRow>
                 ) : profiles.map((p: any) => (
                   <TableRow key={p.id} className="border-border/10 hover:bg-white/[0.015]">
                     <TableCell className="font-mono text-xs text-foreground/70">{shortenAddress(p.walletAddress)}</TableCell>
                     <TableCell className="text-foreground/70">{p.refCode}</TableCell>
                     <TableCell><Badge variant="outline" className="text-xs">{p.rank}</Badge></TableCell>
                     <TableCell className="text-foreground/70">{p.nodeType || "-"}</TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-1 text-xs text-foreground/70">
+                        <Users className="h-3 w-3 text-primary" />{p.teamCount ?? 0}
+                      </span>
+                    </TableCell>
                     <TableCell>{p.isVip ? <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/20">VIP</Badge> : <span className="text-foreground/30">-</span>}</TableCell>
                     <TableCell className="text-foreground/70">{formatUSD(Number(p.totalDeposited ?? 0))}</TableCell>
                     <TableCell className="text-foreground/40 text-xs">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "-"}</TableCell>

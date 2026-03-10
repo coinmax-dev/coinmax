@@ -492,15 +492,37 @@ BEGIN
   INTO direct_refs, direct_count
   FROM team t;
 
-  SELECT direct_count + COALESCE(
-    (SELECT COUNT(*) FROM profiles WHERE referrer_id IN (SELECT id FROM profiles WHERE referrer_id = profile_row.id)),
-    0
-  ) INTO total_team;
+  -- Recursive total team count (all levels)
+  WITH RECURSIVE team_tree AS (
+    SELECT id FROM profiles WHERE referrer_id = profile_row.id
+    UNION ALL
+    SELECT p.id FROM profiles p INNER JOIN team_tree t ON p.referrer_id = t.id
+  )
+  SELECT COUNT(*)::INT INTO total_team FROM team_tree;
 
   RETURN jsonb_build_object(
     'referrals', COALESCE(direct_refs, '[]'::JSONB),
     'teamSize', total_team,
     'directCount', direct_count
   );
+END;
+$$;
+
+-- get_team_counts: batch get recursive team count for multiple profiles
+CREATE OR REPLACE FUNCTION get_team_counts(profile_ids UUID[])
+RETURNS TABLE(profile_id UUID, team_count INT)
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT pid, (
+    WITH RECURSIVE team_tree AS (
+      SELECT p.id FROM profiles p WHERE p.referrer_id = pid
+      UNION ALL
+      SELECT p2.id FROM profiles p2 INNER JOIN team_tree t ON p2.referrer_id = t.id
+    )
+    SELECT COUNT(*)::INT FROM team_tree
+  ) AS team_count
+  FROM unnest(profile_ids) AS pid;
 END;
 $$;

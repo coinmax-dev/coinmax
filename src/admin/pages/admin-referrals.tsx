@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Search, GitBranch, X } from "lucide-react";
+import { Search, GitBranch, X, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +106,7 @@ export default function AdminReferrals() {
                 fields={[
                   { label: "推荐人", value: p.referrerWallet ? shortenAddress(p.referrerWallet) : "-", mono: true },
                   { label: "节点", value: p.nodeType || "-" },
+                  { label: "团队", value: <span className="flex items-center gap-1"><Users className="h-3 w-3 text-primary" />{p.teamCount ?? 0}</span> },
                   { label: "注册时间", value: p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "-" },
                 ]}
                 actions={
@@ -126,19 +127,25 @@ export default function AdminReferrals() {
                   <TableHead>推荐人</TableHead>
                   <TableHead>等级</TableHead>
                   <TableHead>节点</TableHead>
+                  <TableHead>团队</TableHead>
                   <TableHead>注册时间</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pairs.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center text-foreground/40 py-8">暂无数据</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-foreground/40 py-8">暂无数据</TableCell></TableRow>
                 ) : pairs.map((p: any) => (
                   <TableRow key={p.id} className="border-border/10 hover:bg-white/[0.015]">
                     <TableCell className="font-mono text-xs text-foreground/70">{shortenAddress(p.walletAddress)}</TableCell>
                     <TableCell className="font-mono text-xs text-foreground/50">{p.referrerWallet ? shortenAddress(p.referrerWallet) : "-"}</TableCell>
                     <TableCell><Badge className="text-[10px] h-5 bg-primary/10 text-primary border border-primary/20">{p.rank}</Badge></TableCell>
                     <TableCell className="text-foreground/70 text-xs">{p.nodeType || "-"}</TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-1 text-xs text-foreground/70">
+                        <Users className="h-3 w-3 text-primary" />{p.teamCount ?? 0}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-foreground/40 text-xs">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "-"}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" className="h-7 text-xs text-primary hover:text-primary/80" onClick={() => openTree(p.walletAddress)}>

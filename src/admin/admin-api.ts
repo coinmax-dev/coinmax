@@ -127,7 +127,28 @@ export async function adminGetProfiles(
 
   const { data, error, count } = await query;
   if (error) throw error;
-  return { data: toCamel(data ?? []), total: count ?? 0 };
+
+  const profiles = data ?? [];
+
+  // Fetch team count (direct referrals) for each profile
+  const profileIds = profiles.map((p: any) => p.id);
+  let teamCountMap: Record<string, number> = {};
+  if (profileIds.length > 0) {
+    const { data: counts } = await supabase
+      .rpc("get_team_counts", { profile_ids: profileIds });
+    if (counts) {
+      for (const c of counts) {
+        teamCountMap[c.profile_id] = c.team_count;
+      }
+    }
+  }
+
+  const enriched = profiles.map((p: any) => ({
+    ...toCamel(p),
+    teamCount: teamCountMap[p.id] ?? 0,
+  }));
+
+  return { data: enriched, total: count ?? 0 };
 }
 
 // ─────────────────────────────────────────────
@@ -168,9 +189,23 @@ export async function adminGetReferralPairs(page: number, pageSize: number) {
     }
   }
 
+  // Fetch team count for each profile
+  const profileIds = profiles.map((p: any) => p.id);
+  let teamCountMap: Record<string, number> = {};
+  if (profileIds.length > 0) {
+    const { data: counts } = await supabase
+      .rpc("get_team_counts", { profile_ids: profileIds });
+    if (counts) {
+      for (const c of counts) {
+        teamCountMap[c.profile_id] = c.team_count;
+      }
+    }
+  }
+
   const enriched = profiles.map((p: any) => ({
     ...toCamel(p),
     referrerWallet: referrerMap[p.referrer_id] ?? null,
+    teamCount: teamCountMap[p.id] ?? 0,
   }));
 
   return { data: enriched, total: count ?? 0 };

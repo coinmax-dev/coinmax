@@ -59,13 +59,17 @@ export async function getProfile(walletAddress: string) {
 
   // Resolve parent wallet address from referrer_id
   if (data.referrer_id) {
-    const { data: parent } = await supabase
-      .from("profiles")
-      .select("wallet_address")
-      .eq("id", data.referrer_id)
-      .single();
-    if (parent) {
-      profile.parentWallet = parent.wallet_address;
+    try {
+      const { data: parent } = await supabase
+        .from("profiles")
+        .select("wallet_address")
+        .eq("id", data.referrer_id)
+        .single();
+      if (parent) {
+        profile.parentWallet = parent.wallet_address;
+      }
+    } catch {
+      // Ignore – don't let parent lookup break profile loading
     }
   }
 
