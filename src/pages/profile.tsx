@@ -110,9 +110,21 @@ export default function ProfilePage() {
     return `${window.location.origin}?ref=${refCode}`;
   }, [refCode]);
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = async (text: string) => {
     try {
-      navigator.clipboard.writeText(text);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
       toast({ title: t("common.copied"), description: t("common.copiedDesc") });
     } catch {
       toast({ title: t("common.copied"), description: text });

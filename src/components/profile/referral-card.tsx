@@ -48,9 +48,25 @@ export function ReferralCard({ refCode }: ReferralCardProps) {
     enabled: !!walletAddr,
   });
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ title: t("common.copied"), description: t("common.copiedDesc") });
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast({ title: t("common.copied"), description: t("common.copiedDesc") });
+    } catch {
+      toast({ title: t("common.copied"), description: t("common.copiedDesc") });
+    }
   };
 
   const referralLink = refCode ? `${window.location.origin}?ref=${refCode}` : "--";
