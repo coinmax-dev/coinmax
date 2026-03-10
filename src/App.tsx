@@ -43,7 +43,7 @@ function getRefCodeFromUrl(): string | null {
   const urlParams = new URLSearchParams(window.location.search);
   const urlRef = urlParams.get("ref");
   if (urlRef) {
-    sessionStorage.setItem("coinmax_ref_code", urlRef);
+    localStorage.setItem("coinmax_ref_code", urlRef);
     urlParams.delete("ref");
     const newUrl = urlParams.toString()
       ? `${window.location.pathname}?${urlParams.toString()}`
@@ -51,7 +51,7 @@ function getRefCodeFromUrl(): string | null {
     window.history.replaceState({}, "", newUrl);
     return urlRef;
   }
-  return sessionStorage.getItem("coinmax_ref_code");
+  return localStorage.getItem("coinmax_ref_code");
 }
 
 function WalletSync() {
@@ -76,13 +76,13 @@ function WalletSync() {
       setShowRefDialog(true);
       return false;
     }
-    if (refCode) sessionStorage.removeItem("coinmax_ref_code");
+    if (refCode) localStorage.removeItem("coinmax_ref_code");
     return true;
   }, []);
 
   useEffect(() => {
     if (!account?.address) return;
-    const refCode = refCodeRef.current || sessionStorage.getItem("coinmax_ref_code");
+    const refCode = refCodeRef.current || localStorage.getItem("coinmax_ref_code");
 
     (async () => {
       try {
