@@ -73,16 +73,12 @@ export function StrategyCard({ strategy, index }: StrategyCardProps) {
       {/* OpenClaw background */}
       {isOC && (
         <div
-          className="absolute z-0 pointer-events-none opacity-[0.12]"
+          className="absolute inset-0 z-0 pointer-events-none opacity-[0.25]"
           style={{
             backgroundImage: "url(/OPENCLAW.png)",
-            backgroundSize: "contain",
-            backgroundPosition: "center top",
+            backgroundSize: "55%",
+            backgroundPosition: "center center",
             backgroundRepeat: "no-repeat",
-            width: "45%",
-            height: "70%",
-            right: "-5%",
-            bottom: "10%",
           }}
         />
       )}
