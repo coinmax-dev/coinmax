@@ -15,12 +15,12 @@ import {
   getStrategies, getProfile, getSubscriptions, getHedgePositions,
   getInsurancePool, getHedgePurchases, getAiPredictions, fetchPolymarkets,
   getNewsPredictions, getPredictionBets, subscribeStrategy, purchaseHedge,
-  subscribeVip, placePredictionBet,
+  placePredictionBet,
 } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { formatCompact, formatUSD } from "@/lib/constants";
 import {
-  Crown, Zap, Shield, CheckCircle2, TrendingUp, TrendingDown,
+  Shield, CheckCircle2, TrendingUp, TrendingDown,
   Minus, Clock, Brain, Info, RefreshCw, Wallet, ChevronLeft, ChevronRight,
   Search, RotateCcw, Send, Copy, Eye, EyeOff, Key, Link2, MessageCircle,
   Newspaper, Globe, ExternalLink, BarChart3, Sparkles, DollarSign, Trophy,
@@ -218,18 +218,6 @@ export default function StrategyPage() {
     },
   });
 
-  const vipMutation = useMutation({
-    mutationFn: async () => {
-      return subscribeVip(walletAddr, undefined, "monthly");
-    },
-    onSuccess: () => {
-      toast({ title: t("strategy.vipActivated"), description: t("strategy.vipActivatedDesc") });
-      queryClient.invalidateQueries({ queryKey: ["profile", walletAddr] });
-    },
-    onError: (err: Error) => {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
-    },
-  });
 
   const handleSubscribeClick = (strategy: Strategy) => {
     if (!walletAddr) {
@@ -369,37 +357,6 @@ export default function StrategyPage() {
               )}
             </div>
 
-            {walletAddr && !profile?.isVip && (
-              <div style={{ animation: "fadeSlideIn 0.4s ease-out 0.3s both" }}>
-                <Card className="border-border bg-card glow-green-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Crown className="h-5 w-5 text-primary" />
-                      <h3 className="text-sm font-bold">{t("strategy.upgradeToVip")}</h3>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      {t("strategy.vipDesc")}
-                    </p>
-                    <div className="space-y-2 mb-4">
-                      {[t("strategy.vipBenefit1"), t("strategy.vipBenefit2"), t("strategy.vipBenefit3"), t("strategy.vipBenefit4")].map((benefit) => (
-                        <div key={benefit} className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <CheckCircle2 className="h-3 w-3 text-primary shrink-0" />
-                          <span>{benefit}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <Button
-                      className="w-full"
-                      onClick={() => toast({ title: t("common.comingSoon") })}
-                      data-testid="button-upgrade-vip"
-                    >
-                      <Zap className="mr-1 h-4 w-4" />
-                      {vipMutation.isPending ? t("common.processing") : t("strategy.upgradeVipPrice")}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
           </>
         )}
 
