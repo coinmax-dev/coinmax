@@ -34,7 +34,7 @@ export const EARLY_BIRD_DEPOSIT_RATE = 0.10;
 
 export const NODE_PLANS = {
   MINI: {
-    price: 100, label: "Small Node", frozenAmount: 1000, dailyRate: 0.005, dailyYield: 5,
+    price: 100, label: "Small Node", frozenAmount: 1000, dailyRate: 0.009, dailyYield: 9,
     durationDays: 90, contributionRate: 0.10,
     activationDesc: "V2: 100U holding + 3 small node referrals",
     features: ["basicStrategies", "communityAccess"],
