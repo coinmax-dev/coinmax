@@ -392,14 +392,29 @@ export default function ProfilePage() {
             <div className="px-4 pb-4 space-y-2.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
               <div className="pt-3" />
               <div
-                className="rounded-xl p-3.5 flex items-center justify-between gap-3"
+                className={`rounded-xl p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all ${selectedVipPlan === "monthly" ? "ring-1 ring-yellow-400" : ""}`}
                 style={{ border: "1px solid rgba(234,179,8,0.5)", background: "rgba(234,179,8,0.06)" }}
+                onClick={() => setSelectedVipPlan("monthly")}
               >
                 <div>
                   <div className="text-[13px] font-bold text-white">VIP {t("profile.vipPlan_monthly")}</div>
                   <div className="text-[11px] text-white/40 mt-0.5">1 month</div>
                 </div>
                 <div className="text-[16px] font-black text-yellow-400">$49</div>
+              </div>
+              <div
+                className={`rounded-xl p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all ${selectedVipPlan === "semiannual" ? "ring-1 ring-yellow-400" : ""}`}
+                style={{ border: "1px solid rgba(234,179,8,0.5)", background: "rgba(234,179,8,0.06)" }}
+                onClick={() => setSelectedVipPlan("semiannual")}
+              >
+                <div>
+                  <div className="text-[13px] font-bold text-white">VIP {t("profile.vipPlan_halfyear", "Half Year")}</div>
+                  <div className="text-[11px] text-white/40 mt-0.5">6 months</div>
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <div className="text-[16px] font-black text-yellow-400">$249</div>
+                  <div className="text-[10px] text-emerald-400 font-bold">SAVE 15%</div>
+                </div>
               </div>
               <div className="flex gap-2 pt-1">
                 <Button
@@ -411,9 +426,10 @@ export default function ProfilePage() {
                   {t("common.cancel")}
                 </Button>
                 <button
-                  className="flex-1 h-9 rounded-xl text-[12px] font-bold text-black transition-all hover:brightness-110 active:scale-95 flex items-center justify-center"
+                  className="flex-1 h-9 rounded-xl text-[12px] font-bold text-black transition-all hover:brightness-110 active:scale-95 flex items-center justify-center disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg, #facc15, #eab308)" }}
-                  onClick={() => toast({ title: "暂未开放" })}
+                  disabled={!selectedVipPlan}
+                  onClick={() => selectedVipPlan && vipMutation.mutate(selectedVipPlan)}
                 >
                   {t("profile.payNow")}
                 </button>
