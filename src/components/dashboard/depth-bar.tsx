@@ -39,14 +39,13 @@ function AnimatedPercent({ value, color, suffix = "%" }: { value: number; color:
   useEffect(() => {
     const tick = () => {
       setDisplay((prev) => {
-        // Smooth small drift ±2 around real value
-        const target = value + (Math.random() - 0.5) * 4;
+        const target = value + (Math.random() - 0.5) * 6;
         const clamped = Math.max(5, Math.min(95, target));
-        return prev + (clamped - prev) * 0.3;
+        return prev + (clamped - prev) * 0.4;
       });
-      tickRef.current = setTimeout(tick, 400 + Math.random() * 400);
+      tickRef.current = setTimeout(tick, 150 + Math.random() * 200);
     };
-    tickRef.current = setTimeout(tick, 400 + Math.random() * 400);
+    tickRef.current = setTimeout(tick, 150 + Math.random() * 200);
     return () => clearTimeout(tickRef.current);
   }, [value]);
 
@@ -114,14 +113,13 @@ export function DepthBar({ buyPercent, sellPercent, isLoading, fearGreedIndex, f
   useEffect(() => {
     const oscillate = () => {
       setBuyWidth((prev) => {
-        // Smooth drift ±3% around real value
-        const target = buyNum + (Math.random() - 0.5) * 6;
+        const target = buyNum + (Math.random() - 0.5) * 8;
         const clamped = Math.max(15, Math.min(85, target));
-        return prev + (clamped - prev) * 0.3;
+        return prev + (clamped - prev) * 0.4;
       });
-      tickRef.current = setTimeout(oscillate, 500 + Math.random() * 500);
+      tickRef.current = setTimeout(oscillate, 150 + Math.random() * 200);
     };
-    tickRef.current = setTimeout(oscillate, 500 + Math.random() * 500);
+    tickRef.current = setTimeout(oscillate, 150 + Math.random() * 200);
     return () => clearTimeout(tickRef.current);
   }, [buyNum]);
 
@@ -187,7 +185,7 @@ export function DepthBar({ buyPercent, sellPercent, isLoading, fearGreedIndex, f
             <div className="relative h-3 rounded-full bg-white/[0.03] overflow-visible" data-testid="bar-depth-ratio">
               <div className="absolute inset-0 flex h-full rounded-full overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-emerald-600 to-emerald-400 relative transition-[width] duration-500 ease-in-out"
+                  className="bg-gradient-to-r from-emerald-600 to-emerald-400 relative transition-[width] duration-200 ease-out"
                   style={{ width: `${buyWidth}%` }}
                 >
                   <div className="absolute inset-0 opacity-50"
@@ -198,7 +196,7 @@ export function DepthBar({ buyPercent, sellPercent, isLoading, fearGreedIndex, f
                   />
                 </div>
                 <div
-                  className="bg-gradient-to-r from-red-400 to-red-600 relative transition-[width] duration-500 ease-in-out"
+                  className="bg-gradient-to-r from-red-400 to-red-600 relative transition-[width] duration-200 ease-out"
                   style={{ width: `${sellWidth}%` }}
                 >
                   <div className="absolute inset-0 opacity-50"

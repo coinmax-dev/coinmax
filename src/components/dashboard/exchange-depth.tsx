@@ -35,13 +35,13 @@ function JitterPercent({ value, color }: { value: number; color: string }) {
   useEffect(() => {
     const tick = () => {
       setDisplay((prev) => {
-        const target = value + (Math.random() - 0.5) * 0.6;
+        const target = value + (Math.random() - 0.5) * 1.0;
         const clamped = Math.max(0, Math.min(100, target));
-        return prev + (clamped - prev) * 0.3;
+        return prev + (clamped - prev) * 0.4;
       });
-      tickRef.current = setTimeout(tick, 500 + Math.random() * 500);
+      tickRef.current = setTimeout(tick, 150 + Math.random() * 200);
     };
-    tickRef.current = setTimeout(tick, 500);
+    tickRef.current = setTimeout(tick, 150);
     return () => clearTimeout(tickRef.current);
   }, [value]);
 
@@ -77,13 +77,13 @@ function DepthBarRow({ ex, mounted, index }: { ex: ExchangeRow; mounted: boolean
   useEffect(() => {
     const oscillate = () => {
       setBuyWidth((prev) => {
-        const target = ex.buy + (Math.random() - 0.5) * 1.5;
+        const target = ex.buy + (Math.random() - 0.5) * 2.0;
         const clamped = Math.max(1, Math.min(99, target));
-        return prev + (clamped - prev) * 0.3;
+        return prev + (clamped - prev) * 0.4;
       });
-      tickRef.current = setTimeout(oscillate, 500 + Math.random() * 500);
+      tickRef.current = setTimeout(oscillate, 150 + Math.random() * 200);
     };
-    tickRef.current = setTimeout(oscillate, 500);
+    tickRef.current = setTimeout(oscillate, 150);
     return () => clearTimeout(tickRef.current);
   }, [ex.buy]);
 
@@ -109,14 +109,14 @@ function DepthBarRow({ ex, mounted, index }: { ex: ExchangeRow; mounted: boolean
       <div className="flex-1 relative h-[18px] min-w-0">
         <div className="absolute inset-0 flex h-full rounded-sm overflow-hidden">
           <div
-            className="transition-[width] duration-500 ease-in-out"
+            className="transition-[width] duration-200 ease-out"
             style={{
               width: mounted ? `${buyWidth}%` : "0%",
               background: 'linear-gradient(90deg, rgba(16,185,129,0.5), rgba(16,185,129,0.8))',
             }}
           />
           <div
-            className="transition-[width] duration-500 ease-in-out"
+            className="transition-[width] duration-200 ease-out"
             style={{
               width: mounted ? `${sellWidth}%` : "0%",
               background: 'linear-gradient(90deg, rgba(239,68,68,0.8), rgba(239,68,68,0.5))',

@@ -377,7 +377,11 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
   const consensusLabel = consensusRaw === "BULLISH" ? t("dashboard.bullish") : consensusRaw === "BEARISH" ? t("dashboard.bearish") : t("dashboard.mixed");
 
   const bestForecast = sorted[0];
-  const otherForecasts = sorted.slice(1);
+  // Show pressed model's forecast in FeaturedCard, or default to best
+  const displayedForecast = activeModel
+    ? sorted.find(f => f.model === activeModel) || bestForecast
+    : bestForecast;
+  const otherForecasts = sorted.filter(f => f.model !== displayedForecast.model);
 
   return (
     <div
@@ -439,9 +443,9 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
 
       <div className="px-4 pb-3">
         <FeaturedCard
-          forecast={bestForecast}
-          isActive={activeModel === bestForecast.model || !activeModel}
-          onSelect={() => onSelectModel(bestForecast.model)}
+          forecast={displayedForecast}
+          isActive={true}
+          onSelect={() => onSelectModel(displayedForecast.model)}
         />
       </div>
 
