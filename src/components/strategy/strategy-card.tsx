@@ -93,7 +93,7 @@ export function StrategyCard({ strategy, index }: StrategyCardProps) {
           }}
         />
       )}
-      <CardContent className="p-3 relative z-[1]">
+      <CardContent className="p-3 relative z-[1] h-full flex flex-col">
         <div className="flex items-start justify-between gap-1 mb-1">
           <h4 className="text-xs font-semibold leading-tight line-clamp-2 flex-1">{strategy.name}</h4>
           <div className="flex gap-1 shrink-0">
@@ -114,7 +114,7 @@ export function StrategyCard({ strategy, index }: StrategyCardProps) {
           +{monthlyReturn.toFixed(2)}%
         </div>
         <div className="text-[12px] text-muted-foreground mb-2">Win: {winRate.toFixed(1)}%</div>
-        <div className="h-10 w-full">
+        <div className="h-10 w-full mt-auto">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
               <defs>
