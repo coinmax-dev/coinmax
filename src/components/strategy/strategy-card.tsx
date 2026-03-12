@@ -70,13 +70,24 @@ export function StrategyCard({ strategy, index }: StrategyCardProps) {
       data-testid={`strategy-card-${strategy.id}`}
       style={{ animation: `fadeSlideIn 0.4s ease-out ${index * 0.08}s both` }}
     >
-      {/* OpenClaw background */}
+      {/* Strategy background */}
       {isOC && (
         <div
           className="absolute inset-0 z-0 pointer-events-none opacity-[0.25]"
           style={{
             backgroundImage: "url(/OPENCLAW.png)",
             backgroundSize: "55%",
+            backgroundPosition: "center center",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+      )}
+      {isHL && (
+        <div
+          className="absolute inset-0 z-0 pointer-events-none opacity-[0.2]"
+          style={{
+            backgroundImage: "url(/hyperliquid-bg.png)",
+            backgroundSize: "50%",
             backgroundPosition: "center center",
             backgroundRepeat: "no-repeat",
           }}
