@@ -328,7 +328,10 @@
     "lossAbove10": "月間損失 >10%",
     "payout": "支払い",
     "assetPackage": "アセットパッケージ",
-    "dailyYieldAmount": "日次利回り"
+    "dailyYieldAmount": "日次利回り",
+    "deposit": "入金",
+    "levelNotReached": "レベル未到達",
+    "levelNotReachedDesc": "必要なレベルに達していません。この機能はまだ利用できません。"
   },
   "profile": {
     "assetsOverview": "資産概要",

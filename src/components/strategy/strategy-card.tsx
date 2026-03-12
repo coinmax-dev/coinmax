@@ -1,46 +1,88 @@
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Flame, Lock } from "lucide-react";
+import { Flame } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { generateStrategyChartData, calcStrategyReturn, calcStrategyWinDisplay, getReturnColor } from "@/lib/formulas";
-import type { Strategy } from "@shared/types";
-import { useMemo } from "react";
+import { generateStrategyChartData, getReturnColor } from "@/lib/formulas";
 import { formatCompact } from "@/lib/constants";
 import { useTranslation } from "react-i18next";
+import { useToast } from "@/hooks/use-toast";
+import type { LocalStrategy } from "@/lib/data";
 
-interface StrategyCardProps {
-  strategy: Strategy;
-  index: number;
-  isVip?: boolean;
-  onSubscribe: (strategy: Strategy) => void;
+function seededFloat(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 49297;
+  return x - Math.floor(x);
 }
 
-export function StrategyCard({ strategy, index, isVip, onSubscribe }: StrategyCardProps) {
+function useFloatingValue(min: number, max: number, salt: number, intervalMs: number) {
+  const getValue = () => {
+    const tick = Math.floor(Date.now() / intervalMs);
+    return min + seededFloat(tick + salt) * (max - min);
+  };
+  const [value, setValue] = useState(getValue);
+  useEffect(() => {
+    const id = setInterval(() => setValue(getValue()), 60_000);
+    return () => clearInterval(id);
+  }, [min, max, salt, intervalMs]);
+  return value;
+}
+
+interface StrategyCardProps {
+  strategy: LocalStrategy;
+  index: number;
+}
+
+export function StrategyCard({ strategy, index }: StrategyCardProps) {
   const { t } = useTranslation();
-  const returnVal = Number(strategy.monthlyReturn) || 0;
-  const winRate = Number(strategy.winRate || 0);
-  const { formatted, isPositive } = calcStrategyReturn(returnVal);
+  const { toast } = useToast();
+  const isHL = strategy.type === "hyperliquid";
+  const isOC = strategy.type === "openclaw";
+
+  const winRate = useFloatingValue(
+    strategy.winRateRange[0], strategy.winRateRange[1],
+    index * 137, strategy.updateIntervalMs,
+  );
+  const monthlyReturn = useFloatingValue(
+    strategy.monthlyReturnRange[0], strategy.monthlyReturnRange[1],
+    index * 251, strategy.updateIntervalMs,
+  );
+  const aum = useFloatingValue(
+    strategy.totalAumRange[0], strategy.totalAumRange[1],
+    index * 389, strategy.updateIntervalMs,
+  );
+
+  const isPositive = monthlyReturn >= 0;
   const color = getReturnColor(isPositive);
-  const winDisplay = calcStrategyWinDisplay(winRate);
   const chartData = useMemo(() => generateStrategyChartData(index), [index]);
-  const aum = Number(strategy.totalAum) || 0;
+
+  const handleClick = () => {
+    if (isHL) {
+      toast({ title: t("strategy.levelNotReached"), description: t("strategy.levelNotReachedDesc") });
+    } else {
+      toast({ title: t("common.comingSoon") });
+    }
+  };
 
   return (
     <Card
-      className="border-border bg-card hover-elevate relative"
+      className="border-border bg-card hover-elevate relative overflow-hidden"
       data-testid={`strategy-card-${strategy.id}`}
       style={{ animation: `fadeSlideIn 0.4s ease-out ${index * 0.08}s both` }}
     >
-      {strategy.isVipOnly && !isVip && (
-        <div className="absolute inset-0 z-10 rounded-md bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
-          <Lock className="h-6 w-6 text-primary" />
-          <Badge className="bg-primary/20 text-primary text-[12px] no-default-hover-elevate no-default-active-elevate">
-            {t("strategy.vipOnly")}
-          </Badge>
-        </div>
+      {/* OpenClaw background */}
+      {isOC && (
+        <div
+          className="absolute inset-0 z-0 pointer-events-none opacity-[0.06]"
+          style={{
+            backgroundImage: "url(/OPENCLAW.png)",
+            backgroundSize: "60%",
+            backgroundPosition: "bottom right",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
       )}
-      <CardContent className="p-3">
+      <CardContent className="p-3 relative z-[1]">
         <div className="flex items-start justify-between gap-1 mb-1">
           <h4 className="text-xs font-semibold leading-tight line-clamp-2 flex-1">{strategy.name}</h4>
           <div className="flex gap-1 shrink-0">
@@ -58,9 +100,9 @@ export function StrategyCard({ strategy, index, isVip, onSubscribe }: StrategyCa
           {strategy.leverage} | AUM: {formatCompact(aum)}
         </div>
         <div className={`text-xl font-bold mb-1 ${isPositive ? "text-neon-value" : "text-red-400"}`}>
-          {formatted}
+          +{monthlyReturn.toFixed(2)}%
         </div>
-        <div className="text-[12px] text-muted-foreground mb-2">Win: {winDisplay}</div>
+        <div className="text-[12px] text-muted-foreground mb-2">Win: {winRate.toFixed(1)}%</div>
         <div className="h-10 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
@@ -79,9 +121,9 @@ export function StrategyCard({ strategy, index, isVip, onSubscribe }: StrategyCa
           size="sm"
           className="w-full mt-2 text-xs"
           data-testid={`button-subscribe-${strategy.id}`}
-          onClick={() => onSubscribe(strategy)}
+          onClick={handleClick}
         >
-          {t("common.subscribe")}
+          {isHL ? t("strategy.deposit") : t("common.subscribe")}
         </Button>
       </CardContent>
     </Card>

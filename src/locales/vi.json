@@ -328,7 +328,10 @@
     "lossAbove10": "Lỗ tháng >10%",
     "payout": "chi trả",
     "assetPackage": "Gói tài sản",
-    "dailyYieldAmount": "Lợi suất hàng ngày"
+    "dailyYieldAmount": "Lợi suất hàng ngày",
+    "deposit": "Nạp tiền",
+    "levelNotReached": "Chưa đạt cấp bậc",
+    "levelNotReachedDesc": "Cấp bậc của bạn chưa đạt yêu cầu. Tính năng này chưa được mở."
   },
   "profile": {
     "assetsOverview": "Tổng quan tài sản",

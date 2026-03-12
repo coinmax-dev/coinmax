@@ -116,6 +116,108 @@ export const EXCHANGES = [
   { name: "Bybit", tag: "Bybit" },
 ] as const;
 
+export interface LocalStrategy {
+  id: string;
+  name: string;
+  description: string;
+  leverage: string;
+  winRateRange: [number, number];    // min, max — floating
+  monthlyReturnRange: [number, number]; // min, max — floating
+  totalAumRange: [number, number];
+  status: string;
+  isHot: boolean;
+  isVipOnly: boolean;
+  type: "hyperliquid" | "openclaw";
+  updateIntervalMs: number;          // how often values float
+}
+
+export const LOCAL_STRATEGIES: LocalStrategy[] = [
+  {
+    id: "hyperliquid-vault",
+    name: "HyperLiquid Vault",
+    description: "HyperLiquid on-chain vault strategy with delta-neutral market making",
+    leverage: "3x",
+    winRateRange: [76, 82],
+    monthlyReturnRange: [18, 26],
+    totalAumRange: [2_800_000, 3_500_000],
+    status: "ACTIVE",
+    isHot: true,
+    isVipOnly: false,
+    type: "hyperliquid",
+    updateIntervalMs: 3600_000, // 1 hour
+  },
+  {
+    id: "openclaw-gpt",
+    name: "OpenClaw GPT",
+    description: "GPT-powered multi-factor momentum strategy",
+    leverage: "5x",
+    winRateRange: [80, 88],
+    monthlyReturnRange: [22, 26],
+    totalAumRange: [1_200_000, 1_800_000],
+    status: "ACTIVE",
+    isHot: false,
+    isVipOnly: false,
+    type: "openclaw",
+    updateIntervalMs: 7200_000, // 2 hours
+  },
+  {
+    id: "openclaw-gemini",
+    name: "OpenClaw Gemini",
+    description: "Gemini deep-learning trend-following engine",
+    leverage: "5x",
+    winRateRange: [83, 87],
+    monthlyReturnRange: [25, 29],
+    totalAumRange: [900_000, 1_400_000],
+    status: "ACTIVE",
+    isHot: false,
+    isVipOnly: false,
+    type: "openclaw",
+    updateIntervalMs: 7200_000,
+  },
+  {
+    id: "openclaw-deepseek",
+    name: "OpenClaw DeepSeek",
+    description: "DeepSeek quantitative analysis with adaptive risk control",
+    leverage: "8x",
+    winRateRange: [80, 84],
+    monthlyReturnRange: [32, 36],
+    totalAumRange: [600_000, 1_000_000],
+    status: "ACTIVE",
+    isHot: true,
+    isVipOnly: false,
+    type: "openclaw",
+    updateIntervalMs: 7200_000,
+  },
+  {
+    id: "openclaw-qwen",
+    name: "OpenClaw Qwen",
+    description: "Qwen conservative hedging with high win rate",
+    leverage: "3x",
+    winRateRange: [90, 94],
+    monthlyReturnRange: [13, 17],
+    totalAumRange: [1_500_000, 2_000_000],
+    status: "ACTIVE",
+    isHot: false,
+    isVipOnly: false,
+    type: "openclaw",
+    updateIntervalMs: 7200_000,
+  },
+  {
+    id: "openclaw-grok",
+    name: "OpenClaw Grok",
+    description: "Grok real-time sentiment + technical fusion strategy",
+    leverage: "5x",
+    winRateRange: [87, 91],
+    monthlyReturnRange: [18, 22],
+    totalAumRange: [800_000, 1_200_000],
+    status: "ACTIVE",
+    isHot: false,
+    isVipOnly: false,
+    type: "openclaw",
+    updateIntervalMs: 7200_000,
+  },
+];
+
 export const SETTINGS_ITEMS = [
   { key: "leaderboard", label: "Leaderboard" },
   { key: "contact-us", label: "Contact Us" },

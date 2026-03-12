@@ -328,7 +328,10 @@
     "lossAbove10": "الخسارة الشهرية >10%",
     "payout": "دفعة",
     "assetPackage": "حزمة الأصول",
-    "dailyYieldAmount": "العائد اليومي"
+    "dailyYieldAmount": "العائد اليومي",
+    "deposit": "إيداع",
+    "levelNotReached": "لم يتم الوصول للمستوى",
+    "levelNotReachedDesc": "لم يصل مستواك إلى المطلوب. هذه الميزة غير متاحة بعد."
   },
   "profile": {
     "assetsOverview": "نظرة عامة على الأصول",

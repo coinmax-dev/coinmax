@@ -328,7 +328,10 @@
     "lossAbove10": "Pérdida mensual >10%",
     "payout": "pago",
     "assetPackage": "Paquete de Activos",
-    "dailyYieldAmount": "Rendimiento Diario"
+    "dailyYieldAmount": "Rendimiento Diario",
+    "deposit": "Depositar",
+    "levelNotReached": "Nivel no alcanzado",
+    "levelNotReachedDesc": "Su nivel no ha alcanzado el requisito. Esta función aún no está disponible."
   },
   "profile": {
     "assetsOverview": "Resumen de Activos",

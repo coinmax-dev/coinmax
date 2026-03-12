@@ -328,7 +328,10 @@
     "lossAbove10": "當月虧損 >10%",
     "payout": "賠付",
     "assetPackage": "權益資產包",
-    "dailyYieldAmount": "每日收益"
+    "dailyYieldAmount": "每日收益",
+    "deposit": "存入",
+    "levelNotReached": "等級未達標",
+    "levelNotReachedDesc": "您的等級尚未達到要求，該功能暫未開啟。"
   },
   "profile": {
     "assetsOverview": "資產概覽",

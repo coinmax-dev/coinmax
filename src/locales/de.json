@@ -328,7 +328,10 @@
     "lossAbove10": "Monatsverlust >10%",
     "payout": "Auszahlung",
     "assetPackage": "Vermögenspaket",
-    "dailyYieldAmount": "Täglicher Ertrag"
+    "dailyYieldAmount": "Täglicher Ertrag",
+    "deposit": "Einzahlen",
+    "levelNotReached": "Level nicht erreicht",
+    "levelNotReachedDesc": "Ihr Level hat die Anforderung nicht erreicht. Diese Funktion ist noch nicht verfügbar."
   },
   "profile": {
     "assetsOverview": "Vermögensübersicht",

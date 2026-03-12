@@ -328,7 +328,10 @@
     "lossAbove10": "Monthly loss >10%",
     "payout": "payout",
     "assetPackage": "Asset Package",
-    "dailyYieldAmount": "Daily Yield"
+    "dailyYieldAmount": "Daily Yield",
+    "deposit": "Deposit",
+    "levelNotReached": "Level Not Reached",
+    "levelNotReachedDesc": "Your rank has not reached the required level. This feature is not yet available."
   },
   "profile": {
     "assetsOverview": "Assets Overview",

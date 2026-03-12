@@ -12,7 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useActiveAccount } from "thirdweb/react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  getStrategies, getProfile, getSubscriptions, getHedgePositions,
+  getProfile, getSubscriptions, getHedgePositions,
   getInsurancePool, getHedgePurchases, getAiPredictions, fetchPolymarkets,
   getNewsPredictions, getPredictionBets, subscribeStrategy, purchaseHedge,
   placePredictionBet,
@@ -37,7 +37,7 @@ const TABS: { id: TabId; labelKey: string }[] = [
   { id: "predictions", labelKey: "strategy.predictions" },
 ];
 
-import { EXCHANGES, HEDGE_CONFIG } from "@/lib/data";
+import { EXCHANGES, HEDGE_CONFIG, LOCAL_STRATEGIES } from "@/lib/data";
 
 export default function StrategyPage() {
   const { t } = useTranslation();
@@ -73,10 +73,6 @@ export default function StrategyPage() {
   const [betChoice, setBetChoice] = useState("");
   const [betAmount, setBetAmount] = useState("");
 
-  const { data: strategies = [], isLoading } = useQuery<Strategy[]>({
-    queryKey: ["strategies"],
-    queryFn: getStrategies,
-  });
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ["profile", walletAddr],
@@ -300,7 +296,7 @@ export default function StrategyPage() {
   const calendarLabel = `${monthNames[calendarMonth.getMonth()]} ${calendarMonth.getFullYear()}`;
 
   const getStrategyName = (strategyId: string) => {
-    const s = strategies.find((st) => st.id === strategyId);
+    const s = LOCAL_STRATEGIES.find((st) => st.id === strategyId);
     return s?.name || "Unknown Strategy";
   };
 
@@ -342,19 +338,11 @@ export default function StrategyPage() {
           <>
             <div style={{ animation: "fadeSlideIn 0.4s ease-out 0.1s both" }}>
               <h3 className="text-sm font-bold mb-3" data-testid="text-strategies-list-title">{t("strategy.allStrategies")}</h3>
-              {isLoading ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <Skeleton key={i} className="h-56 rounded-md" />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {strategies.map((s, i) => (
-                    <StrategyCard key={s.id} strategy={s} index={i} isVip={profile?.isVip} onSubscribe={handleSubscribeClick} />
-                  ))}
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-3">
+                {LOCAL_STRATEGIES.map((s, i) => (
+                  <StrategyCard key={s.id} strategy={s} index={i} />
+                ))}
+              </div>
             </div>
 
           </>

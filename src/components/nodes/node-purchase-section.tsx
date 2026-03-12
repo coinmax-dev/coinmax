@@ -24,7 +24,7 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr, a
 
   const plan = NODE_PLANS[nodeType];
   const isMAX = nodeType === "MAX";
-  const dailyRate = isMAX ? "0.9%" : "0.5%";
+  const dailyRate = isMAX ? "0.9%" : "0.9%";
 
   const purchaseMutation = useMutation({
     mutationFn: async () => {

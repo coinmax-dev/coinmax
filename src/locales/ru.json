@@ -328,7 +328,10 @@
     "lossAbove10": "Месячный убыток >10%",
     "payout": "выплата",
     "assetPackage": "Пакет Активов",
-    "dailyYieldAmount": "Ежедневный Доход"
+    "dailyYieldAmount": "Ежедневный Доход",
+    "deposit": "Депозит",
+    "levelNotReached": "Уровень не достигнут",
+    "levelNotReachedDesc": "Ваш уровень не достиг требуемого. Эта функция пока недоступна."
   },
   "profile": {
     "assetsOverview": "Обзор Активов",

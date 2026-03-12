@@ -328,7 +328,10 @@
     "lossAbove10": "월간 손실 >10%",
     "payout": "지급",
     "assetPackage": "자산 패키지",
-    "dailyYieldAmount": "일일 수익"
+    "dailyYieldAmount": "일일 수익",
+    "deposit": "입금",
+    "levelNotReached": "등급 미달",
+    "levelNotReachedDesc": "등급이 요구 수준에 도달하지 않았습니다. 이 기능은 아직 사용할 수 없습니다."
   },
   "profile": {
     "assetsOverview": "자산 개요",

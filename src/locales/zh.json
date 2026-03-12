@@ -328,7 +328,10 @@
     "lossAbove10": "当月亏损 >10%",
     "payout": "赔付",
     "assetPackage": "权益资产包",
-    "dailyYieldAmount": "每日收益"
+    "dailyYieldAmount": "每日收益",
+    "deposit": "存入",
+    "levelNotReached": "等级未达标",
+    "levelNotReachedDesc": "您的等级尚未达到要求，该功能暂未开启。"
   },
   "profile": {
     "assetsOverview": "资产概览",

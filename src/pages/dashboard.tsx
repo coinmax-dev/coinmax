@@ -103,19 +103,16 @@ export default function Dashboard() {
 
   const forecastLoading = modelQueries.every(q => q.isLoading);
 
-  // Determine which forecast to display on chart
-  const activeForecast = useMemo(() => {
+  // Chart always shows the highest-confidence model (fixed, no switching)
+  const chartForecast = useMemo(() => {
     if (!allForecasts.length) return null;
-    if (selectedModel) {
-      const found = allForecasts.find(f => f.model === selectedModel);
-      if (found) return found;
-    }
-    // Default: highest confidence (already sorted by backend)
     return allForecasts[0];
-  }, [allForecasts, selectedModel]);
+  }, [allForecasts]);
 
-  // Auto-select best model when data arrives
-  const activeModelName = activeForecast?.model || selectedModel;
+  const chartModelName = chartForecast?.model || null;
+
+  // Active model for carousel highlight only (does NOT affect chart)
+  const activeModelName = selectedModel || chartModelName;
 
   const selectedCoin = prices?.find(
     (p) => p.symbol.toUpperCase() === selectedAsset
@@ -147,11 +144,11 @@ export default function Dashboard() {
         <PriceChart
           ohlcData={klineData}
           isLoading={chartLoading}
-          forecast={activeForecast || null}
+          forecast={chartForecast || null}
           forecastLoading={forecastLoading}
           selectedTimeframe={selectedTimeframe}
           onTimeframeChange={setSelectedTimeframe}
-          activeModel={activeModelName || undefined}
+          activeModel={chartModelName || undefined}
         />
       </div>
 
