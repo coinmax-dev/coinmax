@@ -7,12 +7,15 @@ import {
   getUsdtContract,
   getVaultContract,
   getNodeContract,
+  getSwapRouterContract,
   usdToUsdtUnits,
   VAULT_CONTRACT_ADDRESS,
   NODE_CONTRACT_ADDRESS,
   VIP_RECEIVER_ADDRESS,
+  SWAP_ROUTER_ADDRESS,
   VAULT_ABI,
   NODE_ABI,
+  SWAP_ROUTER_ABI,
   BSC_CHAIN,
   USDT_ADDRESS,
 } from "@/lib/contracts";
@@ -130,7 +133,7 @@ export function usePayment() {
     [client, _executePayment],
   );
 
-  // ── Node purchase ──
+  // ── Node purchase (V1 — direct USDT to Node contract) ──
   const payNodePurchase = useCallback(
     async (nodeType: string, paymentMode: string = "FULL"): Promise<string> => {
       if (!NODE_CONTRACT_ADDRESS) throw new Error("Node contract not configured");
@@ -142,6 +145,32 @@ export function usePayment() {
           contract: getNodeContract(client),
           method: NODE_ABI[0],
           params: [nodeType, USDT_ADDRESS],
+        }),
+      );
+    },
+    [client, _executePayment],
+  );
+
+  // ── Node purchase V2 (USDT → SwapRouter → PancakeSwap V3 → USDC → NodesV2) ──
+  const payNodePurchaseV2 = useCallback(
+    async (nodeType: string): Promise<string> => {
+      if (!SWAP_ROUTER_ADDRESS) throw new Error("SwapRouter not configured");
+      if (!client) throw new Error("Thirdweb client not ready");
+
+      const contributions: Record<string, number> = { MINI: 100, MAX: 600 };
+      const amountUsd = contributions[nodeType] || 0;
+      if (!amountUsd) throw new Error("Invalid node type");
+
+      const usdtAmount = usdToUsdtUnits(amountUsd);
+      // minUsdcOut = 99.9% of input (0.1% slippage for stablecoin pair)
+      const minUsdcOut = usdtAmount * BigInt(999) / BigInt(1000);
+
+      // Approve USDT to SwapRouter, then SwapRouter handles the rest
+      return _executePayment(SWAP_ROUTER_ADDRESS, amountUsd, () =>
+        prepareContractCall({
+          contract: getSwapRouterContract(client),
+          method: SWAP_ROUTER_ABI[0], // swapAndPurchaseNode
+          params: [usdtAmount, nodeType, minUsdcOut],
         }),
       );
     },
@@ -199,6 +228,7 @@ export function usePayment() {
   return {
     payVaultDeposit,
     payNodePurchase,
+    payNodePurchaseV2,
     payVIPSubscribe,
     status,
     txHash,

@@ -6,7 +6,7 @@ import { purchaseNode } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import { NODE_CONTRACT_ADDRESS } from "@/lib/contracts";
+import { NODE_CONTRACT_ADDRESS, SWAP_ROUTER_ADDRESS } from "@/lib/contracts";
 import { useTranslation } from "react-i18next";
 
 interface NodePurchaseDialogProps {
@@ -29,7 +29,11 @@ export function NodePurchaseDialog({ open, onOpenChange, nodeType, walletAddr, a
   const purchaseMutation = useMutation({
     mutationFn: async () => {
       let txHash: string | undefined;
-      if (NODE_CONTRACT_ADDRESS) {
+      if (SWAP_ROUTER_ADDRESS) {
+        // V2: USDT → PancakeSwap V3 → USDC → NodesV2
+        txHash = await payment.payNodePurchaseV2(nodeType);
+      } else if (NODE_CONTRACT_ADDRESS) {
+        // V1 fallback: direct USDT → Node contract
         txHash = await payment.payNodePurchase(nodeType, "FULL");
       }
       const result = await purchaseNode(walletAddr, nodeType, txHash, "FULL", isMAX ? authCode : undefined);
