@@ -379,11 +379,7 @@ function RootRouter() {
   }
 
   if (location.startsWith("/copy-trading")) {
-    return (
-      <ThirdwebProvider>
-        <CopyTradingPage />
-      </ThirdwebProvider>
-    );
+    return <CopyTradingPage />;
   }
 
   return <MainApp />;

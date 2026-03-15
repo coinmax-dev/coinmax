@@ -6,7 +6,6 @@
  */
 
 import { useState } from "react";
-import { useActiveAccount } from "thirdweb/react";
 import { LiveTradingPanel } from "@/components/strategy/live-trading-panel";
 import { RiskControlPanel } from "@/components/strategy/risk-control";
 import { ApiKeyBind } from "@/components/strategy/api-key-bind";
@@ -15,8 +14,6 @@ type Tab = "signals" | "risk" | "keys";
 
 export default function CopyTradingPage() {
   const [activeTab, setActiveTab] = useState<Tab>("signals");
-  const account = useActiveAccount();
-  const userId = account?.address || "";
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "signals", label: "信号 & 持仓" },
@@ -32,9 +29,7 @@ export default function CopyTradingPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-sm font-bold text-foreground/80">CoinMax 跟单交易</h1>
-              <p className="text-[10px] text-foreground/40 mt-0.5">
-                {userId ? `${userId.slice(0, 6)}...${userId.slice(-4)}` : "请连接钱包"}
-              </p>
+              <p className="text-[10px] text-foreground/40 mt-0.5">AI 模拟信号 & 持仓</p>
             </div>
           </div>
 
@@ -60,8 +55,8 @@ export default function CopyTradingPage() {
       {/* Content */}
       <div className="max-w-lg mx-auto px-4 py-4">
         {activeTab === "signals" && <LiveTradingPanel />}
-        {activeTab === "risk" && <RiskControlPanel userId={userId} />}
-        {activeTab === "keys" && <ApiKeyBind userId={userId} />}
+        {activeTab === "risk" && <RiskControlPanel userId="guest" />}
+        {activeTab === "keys" && <ApiKeyBind userId="guest" />}
       </div>
     </div>
   );
