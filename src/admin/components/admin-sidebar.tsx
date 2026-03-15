@@ -24,6 +24,7 @@ export const navItems: NavItem[] = [
   { path: "/admin/contracts", icon: FileCode2, label: "合约", permission: "contracts" },
   { path: "/admin/logs", icon: ScrollText, label: "日志", permission: "logs" },
   { path: "/admin/ai-accuracy", icon: Brain, label: "AI准确率", permission: "ai-accuracy" },
+  { path: "/admin/ai-progress", icon: TrendingUp, label: "AI训练进步", permission: "ai-accuracy" },
   { path: "/admin/providers", icon: Radio, label: "策略商", permission: "providers" },
   { path: "/admin/admins", icon: ShieldCheck, label: "管理员", permission: "admins" },
 ];

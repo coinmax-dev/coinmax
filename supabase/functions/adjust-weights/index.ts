@@ -108,7 +108,38 @@ serve(async (req) => {
       overall_accuracy: parseFloat(
         ((predictions.filter(p => p.direction_correct).length / predictions.length) * 100).toFixed(2)
       ),
-    }).then(() => {}).catch(() => {});
+    });
+
+    // 5. Save daily accuracy snapshots (upsert per model×asset×timeframe per day)
+    const today = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    for (const [key, preds] of Object.entries(groups)) {
+      const [model, asset, timeframe] = key.split(":");
+      const correct = preds.filter(p => p.direction_correct).length;
+      const accuracy = preds.length > 0 ? (correct / preds.length) * 100 : 0;
+      const avgConf = preds.reduce((s, p) => s + (p.confidence || 0), 0) / (preds.length || 1);
+      const avgError = preds.reduce((s, p) => s + Math.abs(p.actual_change_pct || 0), 0) / (preds.length || 1);
+
+      // Get latest weight from ai_model_accuracy
+      const { data: accRow } = await supabase
+        .from("ai_model_accuracy")
+        .select("computed_weight")
+        .eq("model", model).eq("asset", asset).eq("timeframe", timeframe).eq("period", "7d")
+        .single();
+
+      const { error: snapErr } = await supabase.from("accuracy_daily_snapshots").upsert({
+        snapshot_date: today,
+        model,
+        asset,
+        timeframe,
+        accuracy_pct: parseFloat(accuracy.toFixed(2)),
+        total_predictions: preds.length,
+        correct_predictions: correct,
+        avg_confidence: parseFloat(avgConf.toFixed(2)),
+        computed_weight: accRow?.computed_weight ?? 1.0,
+        avg_price_error_pct: parseFloat(avgError.toFixed(4)),
+      }, { onConflict: "snapshot_date,model,asset,timeframe" });
+      // ignore snapshot errors silently
+    }
 
     return new Response(JSON.stringify({
       success: true,
