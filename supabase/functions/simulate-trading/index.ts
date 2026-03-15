@@ -20,6 +20,13 @@ const corsHeaders = {
 
 const ASSETS = ["BTC", "ETH", "SOL", "BNB"];
 
+// Multiple timeframes for predictions
+const PREDICTION_TIMEFRAMES: { tf: string; interval: string; expiresMin: number }[] = [
+  { tf: "5m",  interval: "1m",  expiresMin: 5 },
+  { tf: "15m", interval: "5m",  expiresMin: 15 },
+  { tf: "1H",  interval: "5m",  expiresMin: 60 },
+];
+
 // Models matching the ones in ai_model_accuracy table
 const AI_MODELS = [
   { name: "GPT-4o",    defaultWeight: 0.5 },
@@ -466,25 +473,29 @@ serve(async (req) => {
         },
       }).catch(() => {});
 
-      // ── Step 5: Record predictions for accuracy tracking ──
-      const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString(); // 1h
-      for (const vote of votes) {
-        // Calculate target price based on prediction direction and confidence
-        const targetMul = vote.direction === "BULLISH" ? 1 : vote.direction === "BEARISH" ? -1 : 0;
-        const targetChangePct = targetMul * (vote.confidence / 100) * volatility * 0.5;
-        const targetPrice = currentPrice * (1 + targetChangePct / 100);
+      // ── Step 5: Record predictions for multiple timeframes ──
+      for (const { tf, expiresMin } of PREDICTION_TIMEFRAMES) {
+        const expiresAt = new Date(Date.now() + expiresMin * 60_000).toISOString();
+        // Scale volatility expectation by timeframe
+        const tfScale = tf === "5m" ? 0.15 : tf === "15m" ? 0.3 : 0.5;
 
-        const { error: predErr } = await supabase.from("ai_prediction_records").insert({
-          asset, timeframe: "1H", model: vote.model,
-          prediction: vote.direction, confidence: Math.round(vote.confidence),
-          current_price: currentPrice,
-          target_price: parseFloat(targetPrice.toFixed(2)),
-          status: "pending",
-          expires_at: expiresAt,
-          created_at: new Date().toISOString(),
-        });
-        if (predErr) results.errors.push(`Pred ${vote.model}: ${predErr.message}`);
-        results.predictions_recorded++;
+        for (const vote of votes) {
+          const targetMul = vote.direction === "BULLISH" ? 1 : vote.direction === "BEARISH" ? -1 : 0;
+          const targetChangePct = targetMul * (vote.confidence / 100) * volatility * tfScale;
+          const targetPrice = currentPrice * (1 + targetChangePct / 100);
+
+          const { error: predErr } = await supabase.from("ai_prediction_records").insert({
+            asset, timeframe: tf, model: vote.model,
+            prediction: vote.direction, confidence: Math.round(vote.confidence),
+            current_price: currentPrice,
+            target_price: parseFloat(targetPrice.toFixed(2)),
+            status: "pending",
+            expires_at: expiresAt,
+            created_at: new Date().toISOString(),
+          });
+          if (predErr) results.errors.push(`Pred ${vote.model}/${tf}: ${predErr.message}`);
+          results.predictions_recorded++;
+        }
       }
 
       // ── Step 6: Open paper trade for strong signals ───────
