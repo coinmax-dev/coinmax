@@ -16,6 +16,8 @@ import AdminPerformance from "./pages/admin-performance";
 import AdminLogs from "./pages/admin-logs";
 import AdminContracts from "./pages/admin-contracts";
 import AdminAdmins from "./pages/admin-admins";
+import AdminAIAccuracy from "./pages/admin-ai-accuracy";
+import AdminProviders from "./pages/admin-providers";
 
 function NoPermission() {
   return (
@@ -125,6 +127,12 @@ function AdminLayout() {
               </Route>
               <Route path="/admin/admins">
                 <ProtectedRoute permission="admins"><AdminAdmins /></ProtectedRoute>
+              </Route>
+              <Route path="/admin/ai-accuracy">
+                <ProtectedRoute permission="ai-accuracy"><AdminAIAccuracy /></ProtectedRoute>
+              </Route>
+              <Route path="/admin/providers">
+                <ProtectedRoute permission="providers"><AdminProviders /></ProtectedRoute>
               </Route>
             </Switch>
           </main>

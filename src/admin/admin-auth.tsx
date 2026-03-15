@@ -25,8 +25,8 @@ interface AdminAuthContextValue {
 
 // Permission matrix
 const PERMISSIONS: Record<AdminRole, string[]> = {
-  superadmin: ["dashboard", "members", "referrals", "vaults", "nodes", "node-funds", "auth-codes", "performance", "logs", "contracts", "admins"],
-  admin: ["dashboard", "members", "referrals", "nodes", "performance", "auth-codes", "contracts-view", "logs"],
+  superadmin: ["dashboard", "members", "referrals", "vaults", "nodes", "node-funds", "auth-codes", "performance", "logs", "contracts", "admins", "ai-accuracy", "providers"],
+  admin: ["dashboard", "members", "referrals", "nodes", "performance", "auth-codes", "contracts-view", "logs", "ai-accuracy", "providers"],
   support: ["dashboard", "members", "referrals"],
 };
 

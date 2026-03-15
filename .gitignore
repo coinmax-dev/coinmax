@@ -8,22 +8,18 @@ vite.config.ts.*
 # Environment variables (never commit secrets)
 .env
 .env.local
-.env.*.local
-# secrets / env
-.env
 .env.*
 *.pem
 *.key
+
+# IDE
+.idea/
+
+# Pasted assets
 attached_assets/
 
-# ignore pasted assets/secrets
-attached_assets/
-.env
-.env.*
+# Local Netlify folder
+.netlify
 
-# secrets / pasted assets
-attached_assets/
-.env
-.env.*
-*.pem
-*.key
+# Supabase temp
+supabase/.temp/

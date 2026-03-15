@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/AxomX.iml" filepath="$PROJECT_DIR$/.idea/AxomX.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../hummingbot/.idea/hummingbot.iml" filepath="$PROJECT_DIR$/../hummingbot/.idea/hummingbot.iml" />
     </modules>
   </component>
 </project>
