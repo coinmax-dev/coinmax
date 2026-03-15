@@ -31,9 +31,10 @@ function useFloatingValue(min: number, max: number, salt: number, intervalMs: nu
 interface StrategyCardProps {
   strategy: LocalStrategy;
   index: number;
+  onSubscribe?: (strategy: LocalStrategy) => void;
 }
 
-export function StrategyCard({ strategy, index }: StrategyCardProps) {
+export function StrategyCard({ strategy, index, onSubscribe }: StrategyCardProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const isHL = strategy.type === "hyperliquid";
@@ -57,7 +58,9 @@ export function StrategyCard({ strategy, index }: StrategyCardProps) {
   const chartData = useMemo(() => generateStrategyChartData(index), [index]);
 
   const handleClick = () => {
-    if (isHL) {
+    if (onSubscribe) {
+      onSubscribe(strategy);
+    } else if (isHL) {
       toast({ title: t("strategy.levelNotReached"), description: t("strategy.levelNotReachedDesc") });
     } else {
       toast({ title: t("common.comingSoon") });

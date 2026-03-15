@@ -28,11 +28,15 @@ import {
 import type { Strategy, StrategySubscription, Profile, HedgePosition, InsurancePurchase, AiPrediction, PredictionBet } from "@shared/types";
 import { StrategyHeader } from "@/components/strategy/strategy-header";
 import { StrategyCard } from "@/components/strategy/strategy-card";
+import { LiveTradingPanel } from "@/components/strategy/live-trading-panel";
+import { RiskControlPanel } from "@/components/strategy/risk-control";
+import { ApiKeyBind } from "@/components/strategy/api-key-bind";
 
-type TabId = "strategies" | "hedge" | "predictions";
+type TabId = "strategies" | "copytrading" | "hedge" | "predictions";
 
 const TABS: { id: TabId; labelKey: string }[] = [
   { id: "strategies", labelKey: "strategy.strategyList" },
+  { id: "copytrading", labelKey: "strategy.copyTrading" },
   { id: "hedge", labelKey: "strategy.hedgeProtection" },
   { id: "predictions", labelKey: "strategy.predictions" },
 ];
@@ -45,6 +49,7 @@ export default function StrategyPage() {
   const { toast } = useToast();
   const walletAddr = account?.address || "";
   const [activeTab, setActiveTab] = useState<TabId>("strategies");
+  const [copySubTab, setCopySubTab] = useState<"signals" | "risk" | "keys">("signals");
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [capitalAmount, setCapitalAmount] = useState("");
@@ -346,12 +351,48 @@ export default function StrategyPage() {
               <h3 className="text-sm font-bold mb-3" data-testid="text-strategies-list-title">{t("strategy.allStrategies")}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {LOCAL_STRATEGIES.map((s, i) => (
-                  <StrategyCard key={s.id} strategy={s} index={i} />
+                  <StrategyCard
+                    key={s.id}
+                    strategy={s}
+                    index={i}
+                    onSubscribe={() => {
+                      setActiveTab("copytrading");
+                      setCopySubTab("keys");
+                    }}
+                  />
                 ))}
               </div>
             </div>
 
           </>
+        )}
+
+        {activeTab === "copytrading" && (
+          <div className="space-y-4" style={{ animation: "fadeSlideIn 0.3s ease-out" }}>
+            <div className="flex gap-0 bg-card border border-border rounded-md overflow-hidden">
+              {([
+                { id: "signals" as const, label: t("strategy.signalsPositions") },
+                { id: "risk" as const, label: t("strategy.riskControl") },
+                { id: "keys" as const, label: t("strategy.exchangeBind") },
+              ]).map((sub) => (
+                <button
+                  key={sub.id}
+                  className={`flex-1 py-2 text-xs font-bold text-center transition-all ${
+                    copySubTab === sub.id
+                      ? "bg-primary text-white"
+                      : "text-muted-foreground hover-elevate"
+                  }`}
+                  onClick={() => setCopySubTab(sub.id)}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            {copySubTab === "signals" && <LiveTradingPanel />}
+            {copySubTab === "risk" && <RiskControlPanel userId={walletAddr} />}
+            {copySubTab === "keys" && <ApiKeyBind userId={walletAddr} />}
+          </div>
         )}
 
         {activeTab === "hedge" && (
