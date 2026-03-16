@@ -5,11 +5,11 @@ import { Clock, Users, Lock, Layers } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VAULT_PLANS } from "@/lib/data";
 import { useTranslation } from "react-i18next";
-import { useGrowingStats } from "@/hooks/use-growing-stats";
+import { useHLVault } from "@/hooks/use-hl-vault";
 
 export function VaultStats() {
   const { t } = useTranslation();
-  const { tvlFormatted, holders, positions } = useGrowingStats();
+  const { tvlFormatted, followers, positions } = useHLVault();
 
   const maxApr = Object.values(VAULT_PLANS).reduce((max, p) => {
     const apr = parseFloat(p.apr);
@@ -42,7 +42,7 @@ export function VaultStats() {
           <div className="text-[12px] text-muted-foreground mb-1 flex items-center gap-1">
             <Users className="h-3 w-3" /> {t("vault.holders")}
           </div>
-          <div className="text-lg font-bold" data-testid="text-holders">{holders}+</div>
+          <div className="text-lg font-bold" data-testid="text-holders">{followers}+</div>
         </CardContent>
       </Card>
       <Card className="border-border bg-card">

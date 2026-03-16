@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, BarChart3, Target, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useGrowingStats } from "@/hooks/use-growing-stats";
+import { useHLVault } from "@/hooks/use-hl-vault";
 
 function seededRandom(seed: number) {
   const x = Math.sin(seed * 9301 + 49297) * 49297;
@@ -94,7 +94,7 @@ function getCumulativeStats() {
 
 export function StrategyHeader() {
   const { t } = useTranslation();
-  const { tvlFormatted } = useGrowingStats();
+  const { tvlFormatted } = useHLVault();
   const floatingWinRate = useHourlyValue(80, 85, 100);
   const floatingMonthlyReturn = useHourlyValue(25, 35, 200);
   const [showCalendar, setShowCalendar] = useState(false);

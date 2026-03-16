@@ -10,6 +10,7 @@ import { useThirdwebClient } from "@/hooks/use-thirdweb";
 import { BSC_CHAIN } from "@/lib/contracts";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
+import LangSwitcher from "@/components/lang-switcher";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -280,10 +281,12 @@ function Header() {
         </span>
       </Link>
 
-      {isLoading || !client ? (
-        <div className="h-9 w-24 animate-pulse rounded-md bg-muted" />
-      ) : (
-        <ConnectButton
+      <div className="flex items-center gap-2">
+        <LangSwitcher />
+        {isLoading || !client ? (
+          <div className="h-9 w-24 animate-pulse rounded-md bg-muted" />
+        ) : (
+          <ConnectButton
           client={client}
           chain={BSC_CHAIN}
           wallets={wallets}
@@ -318,6 +321,7 @@ function Header() {
           showThirdwebBranding={false}
         />
       )}
+      </div>
     </header>
   );
 }

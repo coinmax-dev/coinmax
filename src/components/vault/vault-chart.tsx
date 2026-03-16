@@ -6,13 +6,13 @@ import { VAULT_CHART_PERIODS, type VaultChartPeriod } from "@/lib/data";
 import { generateVaultChartData } from "@/lib/formulas";
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useGrowingStats } from "@/hooks/use-growing-stats";
+import { useHLVault } from "@/hooks/use-hl-vault";
 
 export function VaultChart() {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<VaultChartPeriod>("ALL");
   const chartData = useMemo(() => generateVaultChartData(period), [period]);
-  const { tvlFormatted, holders, positions: posCount } = useGrowingStats();
+  const { tvlFormatted, followers, positions: posCount } = useHLVault();
 
   return (
     <div className="gradient-green-dark p-5 pt-2 rounded-b-2xl">
@@ -27,7 +27,7 @@ export function VaultChart() {
         </Badge>
       </div>
       <div className="flex items-center gap-4 text-xs text-muted-foreground mb-1">
-        <span className="flex items-center gap-1"><Users className="h-3 w-3" />{t("vault.holders")}: {holders}+</span>
+        <span className="flex items-center gap-1"><Users className="h-3 w-3" />{t("vault.holders")}: {followers}+</span>
         <span className="flex items-center gap-1"><Lock className="h-3 w-3" />{t("vault.activePositions")}: {posCount}+</span>
       </div>
       <div className="h-36 mt-3" data-testid="chart-vault">

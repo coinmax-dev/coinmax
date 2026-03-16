@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Minus, Sparkles, Brain, Zap, Target, Activity } from "lucide-react";
 import { formatUSD } from "@/lib/constants";
@@ -98,15 +98,16 @@ function MiniGauge({ value, accent, glow }: { value: number; accent: string; glo
 
 function FeaturedCard({
   forecast,
+  isBest,
   isActive,
   onSelect,
 }: {
   forecast: ForecastItem;
+  isBest: boolean;
   isActive: boolean;
   onSelect: () => void;
 }) {
   const { t } = useTranslation();
-  const [reasonExpanded, setReasonExpanded] = useState(false);
   const meta = getModelMeta(forecast.model);
   const isBullish = forecast.direction === "BULLISH";
   const isBearish = forecast.direction === "BEARISH";
@@ -120,6 +121,7 @@ function FeaturedCard({
       onClick={onSelect}
       className="ai-featured-card w-full text-left relative overflow-hidden rounded-xl cursor-pointer active:scale-[0.985] transition-transform duration-200"
       style={{
+        minHeight: 170,
         background: `linear-gradient(160deg, rgba(${meta.glow},0.08) 0%, rgba(255,255,255,0.03) 40%, rgba(0,0,0,0.2) 100%)`,
         backdropFilter: 'blur(12px)',
         border: `1px solid rgba(255,255,255,${isActive ? '0.2' : '0.12'})`,
@@ -149,23 +151,27 @@ function FeaturedCard({
                 >
                   {meta.icon}
                 </div>
-                <div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-amber-400 border-2 ai-best-dot"
-                  style={{ borderColor: 'rgba(15,25,20,0.9)' }}
-                />
+                {isBest && (
+                  <div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-amber-400 border-2 ai-best-dot"
+                    style={{ borderColor: 'rgba(15,25,20,0.9)' }}
+                  />
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[14px] font-bold text-foreground/95 tracking-tight">{forecast.model}</span>
-                  <span className="ai-best-badge inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[7px] font-extrabold uppercase tracking-widest"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05))',
-                      color: '#fbbf24',
-                      border: '1px solid rgba(251,191,36,0.2)',
-                    }}
-                  >
-                    <Zap className="h-1.5 w-1.5" />
-                    {t("dashboard.best")}
-                  </span>
+                  {isBest && (
+                    <span className="ai-best-badge inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[7px] font-extrabold uppercase tracking-widest"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05))',
+                        color: '#fbbf24',
+                        border: '1px solid rgba(251,191,36,0.2)',
+                      }}
+                    >
+                      <Zap className="h-1.5 w-1.5" />
+                      {t("dashboard.best")}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -209,18 +215,10 @@ function FeaturedCard({
 
         {forecast.reasoning && (
           <div className="mt-2.5 pt-2.5 relative" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <div
-              className="cursor-pointer"
-              onClick={(e) => { e.stopPropagation(); setReasonExpanded(prev => !prev); }}
-            >
-              <p className={`text-[11px] text-foreground/60 leading-relaxed ${reasonExpanded ? '' : 'line-clamp-2'}`}>
-                <Sparkles className="inline h-2.5 w-2.5 mr-1 text-amber-400/70 ai-sparkle-icon" />
-                {forecast.reasoning}
-              </p>
-              <span className="text-[11px] text-primary/50 mt-1 inline-block font-semibold tracking-wide uppercase">
-                {reasonExpanded ? t("dashboard.showLess") : t("dashboard.readMore")}
-              </span>
-            </div>
+            <p className="text-[11px] text-foreground/60 leading-relaxed line-clamp-2 h-[2.75rem]">
+              <Sparkles className="inline h-2.5 w-2.5 mr-1 text-amber-400/70 ai-sparkle-icon" />
+              {forecast.reasoning}
+            </p>
           </div>
         )}
       </div>
@@ -241,12 +239,10 @@ function CompactModelPill({
   forecast,
   isActive,
   onSelect,
-  onRelease,
 }: {
   forecast: ForecastItem;
   isActive: boolean;
   onSelect: () => void;
-  onRelease: () => void;
 }) {
   const { t } = useTranslation();
   const meta = getModelMeta(forecast.model);
@@ -258,9 +254,7 @@ function CompactModelPill({
 
   return (
     <button
-      onPointerDown={(e) => { e.stopPropagation(); onSelect(); }}
-      onPointerUp={(e) => { e.stopPropagation(); onRelease(); }}
-      onPointerLeave={(e) => { e.stopPropagation(); onRelease(); }}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
       className="ai-marquee-pill shrink-0 relative overflow-hidden rounded-lg transition-all duration-300 active:scale-[0.96]"
       style={{
         width: 140,
@@ -341,6 +335,18 @@ function MarqueeRow({ children, paused }: { children: React.ReactNode; paused: b
 export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectModel }: AiModelCarouselProps) {
   const { t } = useTranslation();
   const [marqueeHovered, setMarqueeHovered] = useState(false);
+  const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 15s auto-return to best model after user clicks a different model
+  useEffect(() => {
+    if (returnTimer.current) clearTimeout(returnTimer.current);
+    if (activeModel) {
+      returnTimer.current = setTimeout(() => {
+        onSelectModel(null);
+      }, 15000);
+    }
+    return () => { if (returnTimer.current) clearTimeout(returnTimer.current); };
+  }, [activeModel]);
 
   const sorted = useMemo(() => {
     if (!forecasts) return [];
@@ -444,6 +450,7 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
       <div className="px-4 pb-3">
         <FeaturedCard
           forecast={displayedForecast}
+          isBest={displayedForecast.model === bestForecast.model}
           isActive={true}
           onSelect={() => onSelectModel(displayedForecast.model)}
         />
@@ -463,8 +470,7 @@ export function AiModelCarousel({ forecasts, isLoading, activeModel, onSelectMod
                 key={f.model}
                 forecast={f}
                 isActive={activeModel === f.model}
-                onSelect={() => onSelectModel(f.model)}
-                onRelease={() => onSelectModel(null)}
+                onSelect={() => onSelectModel(activeModel === f.model ? null : f.model)}
               />
             ))}
           </MarqueeRow>
