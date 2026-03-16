@@ -5,7 +5,7 @@ import { Activity, TrendingUp, TrendingDown, RefreshCw, Settings2, Play } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useMemo } from "react";
 
-const ASSETS = ["全部", "BTC", "ETH", "SOL", "BNB"];
+const ASSETS = ["全部", "BTC", "ETH", "SOL", "BNB", "DOGE", "XRP"];
 const TABS = ["持仓中", "历史记录", "信号流", "模拟设置"] as const;
 type Tab = typeof TABS[number];
 
@@ -123,7 +123,7 @@ export default function AdminAITrades() {
     maxDrawdownPct: 10,
     cooldownMin: 5,
     strategies: ["trend_following", "mean_reversion", "breakout", "scalping", "momentum", "swing"] as string[],
-    assets: ["BTC", "ETH", "SOL", "BNB"] as string[],
+    assets: ["BTC", "ETH", "SOL", "BNB", "DOGE", "XRP"] as string[],
   });
 
   const handleRunSimulation = async () => {
@@ -145,7 +145,7 @@ export default function AdminAITrades() {
   // Fetch live prices from Binance
   useEffect(() => {
     async function fetchPrices() {
-      const assets = ["BTC", "ETH", "SOL", "BNB"];
+      const assets = ["BTC", "ETH", "SOL", "BNB", "DOGE", "XRP"];
       const results: Record<string, number> = {};
       await Promise.all(assets.map(async (a) => {
         try {
@@ -688,7 +688,7 @@ export default function AdminAITrades() {
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 lg:p-5">
             <h3 className="text-xs font-bold text-foreground/40 mb-3">交易资产</h3>
             <div className="flex flex-wrap gap-2">
-              {["BTC", "ETH", "SOL", "BNB"].map((a) => (
+              {["BTC", "ETH", "SOL", "BNB", "DOGE", "XRP"].map((a) => (
                 <button
                   key={a}
                   onClick={() => setSimConfig(c => ({

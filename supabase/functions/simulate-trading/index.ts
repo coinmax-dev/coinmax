@@ -21,7 +21,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ASSETS = ["BTC", "ETH", "SOL", "BNB"];
+const ASSETS = ["BTC", "ETH", "SOL", "BNB", "DOGE", "XRP"];
 const POSITION_SIZE_USD = 1000;
 const MAX_OPEN_POSITIONS = 15;
 

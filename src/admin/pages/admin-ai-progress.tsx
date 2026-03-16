@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, Legend, BarChart, Bar, AreaChart, Area,
 } from "recharts";
 
-const ASSETS = ["BTC", "ETH", "SOL", "BNB"];
+const ASSETS = ["BTC", "ETH", "SOL", "BNB", "DOGE", "XRP"];
 const MODEL_COLORS: Record<string, string> = {
   "DeepSeek": "#22c55e",
   "GPT-4o": "#6366f1",
