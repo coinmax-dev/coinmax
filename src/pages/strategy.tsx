@@ -1155,41 +1155,15 @@ export default function StrategyPage() {
                     </h4>
                     <div className="grid grid-cols-2 gap-3">
                       {(() => {
-                        // Calculate cumulative stats from historical calendar data
-                        const now = new Date();
-                        const dataStart = new Date(now.getFullYear(), now.getMonth() - 9, 1);
-                        let totalPnl = 0;
-                        let wins = 0;
-                        let losses = 0;
-                        for (let m = 0; m < 9; m++) {
-                          const mDate = new Date(dataStart.getFullYear(), dataStart.getMonth() + m, 1);
-                          const mYear = mDate.getFullYear();
-                          const mMonth = mDate.getMonth();
-                          const mDays = new Date(mYear, mMonth + 1, 0).getDate();
-                          for (let d = 1; d <= mDays; d++) {
-                            const date = new Date(mYear, mMonth, d);
-                            if (date > now) break;
-                            const seed = mYear * 10000 + (mMonth + 1) * 100 + d;
-                            const rng = ((Math.sin(seed * 9301 + 49297) % 1) + 1) % 1;
-                            const rng2 = ((Math.sin(seed * 7919 + 31337) % 1) + 1) % 1;
-                            const rng3 = ((Math.sin(seed * 6271 + 15731) % 1) + 1) % 1;
-                            const isWin = rng > 0.30;
-                            let pnl: number;
-                            if (isWin) {
-                              pnl = 0.8 + rng2 * 2.4;
-                            } else {
-                              pnl = -(0.3 + rng3 * 1.7);
-                            }
-                            const dow = date.getDay();
-                            if (dow === 0 || dow === 6) pnl *= 0.4;
-                            totalPnl += pnl;
-                            if (pnl > 0) wins++; else losses++;
-                          }
-                        }
+                        // Stats based on current calendar month view
+                        const activeDays = calendarDays.filter(c => c.day > 0 && c.pnl !== 0);
+                        const wins = activeDays.filter(c => c.pnl > 0).length;
+                        const losses = activeDays.filter(c => c.pnl < 0).length;
+                        const totalPnl = activeDays.reduce((s, c) => s + c.pnl, 0);
                         return (
                           <>
                             <div>
-                              <div className="text-lg font-bold text-emerald-400 tabular-nums" data-testid="text-cumulative-return">+{totalPnl.toFixed(1)}%</div>
+                              <div className={`text-lg font-bold tabular-nums ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`} data-testid="text-cumulative-return">{totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(1)}%</div>
                               <div className="text-[12px] text-muted-foreground">{t("strategy.cumulativeReturn")}</div>
                             </div>
                             <div>
