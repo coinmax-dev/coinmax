@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { copyText } from "@/lib/copy";
 import { Card, CardContent } from "@/components/ui/card";
@@ -247,6 +247,13 @@ export default function StrategyPage() {
     setInvestmentOpen(true);
   };
 
+  // Refresh trigger: changes every 30s to give live feel
+  const [refreshTick, setRefreshTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setRefreshTick(t => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   const getCalendarDays = () => {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
@@ -269,20 +276,44 @@ export default function StrategyPage() {
     const monthRng = ((Math.sin(monthSeed * 4729 + 17389) % 1) + 1) % 1;
     const targetMonthly = 28 + monthRng * 17;
 
+    // Current hour adds micro-variation for today's data
+    const hourSeed = now.getHours() * 60 + Math.floor(now.getMinutes() / 30);
+
     const rawPnls: number[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d);
       if (date > now) { rawPnls.push(0); continue; }
-      const seed = year * 10000 + (month + 1) * 100 + d;
+
+      const isToday = date.toDateString() === now.toDateString();
+      const seed = year * 10000 + (month + 1) * 100 + d + (isToday ? hourSeed * 7 : 0);
       const rng = ((Math.sin(seed * 9301 + 49297) % 1) + 1) % 1;
       const rng2 = ((Math.sin(seed * 7919 + 31337) % 1) + 1) % 1;
       const rng3 = ((Math.sin(seed * 6271 + 15731) % 1) + 1) % 1;
-      const isWin = rng > 0.30;
+
+      // Win probability varies: older days stable, recent days more volatile
+      const daysAgo = Math.floor((now.getTime() - date.getTime()) / 86400000);
+      const winThreshold = daysAgo > 7 ? 0.30 : 0.25 + (rng3 * 0.1);
+      const isWin = rng > winThreshold;
+
       let pnl: number;
-      if (isWin) { pnl = 0.8 + rng2 * 2.4; }
-      else { pnl = -(0.3 + rng3 * 1.7); }
+      if (isWin) {
+        pnl = 0.8 + rng2 * 2.4;
+        // Recent days have larger swings
+        if (daysAgo <= 3) pnl *= (0.9 + rng3 * 0.4);
+      } else {
+        pnl = -(0.3 + rng3 * 1.7);
+        if (daysAgo <= 3) pnl *= (0.8 + rng2 * 0.3);
+      }
+
       const dow = date.getDay();
       if (dow === 0 || dow === 6) pnl *= 0.4;
+
+      // Today's PnL fluctuates based on hour progression
+      if (isToday) {
+        const hourProgress = (now.getHours() * 60 + now.getMinutes()) / 1440;
+        pnl *= (0.3 + hourProgress * 0.7); // starts small, grows through the day
+      }
+
       rawPnls.push(pnl);
     }
 
@@ -1152,6 +1183,37 @@ export default function StrategyPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Calendar month stats */}
+                  {(() => {
+                    const activeDays = calendarDays.filter(c => c.day > 0 && c.pnl !== 0);
+                    const calWins = activeDays.filter(c => c.pnl > 0).length;
+                    const calLosses = activeDays.filter(c => c.pnl < 0).length;
+                    const calTotalPnl = activeDays.reduce((s, c) => s + c.pnl, 0);
+                    const calWinRate = activeDays.length > 0 ? (calWins / activeDays.length * 100) : 0;
+                    return (
+                      <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-border/30">
+                        <div className="text-center">
+                          <div className={`text-sm font-bold tabular-nums ${calTotalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {calTotalPnl >= 0 ? "+" : ""}{calTotalPnl.toFixed(1)}%
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">{t("strategy.cumulativeReturn", "累计收益")}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-bold text-emerald-400 tabular-nums">{calWins}</div>
+                          <div className="text-[10px] text-muted-foreground">{t("strategy.winCount", "盈利次数")}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-bold text-red-400 tabular-nums">{calLosses}</div>
+                          <div className="text-[10px] text-muted-foreground">{t("strategy.lossCount", "亏损次数")}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-bold tabular-nums">{calWinRate.toFixed(0)}%</div>
+                          <div className="text-[10px] text-muted-foreground">{t("strategy.winRate", "胜率")}</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </TabsContent>
 
