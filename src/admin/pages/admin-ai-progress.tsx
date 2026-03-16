@@ -66,6 +66,22 @@ export default function AdminAIProgress() {
     enabled: !!adminUser,
   });
 
+  // Fetch latest training report
+  const { data: trainingReport } = useQuery({
+    queryKey: ["admin", "ai-training-report"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ai_training_reports")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!adminUser,
+  });
+
   // Fetch weight adjustment logs
   const { data: adjustLogs } = useQuery({
     queryKey: ["admin", "ai-adjust-logs", days],
@@ -349,6 +365,104 @@ export default function AdminAIProgress() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+      {/* Training Report */}
+      {trainingReport && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 lg:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-foreground/60">AI 训练报告</h2>
+              <span className="text-[10px] text-foreground/20">{new Date(trainingReport.created_at).toLocaleString("zh-CN")}</span>
+            </div>
+
+            {/* Recommendations */}
+            {trainingReport.recommendations?.length > 0 && (
+              <div className="space-y-1.5 mb-4">
+                {trainingReport.recommendations.map((r: string, i: number) => (
+                  <div key={i} className="text-xs text-foreground/50 bg-white/[0.02] rounded-lg px-3 py-2 border border-white/[0.04]">
+                    {r}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Per-model performance table */}
+            {trainingReport.model_performance?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-foreground/40 mb-2">模型表现（7天）</h3>
+                <div className="space-y-2">
+                  {trainingReport.model_performance.map((m: any) => (
+                    <div key={m.model} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.02]">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: MODEL_COLORS[m.model] || "#888" }} />
+                      <span className="text-xs font-bold text-foreground/60 w-16 truncate">{m.model}</span>
+                      <span className={`text-xs font-bold w-12 ${m.accuracy >= 50 ? "text-green-400" : "text-red-400"}`}>{m.accuracy}%</span>
+                      <span className="text-[10px] text-foreground/25">{m.correct}/{m.total}</span>
+                      <span className="text-[10px] text-foreground/20">看涨:{m.bullishAcc}%</span>
+                      <span className="text-[10px] text-foreground/20">看跌:{m.bearishAcc}%</span>
+                      <span className="text-[10px] text-foreground/15 ml-auto">信心:{m.avgConf}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Per-timeframe performance */}
+            {trainingReport.timeframe_performance?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-foreground/40 mb-2">时间周期表现</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+                  {trainingReport.timeframe_performance.map((t: any) => (
+                    <div key={t.timeframe} className="rounded-lg bg-white/[0.02] p-2.5 text-center border border-white/[0.04]">
+                      <div className="text-xs font-bold text-foreground/50">{t.timeframe}</div>
+                      <div className={`text-sm font-bold ${t.accuracy >= 50 ? "text-green-400" : "text-red-400"}`}>{t.accuracy}%</div>
+                      <div className="text-[10px] text-foreground/20">{t.total}次</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Trade attribution */}
+            {trainingReport.trade_attribution?.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-bold text-foreground/40 mb-2">交易归因（模拟盘）</h3>
+                <div className="space-y-1.5">
+                  {trainingReport.trade_attribution.map((t: any) => (
+                    <div key={t.model} className="flex items-center gap-2 text-[11px] px-3 py-1.5 rounded-lg bg-white/[0.02]">
+                      <div className="w-2 h-2 rounded-full" style={{ background: MODEL_COLORS[t.model] || "#888" }} />
+                      <span className="font-bold text-foreground/50 w-16 truncate">{t.model}</span>
+                      <span className="text-foreground/30">{t.trades}笔</span>
+                      <span className="text-green-400/60">W:{t.wins}</span>
+                      <span className="text-red-400/60">L:{t.losses}</span>
+                      <span className={`ml-auto font-bold ${t.totalPnl >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {t.totalPnl >= 0 ? "+" : ""}{t.totalPnl.toFixed(4)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Alerts */}
+            {(trainingReport.bias_alerts?.length > 0 || trainingReport.degradation_alerts?.length > 0) && (
+              <div>
+                <h3 className="text-xs font-bold text-foreground/40 mb-2">告警</h3>
+                <div className="space-y-1.5">
+                  {trainingReport.bias_alerts?.map((a: any, i: number) => (
+                    <div key={`b${i}`} className="text-[11px] text-amber-400/70 bg-amber-500/5 rounded-lg px-3 py-1.5 border border-amber-500/10">
+                      偏差: {a.message}
+                    </div>
+                  ))}
+                  {trainingReport.degradation_alerts?.map((a: any, i: number) => (
+                    <div key={`d${i}`} className="text-[11px] text-red-400/70 bg-red-500/5 rounded-lg px-3 py-1.5 border border-red-500/10">
+                      退化: {a.message}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
