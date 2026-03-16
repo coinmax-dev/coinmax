@@ -358,7 +358,50 @@ export default function StrategyPage() {
               </div>
             </div>
 
+            {/* Copy Trading Entry */}
+            <div
+              className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 overflow-hidden cursor-pointer hover:bg-white/[0.04] transition-colors"
+              onClick={() => setActiveTab("copytrading" as TabId)}
+              style={{ animation: "fadeSlideIn 0.4s ease-out 0.2s both" }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground/80">{t("strategy.copyTrading", "跟单交易")}</h3>
+                    <p className="text-[11px] text-foreground/35 mt-0.5">AI 信号自动跟单 · 多策略组合</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20">即将开放</Badge>
+                  <ChevronRight className="h-4 w-4 text-foreground/20" />
+                </div>
+              </div>
+            </div>
           </>
+        )}
+
+        {activeTab === ("copytrading" as TabId) && (
+          <div className="space-y-6" style={{ animation: "fadeSlideIn 0.3s ease-out" }}>
+            <button onClick={() => setActiveTab("strategies")} className="flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground/60 transition-colors">
+              <ChevronLeft className="h-3.5 w-3.5" /> 返回策略列表
+            </button>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mb-4">
+                <Shield className="h-8 w-8 text-primary/40" />
+              </div>
+              <h2 className="text-base font-bold text-foreground/60 mb-2">跟单交易暂未开放</h2>
+              <p className="text-xs text-foreground/30 max-w-[260px] leading-relaxed mb-4">
+                该功能需要达到一定等级后解锁。请先完成节点购买或提升会员等级。
+              </p>
+              <div className="flex items-center gap-2 text-[11px] text-foreground/20 bg-white/[0.03] rounded-lg px-4 py-2 border border-white/[0.06]">
+                <Clock className="h-3.5 w-3.5" />
+                <span>预计开放时间：敬请期待</span>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === "hedge" && (
