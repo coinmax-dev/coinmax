@@ -179,29 +179,38 @@ export function StrategyHeader() {
       {/* Inline Calendar Panel */}
       {showCalendar && (
         <div className="mt-3 space-y-3" style={{ animation: "fadeSlideIn 0.3s ease-out" }}>
-          {/* Cumulative Stats */}
-          <Card className="border-border bg-card/50">
-            <CardContent className="p-3">
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div>
-                  <div className="text-base font-bold text-emerald-400 tabular-nums">+{stats.totalPnl.toFixed(1)}%</div>
-                  <div className="text-[11px] text-muted-foreground">{t("strategy.cumulativeReturn")}</div>
-                </div>
-                <div>
-                  <div className="text-base font-bold tabular-nums">{stats.wins + stats.losses}</div>
-                  <div className="text-[11px] text-muted-foreground">{t("strategy.totalProfit")}</div>
-                </div>
-                <div>
-                  <div className="text-base font-bold text-emerald-400 tabular-nums">{stats.wins}</div>
-                  <div className="text-[11px] text-muted-foreground">{t("strategy.winCount")}</div>
-                </div>
-                <div>
-                  <div className="text-base font-bold text-red-400 tabular-nums">{stats.losses}</div>
-                  <div className="text-[11px] text-muted-foreground">{t("strategy.lossCount")}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Monthly Stats — based on selected calendar month */}
+          {(() => {
+            const activeDays = calendarDays.filter(c => c.day > 0 && c.pnl !== 0);
+            const mWins = activeDays.filter(c => c.pnl > 0).length;
+            const mLosses = activeDays.filter(c => c.pnl < 0).length;
+            const mPnl = activeDays.reduce((s, c) => s + c.pnl, 0);
+            const mWinRate = activeDays.length > 0 ? (mWins / activeDays.length * 100) : 0;
+            return (
+              <Card className="border-border bg-card/50">
+                <CardContent className="p-3">
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div>
+                      <div className={`text-base font-bold tabular-nums ${mPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>{mPnl >= 0 ? "+" : ""}{mPnl.toFixed(1)}%</div>
+                      <div className="text-[11px] text-muted-foreground">{t("strategy.cumulativeReturn")}</div>
+                    </div>
+                    <div>
+                      <div className="text-base font-bold tabular-nums">{mWinRate.toFixed(0)}%</div>
+                      <div className="text-[11px] text-muted-foreground">{t("strategy.avgWinRate", "胜率")}</div>
+                    </div>
+                    <div>
+                      <div className="text-base font-bold text-emerald-400 tabular-nums">{mWins}</div>
+                      <div className="text-[11px] text-muted-foreground">{t("strategy.winCount")}</div>
+                    </div>
+                    <div>
+                      <div className="text-base font-bold text-red-400 tabular-nums">{mLosses}</div>
+                      <div className="text-[11px] text-muted-foreground">{t("strategy.lossCount")}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Calendar */}
           <Card className="border-border bg-card/50">
