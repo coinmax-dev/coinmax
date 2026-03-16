@@ -1,13 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAdminAuth } from "@/admin/admin-auth";
 import { supabase } from "@/lib/supabase";
-import { Activity, TrendingUp, TrendingDown, RefreshCw, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Activity, TrendingUp, TrendingDown, RefreshCw, Settings2, Play } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useMemo } from "react";
 
 const ASSETS = ["全部", "BTC", "ETH", "SOL", "BNB"];
-const TABS = ["持仓中", "历史记录", "信号流"] as const;
+const TABS = ["持仓中", "历史记录", "信号流", "模拟设置"] as const;
 type Tab = typeof TABS[number];
+
+const STRATEGY_LABELS: Record<string, string> = {
+  trend_following: "趋势跟踪",
+  mean_reversion: "均值回归",
+  breakout: "突破",
+  scalping: "短线",
+  momentum: "动量",
+  swing: "波段",
+  directional: "方向",
+  grid: "网格",
+  dca: "定投",
+};
 
 const PAGE_SIZE = 20;
 
@@ -25,6 +37,7 @@ interface PaperTrade {
   pnl: number | null;
   pnl_pct: number | null;
   close_reason: string | null;
+  strategy_type: string | null;
   status: string;
   opened_at: string;
   closed_at: string | null;
@@ -79,6 +92,11 @@ function StrengthBadge({ strength }: { strength: string }) {
   return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cls}`}>{label}</span>;
 }
 
+function StrategyBadge({ type }: { type: string | null }) {
+  if (!type) return null;
+  return <span className="text-[9px] font-semibold text-foreground/35 bg-white/[0.05] px-1.5 py-0.5 rounded">{STRATEGY_LABELS[type] || type}</span>;
+}
+
 function timeSince(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -95,6 +113,34 @@ export default function AdminAITrades() {
   const [assetFilter, setAssetFilter] = useState("全部");
   const [historyPage, setHistoryPage] = useState(0);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [simRunning, setSimRunning] = useState(false);
+
+  // Simulation config
+  const [simConfig, setSimConfig] = useState({
+    positionSize: 1000,
+    maxPositions: 15,
+    maxLeverage: 5,
+    maxDrawdownPct: 10,
+    cooldownMin: 5,
+    strategies: ["trend_following", "mean_reversion", "breakout", "scalping", "momentum", "swing"] as string[],
+    assets: ["BTC", "ETH", "SOL", "BNB"] as string[],
+  });
+
+  const handleRunSimulation = async () => {
+    setSimRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("simulate-trading", {
+        body: simConfig,
+      });
+      if (error) throw error;
+      refetchOpen();
+      alert(`模拟完成: ${data.signals_generated}个信号, ${data.paper_trades_opened}个开仓, ${data.paper_trades_closed}个平仓`);
+    } catch (err: any) {
+      alert(`模拟失败: ${err.message}`);
+    } finally {
+      setSimRunning(false);
+    }
+  };
 
   // Fetch live prices from Binance
   useEffect(() => {
@@ -278,6 +324,7 @@ export default function AdminAITrades() {
                           <span className="text-sm font-bold text-foreground/80">{t.asset}</span>
                           <SideBadge side={t.side} />
                           <span className="text-[10px] text-foreground/25">{t.leverage}x</span>
+                          <StrategyBadge type={t.strategy_type} />
                         </div>
                         <span className="text-[10px] text-foreground/20">{timeSince(t.opened_at)}</span>
                       </div>
@@ -314,6 +361,7 @@ export default function AdminAITrades() {
                     <tr className="text-foreground/30 border-b border-white/[0.04]">
                       <th className="text-left px-4 py-2 font-medium">资产</th>
                       <th className="text-left px-4 py-2 font-medium">方向</th>
+                      <th className="text-left px-4 py-2 font-medium">策略</th>
                       <th className="text-right px-4 py-2 font-medium">入场价</th>
                       <th className="text-right px-4 py-2 font-medium">现价</th>
                       <th className="text-right px-4 py-2 font-medium">未实现盈亏</th>
@@ -336,6 +384,7 @@ export default function AdminAITrades() {
                         <tr key={t.id} className="hover:bg-white/[0.02] transition-colors">
                           <td className="px-4 py-2.5 font-bold text-foreground/70">{t.asset}</td>
                           <td className="px-4 py-2.5"><SideBadge side={t.side} /></td>
+                          <td className="px-4 py-2.5"><StrategyBadge type={t.strategy_type} /></td>
                           <td className="px-4 py-2.5 text-right font-mono text-foreground/50">{formatPrice(t.entry_price)}</td>
                           <td className="px-4 py-2.5 text-right font-mono text-foreground/50">{currentPrice > 0 ? formatPrice(currentPrice) : "—"}</td>
                           <td className={`px-4 py-2.5 text-right font-mono font-bold ${pnlColor(unrealizedPnl)}`}>
@@ -384,6 +433,7 @@ export default function AdminAITrades() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-foreground/80">{t.asset}</span>
                         <SideBadge side={t.side} />
+                        <StrategyBadge type={t.strategy_type} />
                       </div>
                       <span className={`text-sm font-bold ${pnlColor(t.pnl)}`}>{formatPnl(t.pnl)}</span>
                     </div>
@@ -416,6 +466,7 @@ export default function AdminAITrades() {
                     <tr className="text-foreground/30 border-b border-white/[0.04]">
                       <th className="text-left px-4 py-2 font-medium">资产</th>
                       <th className="text-left px-4 py-2 font-medium">方向</th>
+                      <th className="text-left px-4 py-2 font-medium">策略</th>
                       <th className="text-right px-4 py-2 font-medium">入场价</th>
                       <th className="text-right px-4 py-2 font-medium">出场价</th>
                       <th className="text-right px-4 py-2 font-medium">盈亏</th>
@@ -429,6 +480,7 @@ export default function AdminAITrades() {
                       <tr key={t.id} className="hover:bg-white/[0.02] transition-colors">
                         <td className="px-4 py-2.5 font-bold text-foreground/70">{t.asset}</td>
                         <td className="px-4 py-2.5"><SideBadge side={t.side} /></td>
+                        <td className="px-4 py-2.5"><StrategyBadge type={t.strategy_type} /></td>
                         <td className="px-4 py-2.5 text-right font-mono text-foreground/50">{formatPrice(t.entry_price)}</td>
                         <td className="px-4 py-2.5 text-right font-mono text-foreground/50">{formatPrice(t.exit_price)}</td>
                         <td className={`px-4 py-2.5 text-right font-mono font-bold ${pnlColor(t.pnl)}`}>{formatPnl(t.pnl)}</td>
@@ -532,6 +584,167 @@ export default function AdminAITrades() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {tab === "模拟设置" && (
+        <div className="space-y-4">
+          {/* Config Panel */}
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 lg:p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Settings2 className="h-4 w-4 text-primary/60" />
+              <h2 className="text-sm font-bold text-foreground/60">模拟交易参数</h2>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Position Size */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-foreground/40 font-semibold">仓位金额 (USDT)</label>
+                <input
+                  type="number" min={100} max={10000} step={100}
+                  value={simConfig.positionSize}
+                  onChange={e => setSimConfig(c => ({ ...c, positionSize: Number(e.target.value) }))}
+                  className="w-full h-9 rounded-lg px-3 text-sm text-foreground bg-white/[0.04] border border-white/[0.08] outline-none focus:border-primary/30"
+                />
+                <p className="text-[10px] text-foreground/20">每个策略信号触发后的开仓金额</p>
+              </div>
+
+              {/* Max Positions */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-foreground/40 font-semibold">最大持仓数</label>
+                <input
+                  type="number" min={1} max={30} step={1}
+                  value={simConfig.maxPositions}
+                  onChange={e => setSimConfig(c => ({ ...c, maxPositions: Number(e.target.value) }))}
+                  className="w-full h-9 rounded-lg px-3 text-sm text-foreground bg-white/[0.04] border border-white/[0.08] outline-none focus:border-primary/30"
+                />
+                <p className="text-[10px] text-foreground/20">所有资产+策略的最大同时持仓数</p>
+              </div>
+
+              {/* Max Leverage */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-foreground/40 font-semibold">最大杠杆</label>
+                <input
+                  type="number" min={1} max={20} step={1}
+                  value={simConfig.maxLeverage}
+                  onChange={e => setSimConfig(c => ({ ...c, maxLeverage: Number(e.target.value) }))}
+                  className="w-full h-9 rounded-lg px-3 text-sm text-foreground bg-white/[0.04] border border-white/[0.08] outline-none focus:border-primary/30"
+                />
+                <p className="text-[10px] text-foreground/20">策略允许使用的最大杠杆倍数</p>
+              </div>
+
+              {/* Max Drawdown */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-foreground/40 font-semibold">最大回撤 (%)</label>
+                <input
+                  type="number" min={1} max={50} step={1}
+                  value={simConfig.maxDrawdownPct}
+                  onChange={e => setSimConfig(c => ({ ...c, maxDrawdownPct: Number(e.target.value) }))}
+                  className="w-full h-9 rounded-lg px-3 text-sm text-foreground bg-white/[0.04] border border-white/[0.08] outline-none focus:border-primary/30"
+                />
+                <p className="text-[10px] text-foreground/20">达到最大回撤后暂停开新仓</p>
+              </div>
+
+              {/* Cooldown */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-foreground/40 font-semibold">冷却时间 (分钟)</label>
+                <input
+                  type="number" min={1} max={60} step={1}
+                  value={simConfig.cooldownMin}
+                  onChange={e => setSimConfig(c => ({ ...c, cooldownMin: Number(e.target.value) }))}
+                  className="w-full h-9 rounded-lg px-3 text-sm text-foreground bg-white/[0.04] border border-white/[0.08] outline-none focus:border-primary/30"
+                />
+                <p className="text-[10px] text-foreground/20">同一资产+策略止损后的冷却期</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Strategy Selection */}
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 lg:p-5">
+            <h3 className="text-xs font-bold text-foreground/40 mb-3">启用策略</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+              {Object.entries(STRATEGY_LABELS).filter(([k]) => ["trend_following", "mean_reversion", "breakout", "scalping", "momentum", "swing"].includes(k)).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setSimConfig(c => ({
+                    ...c,
+                    strategies: c.strategies.includes(key)
+                      ? c.strategies.filter(s => s !== key)
+                      : [...c.strategies, key],
+                  }))}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
+                    simConfig.strategies.includes(key)
+                      ? "bg-primary/10 text-primary border-primary/20"
+                      : "bg-white/[0.02] text-foreground/30 border-white/[0.06] hover:text-foreground/50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Asset Selection */}
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 lg:p-5">
+            <h3 className="text-xs font-bold text-foreground/40 mb-3">交易资产</h3>
+            <div className="flex flex-wrap gap-2">
+              {["BTC", "ETH", "SOL", "BNB"].map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setSimConfig(c => ({
+                    ...c,
+                    assets: c.assets.includes(a)
+                      ? c.assets.filter(x => x !== a)
+                      : [...c.assets, a],
+                  }))}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                    simConfig.assets.includes(a)
+                      ? "bg-primary/10 text-primary border-primary/20"
+                      : "bg-white/[0.02] text-foreground/30 border-white/[0.06] hover:text-foreground/50"
+                  }`}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Run Button */}
+          <button
+            onClick={handleRunSimulation}
+            disabled={simRunning || simConfig.strategies.length === 0 || simConfig.assets.length === 0}
+            className="w-full h-12 rounded-xl text-sm font-bold text-white transition-all active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2"
+            style={{
+              background: "linear-gradient(135deg, #0abab5, #34d399)",
+              boxShadow: "0 4px 15px rgba(10,186,181,0.3)",
+            }}
+          >
+            <Play className="h-4 w-4" />
+            {simRunning ? "模拟运行中..." : "手动触发模拟交易"}
+          </button>
+
+          {/* Config Summary */}
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <h3 className="text-xs font-bold text-foreground/40 mb-2">当前配置摘要</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-[11px]">
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">仓位</p>
+                <p className="text-foreground/60 font-bold">${simConfig.positionSize}</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">最大持仓</p>
+                <p className="text-foreground/60 font-bold">{simConfig.maxPositions}个</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">策略数</p>
+                <p className="text-foreground/60 font-bold">{simConfig.strategies.length}个</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">最大敞口</p>
+                <p className="text-foreground/60 font-bold">${(simConfig.positionSize * simConfig.maxPositions).toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
