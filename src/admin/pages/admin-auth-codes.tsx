@@ -31,11 +31,47 @@ function exportCSV(filename: string, headers: string[], rows: string[][]) {
   const csv = bom + [headers.join(","), ...rows.map(r => r.map(v => `"${(v ?? "").replace(/"/g, '""')}"`).join(","))].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+
+  // Mobile browsers often block programmatic a.click() downloads.
+  // Use window.open as primary method on mobile, with a.click() as fallback.
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // Try opening in new tab — mobile Safari & Chrome handle blob URLs this way
+    const opened = window.open(url, "_blank");
+    if (!opened) {
+      // Fallback: use navigator.share if available (share sheet lets user save)
+      if (navigator.share && navigator.canShare?.({ files: [new File([blob], filename, { type: "text/csv" })] })) {
+        navigator.share({
+          files: [new File([blob], filename, { type: "text/csv;charset=utf-8" })],
+          title: filename,
+        }).catch(() => {
+          // Last resort: prompt user to long-press
+          alert("请长按链接选择「下载」或「存储到文件」");
+        });
+      } else {
+        // Fallback anchor method
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+        return;
+      }
+    }
+    // Delay revoke so the new tab can load the blob
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } else {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  }
 }
 
 function codeBadge(status: string) {
