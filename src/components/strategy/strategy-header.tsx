@@ -26,7 +26,7 @@ function useHourlyValue(min: number, max: number, salt: number) {
   return value;
 }
 
-export function getCalendarDays(calendarMonth: Date) {
+export function getCalendarDays(calendarMonth: Date, timeSeed = 0) {
   const year = calendarMonth.getFullYear();
   const month = calendarMonth.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
@@ -51,16 +51,34 @@ export function getCalendarDays(calendarMonth: Date) {
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
     if (date > now) { rawPnls.push(0); continue; }
-    const seed = year * 10000 + (month + 1) * 100 + d;
+
+    const daysAgo = Math.floor((now.getTime() - date.getTime()) / 86400000);
+    // Recent 5 days fluctuate with timeSeed; older days are stable
+    const tf = daysAgo <= 5 ? timeSeed * (d + 3) : 0;
+    const seed = year * 10000 + (month + 1) * 100 + d + tf;
     const rng = ((Math.sin(seed * 9301 + 49297) % 1) + 1) % 1;
     const rng2 = ((Math.sin(seed * 7919 + 31337) % 1) + 1) % 1;
     const rng3 = ((Math.sin(seed * 6271 + 15731) % 1) + 1) % 1;
-    const isWin = rng > 0.30;
+    const winThreshold = daysAgo > 7 ? 0.30 : 0.25 + (rng3 * 0.1);
+    const isWin = rng > winThreshold;
     let pnl: number;
-    if (isWin) { pnl = 0.8 + rng2 * 2.4; }
-    else { pnl = -(0.3 + rng3 * 1.7); }
+    if (isWin) {
+      pnl = 0.8 + rng2 * 2.4;
+      if (daysAgo <= 3) pnl *= (0.9 + rng3 * 0.4);
+    } else {
+      pnl = -(0.3 + rng3 * 1.7);
+      if (daysAgo <= 3) pnl *= (0.8 + rng2 * 0.3);
+    }
     const dow = date.getDay();
     if (dow === 0 || dow === 6) pnl *= 0.4;
+
+    // Today fluctuates with hour progress
+    if (date.toDateString() === now.toDateString()) {
+      const hourProgress = (now.getHours() * 60 + now.getMinutes()) / 1440;
+      const jitter = ((Math.sin(timeSeed * 1337) % 1) + 1) % 1;
+      pnl *= (0.3 + hourProgress * 0.7) * (0.85 + jitter * 0.3);
+    }
+
     rawPnls.push(pnl);
   }
 
@@ -74,7 +92,7 @@ export function getCalendarDays(calendarMonth: Date) {
   return days;
 }
 
-function getCumulativeStats() {
+function getCumulativeStats(timeSeed = 0) {
   const now = new Date();
   const dataStart = new Date(now.getFullYear(), now.getMonth() - 9, 1);
   let totalPnl = 0;
@@ -82,7 +100,7 @@ function getCumulativeStats() {
   let losses = 0;
   for (let m = 0; m < 9; m++) {
     const mDate = new Date(dataStart.getFullYear(), dataStart.getMonth() + m, 1);
-    const days = getCalendarDays(mDate);
+    const days = getCalendarDays(mDate, timeSeed);
     for (const cell of days) {
       if (cell.day === 0 || cell.pnl === 0) continue;
       totalPnl += cell.pnl;
@@ -99,9 +117,14 @@ export function StrategyHeader() {
   const floatingMonthlyReturn = useHourlyValue(25, 35, 200);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [timeSeed, setTimeSeed] = useState(() => Math.floor(Date.now() / 30000));
+  useEffect(() => {
+    const timer = setInterval(() => setTimeSeed(Math.floor(Date.now() / 30000)), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const calendarDays = getCalendarDays(calendarMonth);
-  const stats = getCumulativeStats();
+  const calendarDays = getCalendarDays(calendarMonth, timeSeed);
+  const stats = getCumulativeStats(timeSeed);
 
   const weekDays = [
     t("calendar.sun"), t("calendar.mon"), t("calendar.tue"),
