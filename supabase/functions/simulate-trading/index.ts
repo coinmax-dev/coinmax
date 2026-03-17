@@ -221,141 +221,133 @@ interface StrategySignal {
   reason: string;
 }
 
-// 1. Trend Following: EMA crossover + ADX trend strength + MACD confirmation
+// 1. Trend Following: EMA crossover + MACD confirmation
 function strategyTrendFollowing(ind: TechIndicators): StrategySignal | null {
   const { ema9, ema21, sma50, price, adx, macd, mom, vol } = ind;
-  if (adx < 20) return null; // No clear trend
 
-  const emaBullish = ema9 > ema21 && price > sma50;
-  const emaBearish = ema9 < ema21 && price < sma50;
-  const macdConfirm = macd.histogram > 0;
-  const macdBearConfirm = macd.histogram < 0;
+  const emaBullish = ema9 > ema21;
+  const emaBearish = ema9 < ema21;
 
-  if (emaBullish && macdConfirm && mom > 0.1) {
-    const conf = Math.min(90, 55 + adx * 0.5 + Math.abs(mom) * 3);
+  if (emaBullish && macd.histogram > 0 && mom > 0.02) {
+    const conf = Math.min(90, 55 + adx * 0.4 + Math.abs(mom) * 5);
     return {
       strategy: "trend_following", side: "LONG", confidence: conf,
       leverage: conf > 75 ? 3 : 2,
       slPct: Math.max(0.015, vol * 0.02),
       tpPct: Math.max(0.03, vol * 0.04),
       timeLimit: 12,
-      reason: `EMA9>21, 价格>SMA50, ADX=${adx.toFixed(0)}, MACD+`,
+      reason: `EMA9>21, ADX=${adx.toFixed(0)}, MACD+, Mom=${mom.toFixed(2)}%`,
     };
   }
-  if (emaBearish && macdBearConfirm && mom < -0.1) {
-    const conf = Math.min(90, 55 + adx * 0.5 + Math.abs(mom) * 3);
+  if (emaBearish && macd.histogram < 0 && mom < -0.02) {
+    const conf = Math.min(90, 55 + adx * 0.4 + Math.abs(mom) * 5);
     return {
       strategy: "trend_following", side: "SHORT", confidence: conf,
       leverage: conf > 75 ? 3 : 2,
       slPct: Math.max(0.015, vol * 0.02),
       tpPct: Math.max(0.03, vol * 0.04),
       timeLimit: 12,
-      reason: `EMA9<21, 价格<SMA50, ADX=${adx.toFixed(0)}, MACD-`,
+      reason: `EMA9<21, ADX=${adx.toFixed(0)}, MACD-, Mom=${mom.toFixed(2)}%`,
     };
   }
   return null;
 }
 
-// 2. Mean Reversion: RSI extreme + BB band touch + volume confirmation
+// 2. Mean Reversion: RSI oversold/overbought + BB proximity
 function strategyMeanReversion(ind: TechIndicators): StrategySignal | null {
   const { rsi, bb, volRatio, vol } = ind;
 
-  if (rsi < 25 && bb.pctB < 0.1 && volRatio > 1.2) {
-    const conf = Math.min(88, 60 + (30 - rsi) * 1.5 + (1 - bb.pctB) * 10);
+  if (rsi < 38 && bb.pctB < 0.3) {
+    const conf = Math.min(88, 56 + (40 - rsi) * 1.2 + (1 - bb.pctB) * 8);
     return {
       strategy: "mean_reversion", side: "LONG", confidence: conf,
       leverage: 2,
       slPct: Math.max(0.02, vol * 0.025),
-      tpPct: Math.max(0.02, vol * 0.02), // Smaller TP, mean reversion
+      tpPct: Math.max(0.02, vol * 0.02),
       timeLimit: 6,
-      reason: `RSI=${rsi.toFixed(0)}超卖, BB%B=${bb.pctB.toFixed(2)}, 放量${volRatio.toFixed(1)}x`,
+      reason: `RSI=${rsi.toFixed(0)}偏低, BB%B=${bb.pctB.toFixed(2)}, 均值回归做多`,
     };
   }
-  if (rsi > 75 && bb.pctB > 0.9 && volRatio > 1.2) {
-    const conf = Math.min(88, 60 + (rsi - 70) * 1.5 + bb.pctB * 10);
+  if (rsi > 62 && bb.pctB > 0.7) {
+    const conf = Math.min(88, 56 + (rsi - 60) * 1.2 + bb.pctB * 8);
     return {
       strategy: "mean_reversion", side: "SHORT", confidence: conf,
       leverage: 2,
       slPct: Math.max(0.02, vol * 0.025),
       tpPct: Math.max(0.02, vol * 0.02),
       timeLimit: 6,
-      reason: `RSI=${rsi.toFixed(0)}超买, BB%B=${bb.pctB.toFixed(2)}, 放量${volRatio.toFixed(1)}x`,
+      reason: `RSI=${rsi.toFixed(0)}偏高, BB%B=${bb.pctB.toFixed(2)}, 均值回归做空`,
     };
   }
   return null;
 }
 
-// 3. Breakout: Price breaks BB bands + high volume + ADX rising
+// 3. Breakout: Price near BB bands + momentum
 function strategyBreakout(ind: TechIndicators): StrategySignal | null {
   const { price, bb, volRatio, adx, mom, vol } = ind;
-  if (volRatio < 1.5 || adx < 22) return null; // Need volume spike + some trend
 
-  if (price > bb.upper && mom > 0.3) {
-    const conf = Math.min(85, 55 + volRatio * 5 + adx * 0.3);
+  if (bb.pctB > 0.85 && mom > 0.1) {
+    const conf = Math.min(85, 55 + volRatio * 4 + adx * 0.25 + Math.abs(mom) * 5);
     return {
       strategy: "breakout", side: "LONG", confidence: conf,
       leverage: Math.min(4, Math.round(conf / 25)),
       slPct: Math.max(0.01, vol * 0.012),
       tpPct: Math.max(0.025, vol * 0.035),
       timeLimit: 8,
-      reason: `突破BB上轨, 量比${volRatio.toFixed(1)}x, ADX=${adx.toFixed(0)}`,
+      reason: `接近BB上轨, BB%B=${bb.pctB.toFixed(2)}, Mom=${mom.toFixed(2)}%`,
     };
   }
-  if (price < bb.lower && mom < -0.3) {
-    const conf = Math.min(85, 55 + volRatio * 5 + adx * 0.3);
+  if (bb.pctB < 0.15 && mom < -0.1) {
+    const conf = Math.min(85, 55 + volRatio * 4 + adx * 0.25 + Math.abs(mom) * 5);
     return {
       strategy: "breakout", side: "SHORT", confidence: conf,
       leverage: Math.min(4, Math.round(conf / 25)),
       slPct: Math.max(0.01, vol * 0.012),
       tpPct: Math.max(0.025, vol * 0.035),
       timeLimit: 8,
-      reason: `跌破BB下轨, 量比${volRatio.toFixed(1)}x, ADX=${adx.toFixed(0)}`,
+      reason: `接近BB下轨, BB%B=${bb.pctB.toFixed(2)}, Mom=${mom.toFixed(2)}%`,
     };
   }
   return null;
 }
 
-// 4. Scalping: Short-term RSI + MACD crossover + tight SL/TP
+// 4. Scalping: Short-term RSI zones + MACD direction
 function strategyScalping(ind: TechIndicators): StrategySignal | null {
   const { rsi, macd, mom, vol, volRatio } = ind;
-  if (vol < 0.2) return null; // Too flat
 
-  // Quick RSI bounce from 35-40 zone with MACD turning positive
-  if (rsi > 35 && rsi < 45 && macd.histogram > 0 && mom > 0.05 && volRatio > 0.8) {
-    const conf = Math.min(78, 50 + (45 - rsi) * 1.5 + macd.histogram * 500);
-    if (conf < 55) return null;
+  // RSI in lower half with MACD positive → scalp long
+  if (rsi > 30 && rsi < 48 && macd.histogram > 0) {
+    const conf = Math.min(78, 52 + (48 - rsi) * 1.0 + Math.abs(mom) * 8);
     return {
       strategy: "scalping", side: "LONG", confidence: conf,
       leverage: Math.min(5, Math.round(conf / 20)),
       slPct: Math.max(0.005, vol * 0.008),
       tpPct: Math.max(0.008, vol * 0.012),
       timeLimit: 2,
-      reason: `RSI反弹=${rsi.toFixed(0)}, MACD柱转正, 短线做多`,
+      reason: `RSI=${rsi.toFixed(0)}+MACD+, 短线做多`,
     };
   }
-  // RSI dropping from 55-65 zone with MACD turning negative
-  if (rsi > 55 && rsi < 65 && macd.histogram < 0 && mom < -0.05 && volRatio > 0.8) {
-    const conf = Math.min(78, 50 + (rsi - 55) * 1.5 + Math.abs(macd.histogram) * 500);
-    if (conf < 55) return null;
+  // RSI in upper half with MACD negative → scalp short
+  if (rsi > 52 && rsi < 70 && macd.histogram < 0) {
+    const conf = Math.min(78, 52 + (rsi - 52) * 1.0 + Math.abs(mom) * 8);
     return {
       strategy: "scalping", side: "SHORT", confidence: conf,
       leverage: Math.min(5, Math.round(conf / 20)),
       slPct: Math.max(0.005, vol * 0.008),
       tpPct: Math.max(0.008, vol * 0.012),
       timeLimit: 2,
-      reason: `RSI回落=${rsi.toFixed(0)}, MACD柱转负, 短线做空`,
+      reason: `RSI=${rsi.toFixed(0)}+MACD-, 短线做空`,
     };
   }
   return null;
 }
 
-// 5. Momentum: Strong directional move + volume surge + all indicators aligned
+// 5. Momentum: Directional move with indicators aligned
 function strategyMomentum(ind: TechIndicators): StrategySignal | null {
   const { rsi, mom, mom10, macd, volRatio, adx, ema9, ema21, vol } = ind;
-  if (adx < 25 || volRatio < 1.3) return null; // Need strong trend + volume
 
-  const allBullish = mom > 0.4 && mom10 > 0.6 && rsi > 55 && rsi < 80 && macd.histogram > 0 && ema9 > ema21;
-  const allBearish = mom < -0.4 && mom10 < -0.6 && rsi < 45 && rsi > 20 && macd.histogram < 0 && ema9 < ema21;
+  const allBullish = mom > 0.15 && rsi > 50 && rsi < 80 && macd.histogram > 0 && ema9 > ema21;
+  const allBearish = mom < -0.15 && rsi < 50 && rsi > 20 && macd.histogram < 0 && ema9 < ema21;
 
   if (allBullish) {
     const conf = Math.min(92, 60 + adx * 0.4 + volRatio * 3 + Math.abs(mom) * 5);
@@ -387,22 +379,22 @@ function strategySwing(ind: TechIndicators, ind1h: TechIndicators | null): Strat
   const { rsi, bb, ema9, ema21, price, mom, vol } = ind;
   if (!ind1h) return null;
 
-  // 1h trend up + 5m price pulling back to BB mid = swing long entry
-  const htfBullish = ind1h.ema9 > ind1h.ema21 && ind1h.mom > 0;
-  const htfBearish = ind1h.ema9 < ind1h.ema21 && ind1h.mom < 0;
+  // 1h trend alignment + 5m entry zone
+  const htfBullish = ind1h.ema9 > ind1h.ema21;
+  const htfBearish = ind1h.ema9 < ind1h.ema21;
 
-  if (htfBullish && bb.pctB > 0.3 && bb.pctB < 0.55 && rsi > 40 && rsi < 55 && mom > 0) {
-    const conf = Math.min(85, 55 + (ind1h.adx || 25) * 0.3 + Math.abs(ind1h.mom) * 3);
+  if (htfBullish && bb.pctB > 0.25 && bb.pctB < 0.6 && rsi > 38 && rsi < 58) {
+    const conf = Math.min(85, 55 + (ind1h.adx || 25) * 0.3 + Math.abs(ind1h.mom || 0) * 3);
     return {
       strategy: "swing", side: "LONG", confidence: conf,
       leverage: 2,
       slPct: Math.max(0.02, vol * 0.025),
       tpPct: Math.max(0.04, vol * 0.05),
       timeLimit: 24,
-      reason: `1H趋势多+5M回踩BB中轨, RSI=${rsi.toFixed(0)}`,
+      reason: `1H趋势多+5M回踩, RSI=${rsi.toFixed(0)}, BB%B=${bb.pctB.toFixed(2)}`,
     };
   }
-  if (htfBearish && bb.pctB > 0.45 && bb.pctB < 0.7 && rsi > 45 && rsi < 60 && mom < 0) {
+  if (htfBearish && bb.pctB > 0.4 && bb.pctB < 0.75 && rsi > 42 && rsi < 62) {
     const conf = Math.min(85, 55 + (ind1h.adx || 25) * 0.3 + Math.abs(ind1h.mom) * 3);
     return {
       strategy: "swing", side: "SHORT", confidence: conf,
@@ -688,7 +680,7 @@ serve(async (req) => {
         if (openCombos.has(comboKey)) continue;
 
         // Only open if confidence is high enough
-        if (sig.confidence < 55) continue;
+        if (sig.confidence < 50) continue;
 
         const side = sig.side;
         const sl = side === "LONG"
