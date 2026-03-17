@@ -243,6 +243,35 @@ export default function AdminAITrades() {
     enabled: !!adminUser,
   });
 
+  // Global stats (all closed trades, not paginated)
+  const { data: globalStats } = useQuery({
+    queryKey: ["admin", "paper-trades-stats"],
+    queryFn: async () => {
+      const [
+        { count: totalClosed },
+        { count: wins },
+        { data: pnlData },
+        { data: todayData },
+      ] = await Promise.all([
+        supabase.from("paper_trades").select("*", { count: "exact", head: true }).eq("status", "CLOSED"),
+        supabase.from("paper_trades").select("*", { count: "exact", head: true }).eq("status", "CLOSED").gt("pnl", 0),
+        supabase.from("paper_trades").select("pnl").eq("status", "CLOSED"),
+        supabase.from("paper_trades").select("pnl").eq("status", "CLOSED").gte("closed_at", new Date().toISOString().slice(0, 10)),
+      ]);
+      const totalPnl = pnlData?.reduce((s: number, t: any) => s + (t.pnl ?? 0), 0) ?? 0;
+      const todayPnl = todayData?.reduce((s: number, t: any) => s + (t.pnl ?? 0), 0) ?? 0;
+      return {
+        totalClosed: totalClosed ?? 0,
+        wins: wins ?? 0,
+        winRate: (totalClosed ?? 0) > 0 ? ((wins ?? 0) / (totalClosed ?? 1)) * 100 : 0,
+        totalPnl,
+        todayPnl,
+      };
+    },
+    enabled: !!adminUser,
+    refetchInterval: 30000,
+  });
+
   // Recent signals
   const { data: signals, isLoading: sigLoading } = useQuery({
     queryKey: ["admin", "trade-signals", assetFilter],
@@ -262,22 +291,16 @@ export default function AdminAITrades() {
 
   // Compute summary stats
   const summary = useMemo(() => {
-    const openCount = openTrades?.length ?? 0;
-    const signalCount = signals?.length ?? 0;
-
-    // Today PnL from closed trades
-    const today = new Date().toISOString().slice(0, 10);
-    const todayClosed = closedTrades?.data?.filter(t => t.closed_at?.startsWith(today)) ?? [];
-    const todayPnl = todayClosed.reduce((s, t) => s + (t.pnl ?? 0), 0);
-
-    // Total PnL and win rate from all closed
-    const totalPnl = closedTrades?.data?.reduce((s, t) => s + (t.pnl ?? 0), 0) ?? 0;
-    const totalClosed = closedTrades?.count ?? 0;
-    const wins = closedTrades?.data?.filter(t => (t.pnl ?? 0) > 0).length ?? 0;
-    const winRate = totalClosed > 0 ? ((wins / Math.min(totalClosed, closedTrades?.data?.length ?? 1)) * 100) : 0;
-
-    return { openCount, signalCount, todayPnl, totalPnl, winRate, totalClosed };
-  }, [openTrades, signals, closedTrades]);
+    return {
+      openCount: openTrades?.length ?? 0,
+      signalCount: signals?.length ?? 0,
+      todayPnl: globalStats?.todayPnl ?? 0,
+      totalPnl: globalStats?.totalPnl ?? 0,
+      winRate: globalStats?.winRate ?? 0,
+      totalClosed: globalStats?.totalClosed ?? 0,
+      wins: globalStats?.wins ?? 0,
+    };
+  }, [openTrades, signals, globalStats]);
 
   // Filter open trades by asset
   const filteredOpen = useMemo(() => {
@@ -322,6 +345,7 @@ export default function AdminAITrades() {
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
           <p className="text-xs text-foreground/35 mb-1">胜率</p>
           <p className="text-xl font-bold text-primary">{summary.winRate.toFixed(1)}%</p>
+          <p className="text-[11px] text-foreground/25 mt-0.5">{summary.wins}胜/{summary.totalClosed}总</p>
         </div>
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
           <p className="text-xs text-foreground/35 mb-1">信号数</p>
