@@ -227,6 +227,29 @@ export default function ProfileNodesPage() {
               </div>
             </div>
 
+            {/* Target rank display */}
+            {hasAnyNode && (
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] sm:text-xs text-white/35">{t("profile.currentRankLabel", "当前等级")}</span>
+                  <span className="text-sm sm:text-base font-black" style={{ color: tiffanyLight }}>{currentRank}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] sm:text-xs text-white/35">{t("profile.targetRankLabel", "目标等级")}</span>
+                  <span
+                    className="text-sm sm:text-base font-black px-2.5 py-0.5 rounded-lg"
+                    style={{
+                      background: "linear-gradient(135deg, rgba(10,186,181,0.2), rgba(52,211,153,0.15))",
+                      border: "1px solid rgba(10,186,181,0.3)",
+                      color: accentGreen,
+                    }}
+                  >
+                    {nodeType === "MAX" ? "V6" : "V4"}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Progress bar with tiffany-green gradient */}
             <div className="relative mb-1">
               <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
