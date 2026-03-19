@@ -276,7 +276,7 @@ async function fetchChildrenShallow(parentId: string, depth: number, maxDepth: n
     const { count } = await supabase
       .from("profiles")
       .select("id", { count: "exact", head: true })
-      .eq("referrer_id", row.id);
+      .eq("placement_id", row.id);
 
     const childCount = count ?? 0;
     let children: ReferralNode[] = [];
