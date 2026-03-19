@@ -434,14 +434,20 @@ async function callOpenAI(
   gatewayBase: string, cfToken: string, openaiKey: string,
   def: ModelDef, userPrompt: string,
 ): Promise<ModelResult> {
-  const url = `${gatewayBase}/openai/chat/completions`;
+  // Use CF AI Gateway if available, otherwise direct OpenAI API
+  const url = gatewayBase
+    ? `${gatewayBase}/openai/chat/completions`
+    : "https://api.openai.com/v1/chat/completions";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${openaiKey}`,
+  };
+  if (gatewayBase && cfToken) {
+    headers["cf-aig-authorization"] = `Bearer ${cfToken}`;
+  }
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "cf-aig-authorization": `Bearer ${cfToken}`,
-      "Authorization": `Bearer ${openaiKey}`,
-    },
+    headers,
     body: JSON.stringify({
       model: def.model,
       messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userPrompt }],
@@ -584,11 +590,10 @@ serve(async (req) => {
     const cfToken = Deno.env.get("CF_AI_TOKEN") || "";
     const openaiKey = Deno.env.get("OPENAI_API_KEY") || "";
 
-    if (!cfToken) throw new Error("CF_AI_TOKEN must be set");
+    if (!cfToken && !openaiKey) throw new Error("Either CF_AI_TOKEN or OPENAI_API_KEY must be set");
     const gatewayBase = cfGatewayRaw
-      .replace(/\/(compat|openai|workers-ai)\/.*$/, "")
-      .replace(/\/$/, "");
-    if (!gatewayBase) throw new Error("CF_AI_GATEWAY_URL must be set");
+      ? cfGatewayRaw.replace(/\/(compat|openai|workers-ai)\/.*$/, "").replace(/\/$/, "")
+      : "";
 
     // Fetch all data sources in parallel (Phase 2 enhancement)
     const [fearGreed, currentPrice, candles, onchain] = await Promise.all([
@@ -659,6 +664,11 @@ serve(async (req) => {
     function callModel(def: ModelDef): Promise<ModelResult> {
       if (def.type === "openai") return callOpenAI(gatewayBase, cfToken, openaiKey, def, userPrompt);
       if (def.type === "custom") return callCustomAPI(def, userPrompt, customContext);
+      // Workers AI: if CF token not set, fallback to OpenAI with same prompt
+      if (!cfToken || !gatewayBase) {
+        const fallbackDef = { ...def, type: "openai" as const, model: "gpt-4o-mini" };
+        return callOpenAI("", "", openaiKey, fallbackDef, userPrompt);
+      }
       return callWorkersAI(gatewayBase, cfToken, def, userPrompt);
     }
 
