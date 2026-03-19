@@ -15,21 +15,19 @@ const RECEIVER_CHAIN_ID = 42161; // Arbitrum One
 const RECEIVER_ASSET = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"; // USDC on Arbitrum (native)
 const RECEIVER_ASSET_DECIMALS = 6;
 
+// thirdweb server wallet — executes on-chain settlement via EIP-7702
+const THIRDWEB_SECRET_KEY = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
+const SERVER_WALLET_ADDRESS = Deno.env.get("THIRDWEB_SERVER_WALLET") || "";
+
 const VIP_PLANS: Record<string, { price: number; days: number; label: string }> = {
   monthly:  { price: 49,  days: 30,  label: "monthly" },
   halfyear: { price: 149, days: 180, label: "halfyear" },
 };
 
-// ── Facilitator verification ─────────────────────────────────
-const THIRDWEB_SECRET_KEY = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
-
 /**
  * Build the 402 Payment Required response per x402 spec.
- * The client (thirdweb SDK) reads these headers and prompts the user to sign.
  */
 function buildPaymentRequired(priceUsd: number, planKey: string) {
-  // x402 payment requirements — receiver is on Arbitrum USDC
-  // thirdweb facilitator handles cross-chain: user pays BSC USDT → bridge → Arb USDC
   const paymentRequirements = {
     scheme: "exact",
     network: `eip155:${RECEIVER_CHAIN_ID}`,
@@ -61,18 +59,65 @@ function buildPaymentRequired(priceUsd: number, planKey: string) {
 }
 
 /**
- * Verify x402 payment via thirdweb facilitator.
- * Returns the settlement result or null if verification fails.
+ * Settle x402 payment via thirdweb facilitator with server wallet.
+ * The server wallet executes the on-chain transfer (gasless via EIP-7702).
+ */
+async function settlePayment(
+  paymentHeader: string,
+  expectedAmount: number,
+  resourceUrl: string,
+): Promise<{ settled: boolean; txHash?: string } | null> {
+  try {
+    const paymentData = JSON.parse(paymentHeader);
+
+    // Call thirdweb facilitator settle endpoint
+    const resp = await fetch("https://x402.thirdweb.com/settle", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-secret-key": THIRDWEB_SECRET_KEY,
+      },
+      body: JSON.stringify({
+        paymentData,
+        payTo: PAY_TO,
+        network: `eip155:${RECEIVER_CHAIN_ID}`,
+        asset: RECEIVER_ASSET,
+        maxAmountRequired: String(expectedAmount * 10 ** RECEIVER_ASSET_DECIMALS),
+        resource: resourceUrl,
+        serverWalletAddress: SERVER_WALLET_ADDRESS,
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("Facilitator settle failed:", resp.status, errText);
+
+      // Fallback: try verify-only mode if settle fails
+      return await verifyPayment(paymentHeader, expectedAmount);
+    }
+
+    const result = await resp.json();
+    return {
+      settled: result.success === true || result.settled === true || result.isValid === true,
+      txHash: result.txHash || result.transactionHash || paymentData.txHash,
+    };
+  } catch (err) {
+    console.error("Settlement error:", err);
+    // Fallback to verify mode
+    return await verifyPayment(paymentHeader, expectedAmount);
+  }
+}
+
+/**
+ * Fallback: verify-only mode (no server wallet needed).
  */
 async function verifyPayment(
   paymentHeader: string,
   expectedAmount: number,
 ): Promise<{ settled: boolean; txHash?: string } | null> {
   try {
-    // Decode the payment payload from the client
     const paymentData = JSON.parse(paymentHeader);
 
-    // Verify via thirdweb facilitator API
     const resp = await fetch("https://x402.thirdweb.com/verify", {
       method: "POST",
       headers: {
@@ -110,7 +155,6 @@ serve(async (req) => {
   }
 
   try {
-    // Parse plan from body or URL
     let planKey = "monthly";
     let walletAddress = "";
 
@@ -132,12 +176,14 @@ serve(async (req) => {
     const paymentHeader = req.headers.get("x-payment");
 
     if (!paymentHeader) {
-      // No payment yet — return 402 with payment requirements
       return buildPaymentRequired(plan.price, planKey);
     }
 
-    // ── Verify payment ──
-    const verification = await verifyPayment(paymentHeader, plan.price);
+    // ── Settle payment via server wallet ──
+    const resourceUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/vip-subscribe`;
+    const verification = SERVER_WALLET_ADDRESS
+      ? await settlePayment(paymentHeader, plan.price, resourceUrl)
+      : await verifyPayment(paymentHeader, plan.price);
 
     if (!verification || !verification.settled) {
       return new Response(
