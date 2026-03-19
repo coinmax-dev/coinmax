@@ -176,7 +176,7 @@ export function usePayment() {
     [client, _executePayment],
   );
 
-  // ── VIP subscribe (x402 payment via edge function) ──
+  // ── VIP subscribe (USDT transfer to receiver → edge function activates VIP) ──
   const payVIPSubscribe = useCallback(
     async (planKey: keyof typeof VIP_PLANS): Promise<{ txHash?: string; profile?: any }> => {
       if (!client) throw new Error("Thirdweb client not ready");
@@ -185,37 +185,59 @@ export function usePayment() {
       const plan = VIP_PLANS[planKey];
       if (!plan) throw new Error("Invalid VIP plan");
 
+      const receiverAddress = import.meta.env.VITE_VIP_RECEIVER_ADDRESS;
+      if (!receiverAddress) throw new Error("VIP receiver address not configured");
+
       setStatus("paying");
       setError(null);
       setTxHash(null);
 
       try {
-        const { wrapFetchWithPayment } = await import("thirdweb/x402");
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const fetchWithPay = wrapFetchWithPayment(fetch, client, account as any);
+        const { transfer } = await import("thirdweb/extensions/erc20");
 
-        const resp = await fetchWithPay(
-          `${supabaseUrl}/functions/v1/vip-subscribe`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              planKey,
-              walletAddress: account.address,
-            }),
-          },
-        );
+        // Step 1: Transfer USDT to receiver
+        const usdtContract = getUsdtContract(client);
+        const tx = transfer({
+          contract: usdtContract,
+          to: receiverAddress,
+          amount: plan.price,
+        });
+        const payResult = await sendTransaction(tx);
 
-        if (!resp.ok && resp.status !== 200) {
-          const errBody = await resp.json().catch(() => ({ error: "Payment failed" }));
-          throw new Error(errBody.error || `Payment failed (${resp.status})`);
+        // Step 2: Wait for on-chain confirmation
+        setStatus("confirming");
+        const receipt = await waitForReceipt({
+          client,
+          chain: BSC_CHAIN,
+          transactionHash: payResult.transactionHash,
+        });
+
+        if (receipt.status === "reverted") {
+          throw new Error("Transaction reverted");
         }
 
-        const result = await resp.json();
-        const confirmedHash = result.txHash || "";
-        if (confirmedHash) setTxHash(confirmedHash);
+        const confirmedHash = receipt.transactionHash;
+        setTxHash(confirmedHash);
+
+        // Step 3: Call edge function to activate VIP
         setStatus("recording");
-        return result;
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const resp = await fetch(`${supabaseUrl}/functions/v1/vip-subscribe`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-payment": JSON.stringify({ txHash: confirmedHash, settled: true }),
+          },
+          body: JSON.stringify({
+            planKey,
+            walletAddress: account.address,
+          }),
+        });
+
+        const result = await resp.json();
+        if (!resp.ok) throw new Error(result.error || "VIP activation failed");
+
+        return { txHash: confirmedHash, profile: result.profile };
       } catch (err: any) {
         const message = err?.message || "Payment failed";
         setError(message);
@@ -223,7 +245,7 @@ export function usePayment() {
         throw err;
       }
     },
-    [account, client],
+    [account, client, sendTransaction],
   );
 
   return {
