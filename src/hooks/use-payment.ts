@@ -176,7 +176,7 @@ export function usePayment() {
     [client, _executePayment],
   );
 
-  // ── VIP subscribe (USDT transfer to receiver → edge function activates VIP) ──
+  // ── VIP subscribe (cross-chain: BSC USDT → Arb USDC via thirdweb Bridge) ──
   const payVIPSubscribe = useCallback(
     async (planKey: keyof typeof VIP_PLANS): Promise<{ txHash?: string; profile?: any }> => {
       if (!client) throw new Error("Thirdweb client not ready");
@@ -193,40 +193,50 @@ export function usePayment() {
       setTxHash(null);
 
       try {
-        const { transfer } = await import("thirdweb/extensions/erc20");
+        const { Bridge } = await import("thirdweb/bridge");
 
-        // Step 1: Transfer USDT to receiver
-        const usdtContract = getUsdtContract(client);
-        const tx = transfer({
-          contract: usdtContract,
-          to: receiverAddress,
-          amount: plan.price,
-        });
-        const payResult = await sendTransaction(tx);
-
-        // Step 2: Wait for on-chain confirmation
-        setStatus("confirming");
-        const receipt = await waitForReceipt({
+        // Prepare cross-chain transfer: BSC USDT → Arb USDC
+        const preparedQuote = await Bridge.prepare({
           client,
-          chain: BSC_CHAIN,
-          transactionHash: payResult.transactionHash,
+          originChainId: 56,         // BSC
+          originTokenAddress: USDT_ADDRESS, // BSC USDT
+          destinationChainId: 42161,  // Arbitrum
+          destinationTokenAddress: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // Arb USDC
+          amount: BigInt(plan.price) * BigInt(10 ** 6), // USDC 6 decimals
+          sender: account.address,
+          receiver: receiverAddress,
         });
 
-        if (receipt.status === "reverted") {
-          throw new Error("Transaction reverted");
+        // Execute all steps (approve + bridge txs)
+        let lastTxHash = "";
+        for (const step of preparedQuote.steps) {
+          for (const tx of step.transactions) {
+            const result = await sendTransaction(tx as any);
+
+            setStatus("confirming");
+            const receipt = await waitForReceipt({
+              client,
+              chain: BSC_CHAIN,
+              transactionHash: result.transactionHash,
+            });
+
+            if (receipt.status === "reverted") {
+              throw new Error("Transaction reverted");
+            }
+            lastTxHash = receipt.transactionHash;
+          }
         }
 
-        const confirmedHash = receipt.transactionHash;
-        setTxHash(confirmedHash);
+        setTxHash(lastTxHash);
 
-        // Step 3: Call edge function to activate VIP
+        // Activate VIP via edge function
         setStatus("recording");
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const resp = await fetch(`${supabaseUrl}/functions/v1/vip-subscribe`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-payment": JSON.stringify({ txHash: confirmedHash, settled: true }),
+            "x-payment": JSON.stringify({ txHash: lastTxHash, settled: true }),
           },
           body: JSON.stringify({
             planKey,
@@ -237,7 +247,7 @@ export function usePayment() {
         const result = await resp.json();
         if (!resp.ok) throw new Error(result.error || "VIP activation failed");
 
-        return { txHash: confirmedHash, profile: result.profile };
+        return { txHash: lastTxHash, profile: result.profile };
       } catch (err: any) {
         const message = err?.message || "Payment failed";
         setError(message);
