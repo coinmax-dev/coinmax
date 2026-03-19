@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 import { useActiveAccount } from "thirdweb/react";
 import { shortenAddress, formatCompact } from "@/lib/constants";
 import { useMaPrice } from "@/hooks/use-ma-price";
-import { ArrowLeft, Copy, Users, UserPlus, DollarSign, WalletCards, Layers, ChevronRight, ChevronDown, History, Network } from "lucide-react";
+import { ArrowLeft, Copy, Users, UserPlus, DollarSign, WalletCards, Layers, ChevronRight, ChevronDown, History, Network, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { copyText } from "@/lib/copy";
 import { useQuery } from "@tanstack/react-query";
@@ -528,8 +528,21 @@ export default function ProfileReferralPage() {
                           className="text-left w-full"
                           onClick={() => drillInto(ref.walletAddress, shortenAddress(ref.walletAddress))}
                         >
-                          <div className="text-[12px] font-mono text-white/80 truncate">
-                            {shortenAddress(ref.walletAddress)}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px] font-mono text-white/80 truncate">
+                              {shortenAddress(ref.walletAddress)}
+                            </span>
+                            {refCode && ref.refCode && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); e.preventDefault(); copyToClipboard(`${window.location.origin}/r/${refCode}/${ref.refCode}`); }}
+                                className="shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-bold flex items-center gap-1 transition-all hover:brightness-125 active:scale-95"
+                                style={{ background: "rgba(234,179,8,0.12)", border: "1px solid rgba(234,179,8,0.25)", color: "#facc15" }}
+                                title={`${window.location.origin}/r/${refCode}/${ref.refCode}`}
+                              >
+                                <Link2 className="h-2.5 w-2.5" />
+                                Placement
+                              </button>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: subCount > 0 ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.04)", color: subCount > 0 ? "rgba(74,222,128,0.7)" : "rgba(255,255,255,0.3)" }}>
@@ -606,8 +619,20 @@ export default function ProfileReferralPage() {
                           >
                             <div className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: hasTeam ? "#4ade80" : "rgba(255,255,255,0.2)" }} />
                             <div className="flex-1 min-w-0">
-                              <div className="text-[11px] font-mono text-white/60 truncate">
-                                {shortenAddress(sub.walletAddress)}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-mono text-white/60 truncate">
+                                  {shortenAddress(sub.walletAddress)}
+                                </span>
+                                {refCode && sub.refCode && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); copyToClipboard(`${window.location.origin}/r/${refCode}/${sub.refCode}`); }}
+                                    className="shrink-0 px-1 py-0.5 rounded text-[8px] font-bold flex items-center gap-0.5 transition-all hover:brightness-125 active:scale-95"
+                                    style={{ background: "rgba(234,179,8,0.10)", border: "1px solid rgba(234,179,8,0.2)", color: "#facc15" }}
+                                    title={`${window.location.origin}/r/${refCode}/${sub.refCode}`}
+                                  >
+                                    <Link2 className="h-2 w-2" />
+                                  </button>
+                                )}
                               </div>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: hasTeam ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.04)", color: hasTeam ? "rgba(74,222,128,0.7)" : "rgba(255,255,255,0.3)" }}>
