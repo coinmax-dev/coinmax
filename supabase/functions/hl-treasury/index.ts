@@ -1,20 +1,21 @@
 /**
- * HyperLiquid Treasury Edge Function
+ * HyperLiquid Treasury Edge Function (thirdweb Server Wallet)
  *
- * Manages protocol treasury funds on HyperLiquid:
- *   - deposit: Transfer USDC from Arbitrum wallet → HyperLiquid perps account
- *   - withdraw: Withdraw USDC from HyperLiquid perps account → Arbitrum wallet
- *   - balance: Query current account state (balances, positions, withdrawable)
- *   - status: Full treasury status with positions and PnL
+ * Uses thirdweb server wallet for all signing — no raw private key needed.
+ * Server wallet: 0x60D416dA873508c23C1315a2b750a31201959d78
  *
- * Authentication: requires TREASURY_ADMIN_KEY header or service_role JWT
+ * Actions:
+ *   - balance:  Query HL perps account (balances + positions)
+ *   - deposit:  Arbitrum USDC → HL bridge → perps account
+ *   - withdraw: HL perps → Arbitrum wallet (24h delay)
+ *   - transfer: HL internal transfer (instant)
+ *   - status:   Full treasury snapshot
  *
- * HyperLiquid API docs: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api
+ * HyperLiquid API: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.3";
-import { ethers } from "https://esm.sh/ethers@6.13.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,32 +24,182 @@ const corsHeaders = {
 
 // ── Config ───────────────────────────────────────────────────
 const HL_API = "https://api.hyperliquid.xyz";
-const HL_WALLET_KEY = Deno.env.get("HL_PRIVATE_KEY") || "";
 const TREASURY_ADMIN_KEY = Deno.env.get("TREASURY_ADMIN_KEY") || "";
 
-// USDC on Arbitrum (used for L1 deposit to HL)
-const USDC_ARB_ADDRESS = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
-// HyperLiquid L1 bridge contract on Arbitrum
-const HL_BRIDGE_ADDRESS = "0x2Df1c51E09aECF9cacB7bc98cB1742757f163dF7";
+// thirdweb server wallet
+const TW_SECRET_KEY = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
+const SERVER_WALLET = Deno.env.get("THIRDWEB_SERVER_WALLET") || "0x60D416dA873508c23C1315a2b750a31201959d78";
 
-// Minimal ERC-20 ABI for approve + transfer
-const ERC20_ABI = [
-  "function approve(address spender, uint256 amount) external returns (bool)",
-  "function balanceOf(address account) external view returns (uint256)",
-  "function allowance(address owner, address spender) external view returns (uint256)",
-];
+// Contracts on Arbitrum
+const USDC_ARB = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
+const HL_BRIDGE = "0x2Df1c51E09aECF9cacB7bc98cB1742757f163dF7";
+const ARB_CHAIN_ID = 42161;
 
-// HyperLiquid Bridge ABI (deposit USDC to perps account)
-const BRIDGE_ABI = [
-  "function sendUsd(address destination, uint64 amount) external",
-];
+// ── thirdweb Engine: sign typed data via server wallet ───────
 
-// EIP-712 domain for HyperLiquid exchange actions
-const EIP712_DOMAIN = {
+async function twSignTypedData(
+  domain: Record<string, unknown>,
+  types: Record<string, Array<{ name: string; type: string }>>,
+  value: Record<string, unknown>,
+): Promise<string> {
+  const res = await fetch(
+    `https://engine.thirdweb.com/backend-wallet/${SERVER_WALLET}/sign-typed-data`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-secret-key": TW_SECRET_KEY,
+      },
+      body: JSON.stringify({ domain, types, value }),
+    },
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`thirdweb sign-typed-data failed: ${res.status} ${err}`);
+  }
+
+  const data = await res.json();
+  return data.result;
+}
+
+// ── thirdweb Engine: send transaction via server wallet ──────
+
+async function twSendTransaction(
+  toAddress: string,
+  data: string,
+  value: string = "0",
+): Promise<{ txHash: string }> {
+  const res = await fetch(
+    `https://engine.thirdweb.com/backend-wallet/${SERVER_WALLET}/send-transaction`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-secret-key": TW_SECRET_KEY,
+        "x-chain-id": String(ARB_CHAIN_ID),
+      },
+      body: JSON.stringify({
+        toAddress,
+        data,
+        value,
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`thirdweb send-transaction failed: ${res.status} ${err}`);
+  }
+
+  const result = await res.json();
+  // Engine returns a queue ID, poll for tx hash
+  const queueId = result.result?.queueId;
+  if (queueId) {
+    return await pollTransactionStatus(queueId);
+  }
+  return { txHash: result.result?.transactionHash || "" };
+}
+
+async function pollTransactionStatus(queueId: string): Promise<{ txHash: string }> {
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const res = await fetch(
+      `https://engine.thirdweb.com/transaction/status/${queueId}`,
+      {
+        headers: { "x-secret-key": TW_SECRET_KEY },
+      },
+    );
+    if (!res.ok) continue;
+    const data = await res.json();
+    const status = data.result?.status;
+    if (status === "mined") {
+      return { txHash: data.result.transactionHash };
+    }
+    if (status === "errored" || status === "cancelled") {
+      throw new Error(`Transaction ${status}: ${data.result?.errorMessage || "unknown"}`);
+    }
+  }
+  throw new Error("Transaction polling timeout");
+}
+
+// ── thirdweb Engine: read contract ───────────────────────────
+
+async function twReadContract(
+  contractAddress: string,
+  functionName: string,
+  args: string[],
+): Promise<string> {
+  const params = new URLSearchParams({
+    functionName,
+    args: JSON.stringify(args),
+  });
+  const res = await fetch(
+    `https://engine.thirdweb.com/contract/${ARB_CHAIN_ID}/${contractAddress}/read?${params}`,
+    {
+      headers: { "x-secret-key": TW_SECRET_KEY },
+    },
+  );
+  if (!res.ok) throw new Error(`Read contract failed: ${res.status}`);
+  const data = await res.json();
+  return data.result;
+}
+
+// ── thirdweb Engine: write contract ──────────────────────────
+
+async function twWriteContract(
+  contractAddress: string,
+  functionName: string,
+  args: unknown[],
+): Promise<{ txHash: string }> {
+  const res = await fetch(
+    `https://engine.thirdweb.com/contract/${ARB_CHAIN_ID}/${contractAddress}/write`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-secret-key": TW_SECRET_KEY,
+        "x-backend-wallet-address": SERVER_WALLET,
+      },
+      body: JSON.stringify({
+        functionName,
+        args,
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Write contract failed: ${res.status} ${err}`);
+  }
+
+  const result = await res.json();
+  const queueId = result.result?.queueId;
+  if (queueId) {
+    return await pollTransactionStatus(queueId);
+  }
+  return { txHash: result.result?.transactionHash || "" };
+}
+
+// ── HyperLiquid Info API ─────────────────────────────────────
+
+async function hlInfo(body: Record<string, unknown>): Promise<any> {
+  const res = await fetch(`${HL_API}/info`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HL info error: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+// ── EIP-712 Domain & Types for HyperLiquid ───────────────────
+
+const HL_EIP712_DOMAIN = {
   name: "HyperliquidSignTransaction",
   version: "1",
   chainId: 42161,
-  verifyingContract: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+  verifyingContract: "0x0000000000000000000000000000000000000000",
 };
 
 const WITHDRAW_TYPES = {
@@ -60,7 +211,7 @@ const WITHDRAW_TYPES = {
   ],
 };
 
-const USD_TRANSFER_TYPES = {
+const USD_SEND_TYPES = {
   "HyperliquidTransaction:UsdSend": [
     { name: "hyperliquidChain", type: "string" },
     { name: "destination", type: "string" },
@@ -69,79 +220,10 @@ const USD_TRANSFER_TYPES = {
   ],
 };
 
-// ── Helper: get wallet from private key ──────────────────────
-function getWallet(): ethers.Wallet {
-  if (!HL_WALLET_KEY) throw new Error("HL_PRIVATE_KEY not configured");
-  return new ethers.Wallet(HL_WALLET_KEY);
-}
-
-function getArbitrumProvider(): ethers.JsonRpcProvider {
-  return new ethers.JsonRpcProvider("https://arb1.arbitrum.io/rpc");
-}
-
-// ── HyperLiquid Info API ─────────────────────────────────────
-async function hlInfo(body: Record<string, unknown>): Promise<any> {
-  const res = await fetch(`${HL_API}/info`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`HL info error: ${res.status} ${await res.text()}`);
-  return res.json();
-}
-
-// ── HyperLiquid Exchange API (signed) ────────────────────────
-async function hlExchange(action: Record<string, unknown>, wallet: ethers.Wallet): Promise<any> {
-  const nonce = Date.now();
-  const timestamp = nonce;
-
-  // Build typed data for signing
-  const connectionId = {
-    source: "a",
-    connectionId: ethers.hexlify(ethers.randomBytes(16)),
-  };
-
-  // Sign the action using EIP-712
-  const phantomAgent = {
-    source: action.type === "withdraw" ? "a" : "a",
-    connectionId: connectionId.connectionId,
-  };
-
-  const signature = await wallet.signTypedData(
-    EIP712_DOMAIN,
-    { "HyperliquidTransaction:Withdraw": WITHDRAW_TYPES["HyperliquidTransaction:Withdraw"] },
-    action,
-  );
-
-  const payload = {
-    action,
-    nonce: timestamp,
-    signature,
-  };
-
-  const res = await fetch(`${HL_API}/exchange`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`HL exchange error: ${res.status} ${err}`);
-  }
-  return res.json();
-}
-
 // ── Actions ──────────────────────────────────────────────────
 
-/**
- * Get HyperLiquid account balance and positions
- */
 async function getBalance(walletAddress: string) {
-  const state = await hlInfo({
-    type: "clearinghouseState",
-    user: walletAddress,
-  });
+  const state = await hlInfo({ type: "clearinghouseState", user: walletAddress });
 
   const margin = state.marginSummary || state.crossMarginSummary || {};
   const positions = (state.assetPositions || [])
@@ -167,143 +249,132 @@ async function getBalance(walletAddress: string) {
 }
 
 /**
- * Deposit USDC from Arbitrum wallet → HyperLiquid perps account
- * This is an L1 operation: approve + send USDC to HL bridge contract
+ * Deposit USDC from server wallet (Arbitrum) → HyperLiquid perps
+ * Uses thirdweb Engine to send transactions from server wallet
  */
 async function depositToHL(amountUsd: number) {
-  const wallet = getWallet();
-  const provider = getArbitrumProvider();
-  const signer = wallet.connect(provider);
-  const walletAddress = await wallet.getAddress();
+  const amountRaw = String(Math.round(amountUsd * 1e6)); // USDC 6 decimals
 
-  // Amount in USDC (6 decimals)
-  const amount = BigInt(Math.round(amountUsd * 1e6));
-
-  // 1. Check USDC balance on Arbitrum
-  const usdc = new ethers.Contract(USDC_ARB_ADDRESS, ERC20_ABI, signer);
-  const balance = await usdc.balanceOf(walletAddress);
-  if (balance < amount) {
-    throw new Error(`Insufficient USDC balance: ${ethers.formatUnits(balance, 6)} < ${amountUsd}`);
+  // 1. Check USDC balance
+  const balance = await twReadContract(USDC_ARB, "balanceOf", [SERVER_WALLET]);
+  const balanceNum = Number(balance) / 1e6;
+  if (balanceNum < amountUsd) {
+    throw new Error(`Insufficient USDC: ${balanceNum.toFixed(2)} < ${amountUsd}`);
   }
 
-  // 2. Approve bridge contract to spend USDC
-  const allowance = await usdc.allowance(walletAddress, HL_BRIDGE_ADDRESS);
-  if (allowance < amount) {
-    const approveTx = await usdc.approve(HL_BRIDGE_ADDRESS, amount);
-    await approveTx.wait();
+  // 2. Approve HL bridge
+  const allowance = await twReadContract(USDC_ARB, "allowance", [SERVER_WALLET, HL_BRIDGE]);
+  if (Number(allowance) < Number(amountRaw)) {
+    await twWriteContract(USDC_ARB, "approve", [HL_BRIDGE, amountRaw]);
   }
 
-  // 3. Call bridge sendUsd to deposit into HL perps account
-  const bridge = new ethers.Contract(HL_BRIDGE_ADDRESS, BRIDGE_ABI, signer);
-  const depositTx = await bridge.sendUsd(walletAddress, amount);
-  const receipt = await depositTx.wait();
+  // 3. Bridge deposit: sendUsd(destination, amount)
+  const depositResult = await twWriteContract(HL_BRIDGE, "sendUsd", [SERVER_WALLET, amountRaw]);
 
   return {
     success: true,
-    txHash: receipt.hash,
+    txHash: depositResult.txHash,
     amount: amountUsd,
-    from: walletAddress,
+    from: SERVER_WALLET,
     to: "HyperLiquid Perps Account",
   };
 }
 
 /**
- * Withdraw USDC from HyperLiquid perps account → Arbitrum wallet
- * This is an L2 exchange action: signed withdraw request
- * Note: HyperLiquid enforces a ~24h withdrawal delay for security
+ * Withdraw USDC from HyperLiquid perps → Arbitrum wallet
+ * Signs EIP-712 typed data via thirdweb server wallet
+ * Note: 24h withdrawal delay enforced by HyperLiquid
  */
-async function withdrawFromHL(amountUsd: number, destinationAddress?: string) {
-  const wallet = getWallet();
-  const walletAddress = await wallet.getAddress();
-  const destination = destinationAddress || walletAddress;
+async function withdrawFromHL(amountUsd: number, destination?: string) {
+  const dest = destination || SERVER_WALLET;
 
-  // Check withdrawable balance
-  const balance = await getBalance(walletAddress);
-  if (balance.withdrawable < amountUsd) {
-    throw new Error(`Insufficient withdrawable: ${balance.withdrawable.toFixed(2)} < ${amountUsd}`);
+  // Check withdrawable
+  const bal = await getBalance(SERVER_WALLET);
+  if (bal.withdrawable < amountUsd) {
+    throw new Error(`Insufficient withdrawable: ${bal.withdrawable.toFixed(2)} < ${amountUsd}`);
   }
 
-  // Build withdraw action
+  const timestamp = Date.now();
   const action = {
-    type: "withdraw",
+    type: "withdraw3",
     hyperliquidChain: "Arbitrum",
-    destination,
+    signatureChainId: "0xa4b1",
+    destination: dest,
     amount: amountUsd.toFixed(2),
-    time: Date.now(),
+    time: timestamp,
   };
 
-  // Sign and send
-  const signature = await wallet.signTypedData(
-    EIP712_DOMAIN,
+  // Sign via thirdweb server wallet
+  const signature = await twSignTypedData(
+    HL_EIP712_DOMAIN,
     WITHDRAW_TYPES,
-    action,
+    {
+      hyperliquidChain: "Arbitrum",
+      destination: dest,
+      amount: amountUsd.toFixed(2),
+      time: timestamp,
+    },
   );
 
   const res = await fetch(`${HL_API}/exchange`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action,
-      nonce: Date.now(),
-      signature,
-    }),
+    body: JSON.stringify({ action, nonce: timestamp, signature }),
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Withdraw failed: ${res.status} ${err}`);
+    throw new Error(`HL withdraw failed: ${res.status} ${await res.text()}`);
   }
-
-  const result = await res.json();
 
   return {
     success: true,
     amount: amountUsd,
-    destination,
-    status: "pending", // HL has ~24h delay
-    result,
+    destination: dest,
+    status: "pending_24h",
+    result: await res.json(),
   };
 }
 
 /**
- * Internal transfer: send USDC between HL accounts (instant, no delay)
+ * Internal HL transfer (instant, no delay)
  */
-async function internalTransfer(amountUsd: number, destinationAddress: string) {
-  const wallet = getWallet();
+async function internalTransfer(amountUsd: number, destination: string) {
+  const timestamp = Date.now();
 
   const action = {
     type: "usdSend",
     hyperliquidChain: "Arbitrum",
-    destination: destinationAddress,
+    signatureChainId: "0xa4b1",
+    destination,
     amount: amountUsd.toFixed(2),
-    time: Date.now(),
+    time: timestamp,
   };
 
-  const signature = await wallet.signTypedData(
-    EIP712_DOMAIN,
-    USD_TRANSFER_TYPES,
-    action,
+  const signature = await twSignTypedData(
+    HL_EIP712_DOMAIN,
+    USD_SEND_TYPES,
+    {
+      hyperliquidChain: "Arbitrum",
+      destination,
+      amount: amountUsd.toFixed(2),
+      time: timestamp,
+    },
   );
 
   const res = await fetch(`${HL_API}/exchange`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action,
-      nonce: Date.now(),
-      signature,
-    }),
+    body: JSON.stringify({ action, nonce: timestamp, signature }),
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Transfer failed: ${res.status} ${err}`);
+    throw new Error(`HL transfer failed: ${res.status} ${await res.text()}`);
   }
 
   return {
     success: true,
     amount: amountUsd,
-    destination: destinationAddress,
+    destination,
     status: "completed",
     result: await res.json(),
   };
@@ -316,7 +387,6 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Auth check: require admin key or service_role
   const adminKey = req.headers.get("x-admin-key");
   const authHeader = req.headers.get("authorization");
   const isServiceRole = authHeader?.includes("service_role");
@@ -331,10 +401,7 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const { action, amount, destination } = body;
-    const wallet = getWallet();
-    const walletAddress = await wallet.getAddress();
 
-    // Supabase client for logging
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -344,7 +411,7 @@ serve(async (req) => {
 
     switch (action) {
       case "balance": {
-        result = await getBalance(walletAddress);
+        result = await getBalance(SERVER_WALLET);
         break;
       }
 
@@ -352,18 +419,10 @@ serve(async (req) => {
         if (!amount || amount <= 0) throw new Error("Amount required and must be > 0");
         result = await depositToHL(amount);
 
-        // Log to treasury_events
         await supabase.from("treasury_events").insert({
           event_type: "HL_DEPOSIT",
-          details: { amount, txHash: result.txHash, wallet: walletAddress },
+          details: { amount, txHash: result.txHash, wallet: SERVER_WALLET },
         });
-
-        // Update treasury_state
-        await supabase.from("treasury_state").update({
-          total_deployed: supabase.rpc("", {}), // will be updated by next balance check
-          updated_at: new Date().toISOString(),
-        }).eq("id", 1);
-
         break;
       }
 
@@ -373,9 +432,8 @@ serve(async (req) => {
 
         await supabase.from("treasury_events").insert({
           event_type: "HL_WITHDRAW",
-          details: { amount, destination: destination || walletAddress, status: "pending_24h" },
+          details: { amount, destination: destination || SERVER_WALLET, status: "pending_24h" },
         });
-
         break;
       }
 
@@ -388,14 +446,12 @@ serve(async (req) => {
           event_type: "HL_TRANSFER",
           details: { amount, destination, status: "completed" },
         });
-
         break;
       }
 
       case "status": {
-        const balance = await getBalance(walletAddress);
+        const balance = await getBalance(SERVER_WALLET);
 
-        // Get recent treasury events
         const { data: events } = await supabase
           .from("treasury_events")
           .select("*")
@@ -403,7 +459,6 @@ serve(async (req) => {
           .order("created_at", { ascending: false })
           .limit(20);
 
-        // Get treasury_state
         const { data: state } = await supabase
           .from("treasury_state")
           .select("*")
@@ -411,13 +466,12 @@ serve(async (req) => {
           .single();
 
         result = {
-          wallet: walletAddress,
+          wallet: SERVER_WALLET,
           hlAccount: balance,
           treasuryState: state,
           recentEvents: events || [],
         };
 
-        // Update treasury_state with live data
         await supabase.from("treasury_state").update({
           total_deployed: balance.accountValue,
           available_balance: balance.withdrawable,
@@ -425,7 +479,6 @@ serve(async (req) => {
           active_positions: balance.positions,
           updated_at: new Date().toISOString(),
         }).eq("id", 1);
-
         break;
       }
 
