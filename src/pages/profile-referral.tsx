@@ -556,15 +556,24 @@ export default function ProfileReferralPage() {
                             </span>
                           </div>
                         </button>
-                        {/* Sponsor info + placement link (shown when expanded) */}
+                        {/* Details: sponsor, placement, link (shown when expanded) */}
                         {isExpanded && (
                           <div className="mt-2 pt-2 space-y-1.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                            {ref.sponsorWallet && (
-                              <div className="text-[10px] text-white/30">
-                                {t("profile.sponsorLabel", "Sponsor")}: <span className="font-mono text-white/50">{shortenAddress(ref.sponsorWallet)}</span>
-                              </div>
-                            )}
-                            {/* Placement referral link: sponsor=current user, placement=this member */}
+                            <div className="grid grid-cols-2 gap-2">
+                              {ref.sponsorWallet && (
+                                <div className="rounded-lg px-2 py-1.5" style={{ background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.1)" }}>
+                                  <div className="text-[9px] text-white/35">{t("profile.sponsorLabel", "Sponsor (Referrer)")}</div>
+                                  <div className="text-[10px] font-mono text-green-400/70 truncate">{shortenAddress(ref.sponsorWallet)}</div>
+                                </div>
+                              )}
+                              {(ref as any).placedByWallet && (
+                                <div className="rounded-lg px-2 py-1.5" style={{ background: "rgba(147,130,220,0.05)", border: "1px solid rgba(147,130,220,0.1)" }}>
+                                  <div className="text-[9px] text-white/35">{t("profile.placedByLabel", "Placed By")}</div>
+                                  <div className="text-[10px] font-mono text-purple-400/70 truncate">{shortenAddress((ref as any).placedByWallet)}</div>
+                                </div>
+                              )}
+                            </div>
+                            {/* Placement referral link */}
                             {refCode && ref.refCode && (
                               <div className="flex items-center gap-1.5">
                                 <div className="flex-1 min-w-0 rounded-lg px-2 py-1.5 text-[9px] font-mono text-yellow-400/70 truncate"
