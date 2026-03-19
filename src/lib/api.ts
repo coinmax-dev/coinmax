@@ -255,10 +255,11 @@ export async function getNodeOverview(walletAddress: string) {
 // B) Supabase RPC functions (business logic)
 // ─────────────────────────────────────────────
 
-export async function authWallet(walletAddress: string, refCode?: string) {
+export async function authWallet(walletAddress: string, refCode?: string, placementCode?: string) {
   const { data, error } = await supabase.rpc("auth_wallet", {
     addr: walletAddress,
     ref_code: refCode || null,
+    placement_code: placementCode || null,
   });
   if (error) throw error;
   return toCamel(data);

@@ -266,7 +266,7 @@ async function fetchChildrenShallow(parentId: string, depth: number, maxDepth: n
   const { data } = await supabase
     .from("profiles")
     .select("id, wallet_address, rank, node_type, ref_code, created_at")
-    .eq("referrer_id", parentId)
+    .eq("placement_id", parentId)
     .order("created_at", { ascending: true });
   if (!data?.length) return [];
 

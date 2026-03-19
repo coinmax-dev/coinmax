@@ -42,70 +42,104 @@ const wallets = [
   createWallet("io.rabby"),
 ];
 
-function getRefCodeFromUrl(): string | null {
+/**
+ * Parse referral codes from URL.
+ * Supports two formats:
+ *   - New: /r/{refCode}/{placementCode}  (dual referral)
+ *   - Legacy: ?ref={refCode}              (single referral, placement = referrer)
+ */
+function getRefCodesFromUrl(): { refCode: string | null; placementCode: string | null } {
+  // New format: /r/{refCode}/{placementCode}
+  const pathMatch = window.location.pathname.match(/^\/r\/([^/]+)(?:\/([^/]+))?/);
+  if (pathMatch) {
+    const ref = pathMatch[1];
+    const placement = pathMatch[2] || ref; // default placement = referrer
+    localStorage.setItem("coinmax_ref_code", ref);
+    localStorage.setItem("coinmax_placement_code", placement);
+    window.history.replaceState({}, "", "/");
+    return { refCode: ref, placementCode: placement };
+  }
+
+  // Legacy format: ?ref={refCode}
   const urlParams = new URLSearchParams(window.location.search);
   const urlRef = urlParams.get("ref");
   if (urlRef) {
     localStorage.setItem("coinmax_ref_code", urlRef);
+    localStorage.setItem("coinmax_placement_code", urlRef);
     urlParams.delete("ref");
     const newUrl = urlParams.toString()
       ? `${window.location.pathname}?${urlParams.toString()}`
       : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
-    return urlRef;
+    return { refCode: urlRef, placementCode: urlRef };
   }
-  return localStorage.getItem("coinmax_ref_code");
+
+  return {
+    refCode: localStorage.getItem("coinmax_ref_code"),
+    placementCode: localStorage.getItem("coinmax_placement_code"),
+  };
 }
 
 function WalletSync() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const account = useActiveAccount();
-  const refCodeRef = useRef<string | null>(null);
+  const refCodesRef = useRef<{ refCode: string | null; placementCode: string | null }>({ refCode: null, placementCode: null });
   const [showRefDialog, setShowRefDialog] = useState(false);
   const [showRefConfirm, setShowRefConfirm] = useState(false);
   const [refInput, setRefInput] = useState("");
+  const [placementInput, setPlacementInput] = useState("");
   const [refError, setRefError] = useState("");
   const [refLoading, setRefLoading] = useState(false);
   const [referrerWallet, setReferrerWallet] = useState<string | null>(null);
+  const [placementWallet, setPlacementWallet] = useState<string | null>(null);
 
   useEffect(() => {
-    refCodeRef.current = getRefCodeFromUrl();
+    refCodesRef.current = getRefCodesFromUrl();
   }, []);
 
-  const doAuth = useCallback(async (address: string, refCode?: string) => {
-    const result = await authWallet(address, refCode);
+  const doAuth = useCallback(async (address: string, refCode?: string, placementCode?: string) => {
+    const result = await authWallet(address, refCode, placementCode);
     if (result?.error === "REFERRAL_REQUIRED") {
       setShowRefDialog(true);
       return false;
     }
-    if (refCode) localStorage.removeItem("coinmax_ref_code");
+    if (refCode) {
+      localStorage.removeItem("coinmax_ref_code");
+      localStorage.removeItem("coinmax_placement_code");
+    }
     return true;
   }, []);
 
   useEffect(() => {
     if (!account?.address) return;
-    const refCode = refCodeRef.current || localStorage.getItem("coinmax_ref_code");
+    const codes = refCodesRef.current;
+    const refCode = codes.refCode || localStorage.getItem("coinmax_ref_code");
+    const placementCode = codes.placementCode || localStorage.getItem("coinmax_placement_code");
 
     (async () => {
       try {
         const profile = await getProfile(account.address);
         if (!profile && refCode) {
-          // New user with referral code — look up referrer and show confirmation
+          // New user with referral code — look up referrer/placement and show confirmation
           try {
             const referrer = await getProfileByRefCode(refCode);
-            if (referrer?.walletAddress) {
-              setReferrerWallet(referrer.walletAddress);
-            }
+            if (referrer?.walletAddress) setReferrerWallet(referrer.walletAddress);
           } catch {}
+          if (placementCode && placementCode !== refCode) {
+            try {
+              const placement = await getProfileByRefCode(placementCode);
+              if (placement?.walletAddress) setPlacementWallet(placement.walletAddress);
+            } catch {}
+          }
           setRefInput(refCode);
+          setPlacementInput(placementCode || refCode);
           setShowRefConfirm(true);
         } else {
-          // Existing user or no ref code — auth directly
-          await doAuth(account.address, refCode || undefined);
+          await doAuth(account.address, refCode || undefined, placementCode || undefined);
         }
       } catch {
-        await doAuth(account.address, refCode || undefined);
+        await doAuth(account.address, refCode || undefined, placementCode || undefined);
       }
     })();
   }, [account?.address, doAuth]);
@@ -115,10 +149,11 @@ function WalletSync() {
     setRefError("");
     setRefLoading(true);
     try {
-      const ok = await doAuth(account.address, refInput.trim());
+      const placement = placementInput.trim() || refInput.trim();
+      const ok = await doAuth(account.address, refInput.trim(), placement);
       if (ok) {
         setShowRefConfirm(false);
-        setRefInput("");
+        setRefInput(""); setPlacementInput("");
         toast({ title: t("common.registerSuccess"), description: t("common.registerSuccessDesc") });
       } else {
         setRefError(t("profile.invalidRefCode"));
@@ -135,10 +170,11 @@ function WalletSync() {
     setRefError("");
     setRefLoading(true);
     try {
-      const ok = await doAuth(account.address, refInput.trim());
+      const placement = placementInput.trim() || refInput.trim();
+      const ok = await doAuth(account.address, refInput.trim(), placement);
       if (ok) {
         setShowRefDialog(false);
-        setRefInput("");
+        setRefInput(""); setPlacementInput("");
         toast({ title: t("common.registerSuccess"), description: t("common.registerSuccessDesc") });
       } else {
         setRefError(t("profile.invalidRefCode"));
@@ -179,16 +215,31 @@ function WalletSync() {
           </div>
         </div>
         <div className="px-4 sm:px-6 pb-5 sm:pb-6 space-y-3">
-          <input
-            type="text"
-            value={refInput}
-            onChange={(e) => { setRefInput(e.target.value); setRefError(""); }}
-            placeholder={t("profile.refCodePlaceholder")}
-            className="w-full h-11 rounded-xl px-4 text-sm text-white placeholder:text-white/25 outline-none"
-            style={{ background: "rgba(255,255,255,0.06)", border: refError ? "1px solid #ef4444" : "1px solid rgba(10,186,181,0.15)" }}
-            onKeyDown={(e) => e.key === "Enter" && handleRefSubmit()}
-            autoFocus
-          />
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">{t("profile.sponsorCode", "Sponsor Code")}</p>
+            <input
+              type="text"
+              value={refInput}
+              onChange={(e) => { setRefInput(e.target.value); setRefError(""); }}
+              placeholder={t("profile.refCodePlaceholder")}
+              className="w-full h-11 rounded-xl px-4 text-sm text-white placeholder:text-white/25 outline-none"
+              style={{ background: "rgba(255,255,255,0.06)", border: refError ? "1px solid #ef4444" : "1px solid rgba(10,186,181,0.15)" }}
+              autoFocus
+            />
+          </div>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">{t("profile.placementCode", "Placement Code")}</p>
+            <input
+              type="text"
+              value={placementInput}
+              onChange={(e) => { setPlacementInput(e.target.value); setRefError(""); }}
+              placeholder={t("profile.placementCodePlaceholder", "Placement code (optional)")}
+              className="w-full h-11 rounded-xl px-4 text-sm text-white placeholder:text-white/25 outline-none"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(10,186,181,0.15)" }}
+              onKeyDown={(e) => e.key === "Enter" && handleRefSubmit()}
+            />
+            <p className="text-[10px] text-white/25 mt-1">{t("profile.placementCodeHint", "Defaults to sponsor if empty")}</p>
+          </div>
           {refError && <p className="text-xs text-red-400">{refError}</p>}
           <button
             onClick={handleRefSubmit}
@@ -235,20 +286,41 @@ function WalletSync() {
         <div className="px-4 sm:px-6 pb-5 sm:pb-6 space-y-3">
           {referrerWallet && (
             <div className="rounded-xl px-3 sm:px-4 py-2.5 sm:py-3" style={{ background: "rgba(10,186,181,0.08)", border: "1px solid rgba(10,186,181,0.15)" }}>
-              <p className="text-[11px] text-white/40 mb-1">{t("profile.referrer")}</p>
+              <p className="text-[11px] text-white/40 mb-1">{t("profile.sponsorLabel", "Sponsor (Referrer)")}</p>
               <p className="text-[11px] sm:text-xs text-primary font-mono truncate">{referrerWallet}</p>
             </div>
           )}
-          <input
-            type="text"
-            value={refInput}
-            onChange={(e) => { setRefInput(e.target.value); setRefError(""); setReferrerWallet(null); }}
-            placeholder={t("profile.refCodePlaceholder")}
-            className="w-full h-11 rounded-xl px-4 text-sm text-white placeholder:text-white/25 outline-none text-center font-mono tracking-widest"
-            style={{ background: "rgba(255,255,255,0.06)", border: refError ? "1px solid #ef4444" : "1px solid rgba(10,186,181,0.15)" }}
-            onKeyDown={(e) => e.key === "Enter" && handleRefConfirm()}
-            autoFocus
-          />
+          {placementWallet && placementWallet !== referrerWallet && (
+            <div className="rounded-xl px-3 sm:px-4 py-2.5 sm:py-3" style={{ background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.15)" }}>
+              <p className="text-[11px] text-white/40 mb-1">{t("profile.placementLabel", "Placement (Team)")}</p>
+              <p className="text-[11px] sm:text-xs text-yellow-400 font-mono truncate">{placementWallet}</p>
+            </div>
+          )}
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">{t("profile.sponsorCode", "Sponsor Code")}</p>
+            <input
+              type="text"
+              value={refInput}
+              onChange={(e) => { setRefInput(e.target.value); setRefError(""); setReferrerWallet(null); }}
+              placeholder={t("profile.refCodePlaceholder")}
+              className="w-full h-11 rounded-xl px-4 text-sm text-white placeholder:text-white/25 outline-none text-center font-mono tracking-widest"
+              style={{ background: "rgba(255,255,255,0.06)", border: refError ? "1px solid #ef4444" : "1px solid rgba(10,186,181,0.15)" }}
+              autoFocus
+            />
+          </div>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">{t("profile.placementCode", "Placement Code")}</p>
+            <input
+              type="text"
+              value={placementInput}
+              onChange={(e) => { setPlacementInput(e.target.value); setRefError(""); setPlacementWallet(null); }}
+              placeholder={t("profile.placementCodePlaceholder", "Placement code (optional)")}
+              className="w-full h-11 rounded-xl px-4 text-sm text-white placeholder:text-white/25 outline-none text-center font-mono tracking-widest"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(10,186,181,0.15)" }}
+              onKeyDown={(e) => e.key === "Enter" && handleRefConfirm()}
+            />
+            <p className="text-[10px] text-white/25 mt-1">{t("profile.placementCodeHint", "Defaults to sponsor if empty")}</p>
+          </div>
           {refError && <p className="text-xs text-red-400">{refError}</p>}
           <button
             onClick={handleRefConfirm}
@@ -330,6 +402,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/r/:ref/:placement?" component={Dashboard} />
       <Route path="/trade" component={Trade} />
       <Route path="/vault" component={Vault} />
       <Route path="/strategy" component={StrategyPage} />

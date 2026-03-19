@@ -12,24 +12,22 @@ import { getProfile, getReferralTree, getCommissionRecords } from "@/lib/api";
 import type { Profile, CommissionSummary } from "@shared/types";
 import { useTranslation } from "react-i18next";
 
+interface ReferralMember {
+  id: string;
+  walletAddress: string;
+  rank: string;
+  nodeType: string;
+  totalDeposited: string;
+  level: number;
+  refCode?: string;
+  sponsorWallet?: string;
+  sponsorCode?: string;
+  subCount?: number;
+  subReferrals?: ReferralMember[] | null;
+}
+
 interface ReferralData {
-  referrals: Array<{
-    id: string;
-    walletAddress: string;
-    rank: string;
-    nodeType: string;
-    totalDeposited: string;
-    level: number;
-    subReferrals: Array<{
-      id: string;
-      walletAddress: string;
-      rank: string;
-      nodeType: string;
-      totalDeposited: string;
-      level: number;
-      subCount?: number;
-    }>;
-  }>;
+  referrals: ReferralMember[];
   teamSize: number;
   directCount: number;
 }
@@ -91,7 +89,8 @@ export default function ProfileReferralPage() {
 
   const refCode = profile?.refCode;
   const currentRank = profile?.rank || "V0";
-  const referralLink = refCode ? `${window.location.origin}?ref=${refCode}` : "--";
+  // Self-referral link: sponsor=self, placement=self
+  const referralLink = refCode ? `${window.location.origin}/r/${refCode}/${refCode}` : "--";
   const parentWallet = (profile as any)?.parentWallet || null;
 
   const copyToClipboard = async (text: string) => {
@@ -384,7 +383,7 @@ export default function ProfileReferralPage() {
                   {t("profile.teamMembersCount", { count: teamData?.teamSize || 0 })}
                 </span>
               </div>
-              {teamData?.referrals && teamData.referrals.some(r => r.subReferrals?.length > 0) && (
+              {teamData?.referrals && teamData.referrals.some(r => (r.subReferrals?.length ?? 0) > 0) && (
                 <button
                   className="text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all"
                   style={{
@@ -396,7 +395,7 @@ export default function ProfileReferralPage() {
                     if (expandedRefs.size > 0) {
                       setExpandedRefs(new Set());
                     } else {
-                      setExpandedRefs(new Set(teamData.referrals.filter(r => r.subReferrals?.length > 0).map(r => r.id)));
+                      setExpandedRefs(new Set(teamData.referrals.filter(r => (r.subReferrals?.length ?? 0) > 0).map(r => r.id)));
                     }
                   }}
                 >
@@ -524,34 +523,69 @@ export default function ProfileReferralPage() {
                       ) : (
                         <div className="h-2 w-2 rounded-full shrink-0" style={{ background: "rgba(255,255,255,0.2)" }} />
                       )}
-                      <button
-                        className="flex-1 min-w-0 text-left"
-                        onClick={() => drillInto(ref.walletAddress, shortenAddress(ref.walletAddress))}
-                      >
-                        <div className="text-[12px] font-mono text-white/80 truncate">
-                          {shortenAddress(ref.walletAddress)}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: subCount > 0 ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.04)", color: subCount > 0 ? "rgba(74,222,128,0.7)" : "rgba(255,255,255,0.3)" }}>
-                            {t("profile.teamCount", { count: subCount })}
-                          </span>
-                          <span className="text-[10px] text-white/35">
-                            {t("profile.teamPerformance")}: {formatCompact(teamDeposits)}
-                          </span>
-                        </div>
-                      </button>
-                      <span
-                        className="text-[10px] px-2 py-0.5 rounded-md font-bold shrink-0"
-                        style={{ background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.2)", color: "#4ade80" }}
-                      >
-                        {ref.rank}
-                      </span>
-                      <span
-                        className="text-[10px] px-2 py-0.5 rounded-md font-bold shrink-0"
-                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.5)" }}
-                      >
-                        {ref.nodeType}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <button
+                          className="text-left w-full"
+                          onClick={() => drillInto(ref.walletAddress, shortenAddress(ref.walletAddress))}
+                        >
+                          <div className="text-[12px] font-mono text-white/80 truncate">
+                            {shortenAddress(ref.walletAddress)}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: subCount > 0 ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.04)", color: subCount > 0 ? "rgba(74,222,128,0.7)" : "rgba(255,255,255,0.3)" }}>
+                              {t("profile.teamCount", { count: subCount })}
+                            </span>
+                            <span className="text-[10px] text-white/35">
+                              {t("profile.deposits", "Deposits")}: {formatCompact(Number(ref.totalDeposited || 0))}
+                            </span>
+                            <span className="text-[10px] text-white/25">
+                              {t("profile.teamPerformance")}: {formatCompact(teamDeposits)}
+                            </span>
+                          </div>
+                        </button>
+                        {/* Sponsor info + placement link (shown when expanded) */}
+                        {isExpanded && (
+                          <div className="mt-2 pt-2 space-y-1.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                            {ref.sponsorWallet && (
+                              <div className="text-[10px] text-white/30">
+                                {t("profile.sponsorLabel", "Sponsor")}: <span className="font-mono text-white/50">{shortenAddress(ref.sponsorWallet)}</span>
+                              </div>
+                            )}
+                            {/* Placement referral link: sponsor=current user, placement=this member */}
+                            {refCode && ref.refCode && (
+                              <div className="flex items-center gap-1.5">
+                                <div className="flex-1 min-w-0 rounded-lg px-2 py-1.5 text-[9px] font-mono text-yellow-400/70 truncate"
+                                  style={{ background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.15)" }}
+                                >
+                                  {window.location.origin}/r/{refCode}/{ref.refCode}
+                                </div>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); copyToClipboard(`${window.location.origin}/r/${refCode}/${ref.refCode}`); }}
+                                  className="shrink-0 p-1.5 rounded-lg transition-colors hover:bg-white/10"
+                                  style={{ background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.2)" }}
+                                  title={t("profile.placementLink", "Placement Link")}
+                                >
+                                  <Copy className="h-3 w-3 text-yellow-400/70" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span
+                          className="text-[10px] px-2 py-0.5 rounded-md font-bold"
+                          style={{ background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.2)", color: "#4ade80" }}
+                        >
+                          {ref.rank}
+                        </span>
+                        <span
+                          className="text-[10px] px-2 py-0.5 rounded-md font-bold"
+                          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.5)" }}
+                        >
+                          {ref.nodeType}
+                        </span>
+                      </div>
                       <button onClick={() => drillInto(ref.walletAddress, shortenAddress(ref.walletAddress))} className="shrink-0">
                         <ChevronRight className="h-3.5 w-3.5 text-white/30" />
                       </button>

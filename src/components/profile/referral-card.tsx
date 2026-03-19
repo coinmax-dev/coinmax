@@ -54,7 +54,7 @@ export function ReferralCard({ refCode }: ReferralCardProps) {
     toast({ title: t("common.copied"), description: t("common.copiedDesc") });
   };
 
-  const referralLink = refCode ? `${window.location.origin}?ref=${refCode}` : "--";
+  const referralLink = refCode ? `${window.location.origin}/r/${refCode}/${refCode}` : "--";
 
   const totalTeamDeposits = teamData?.referrals.reduce((sum, ref) => {
     const direct = Number(ref.totalDeposited || 0);

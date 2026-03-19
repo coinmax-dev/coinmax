@@ -7,11 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { copyText } from "@/lib/copy";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getProfile, getNodeOverview, getVaultPositions, subscribeVip } from "@/lib/api";
+import { getProfile, getNodeOverview, getVaultPositions } from "@/lib/api";
 import type { NodeOverview } from "@shared/types";
 import { queryClient } from "@/lib/queryClient";
 import { usePayment, getPaymentStatusLabel } from "@/hooks/use-payment";
-import { VIP_RECEIVER_ADDRESS } from "@/lib/contracts";
 import { VIP_PLANS } from "@/lib/data";
 import type { Profile } from "@shared/types";
 
@@ -68,15 +67,12 @@ export default function ProfilePage() {
 
   const payment = usePayment();
   const [showVipPlans, setShowVipPlans] = useState(false);
-  const [selectedVipPlan, setSelectedVipPlan] = useState<"monthly" | "semiannual" | null>(null);
+  const [selectedVipPlan, setSelectedVipPlan] = useState<"monthly" | "halfyear" | null>(null);
 
   const vipMutation = useMutation({
-    mutationFn: async (planKey: "monthly" | "semiannual") => {
-      let txHash: string | undefined;
-      if (VIP_RECEIVER_ADDRESS) {
-        txHash = await payment.payVIPSubscribe(planKey);
-      }
-      const result = await subscribeVip(walletAddr, txHash, planKey);
+    mutationFn: async (planKey: "monthly" | "halfyear") => {
+      // x402 flow: payment + VIP activation handled by edge function in one call
+      const result = await payment.payVIPSubscribe(planKey);
       payment.markSuccess();
       return result;
     },
@@ -106,9 +102,10 @@ export default function ProfilePage() {
   const net = deposited - withdrawn + referralEarnings;
 
   const refCode = profile?.refCode;
+  // Self-referral link: both sponsor and placement = self
   const referralLink = useMemo(() => {
     if (!refCode || typeof window === "undefined") return "";
-    return `${window.location.origin}?ref=${refCode}`;
+    return `${window.location.origin}/r/${refCode}/${refCode}`;
   }, [refCode]);
 
   const copyToClipboard = async (text: string) => {
@@ -403,17 +400,17 @@ export default function ProfilePage() {
                 <div className="text-[16px] font-black text-yellow-400">$49</div>
               </div>
               <div
-                className={`rounded-xl p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all ${selectedVipPlan === "semiannual" ? "ring-1 ring-yellow-400" : ""}`}
+                className={`rounded-xl p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all ${selectedVipPlan === "halfyear" ? "ring-1 ring-yellow-400" : ""}`}
                 style={{ border: "1px solid rgba(234,179,8,0.5)", background: "rgba(234,179,8,0.06)" }}
-                onClick={() => setSelectedVipPlan("semiannual")}
+                onClick={() => setSelectedVipPlan("halfyear")}
               >
                 <div>
                   <div className="text-[13px] font-bold text-white">VIP {t("profile.vipPlan_halfyear", "Half Year")}</div>
                   <div className="text-[11px] text-white/40 mt-0.5">6 months</div>
                 </div>
                 <div className="flex items-baseline gap-1.5">
-                  <div className="text-[16px] font-black text-yellow-400">$249</div>
-                  <div className="text-[10px] text-emerald-400 font-bold">SAVE 15%</div>
+                  <div className="text-[16px] font-black text-yellow-400">$149</div>
+                  <div className="text-[10px] text-emerald-400 font-bold">SAVE 49%</div>
                 </div>
               </div>
               <div className="flex gap-2 pt-1">

@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
-import { approve, transfer } from "thirdweb/extensions/erc20";
+import { approve } from "thirdweb/extensions/erc20";
 import { prepareContractCall, waitForReceipt } from "thirdweb";
 import { useThirdwebClient } from "./use-thirdweb";
 import {
@@ -11,7 +11,6 @@ import {
   usdToUsdtUnits,
   VAULT_CONTRACT_ADDRESS,
   NODE_CONTRACT_ADDRESS,
-  VIP_RECEIVER_ADDRESS,
   SWAP_ROUTER_ADDRESS,
   VAULT_ABI,
   NODE_ABI,
@@ -177,10 +176,9 @@ export function usePayment() {
     [client, _executePayment],
   );
 
-  // ── VIP subscribe (x402 direct USDT transfer) ──
+  // ── VIP subscribe (x402 payment via edge function) ──
   const payVIPSubscribe = useCallback(
-    async (planKey: keyof typeof VIP_PLANS): Promise<string> => {
-      if (!VIP_RECEIVER_ADDRESS) throw new Error("VIP receiver address not configured");
+    async (planKey: keyof typeof VIP_PLANS): Promise<{ txHash?: string; profile?: any }> => {
       if (!client) throw new Error("Thirdweb client not ready");
       if (!account) throw new Error("Wallet not connected");
 
@@ -192,29 +190,32 @@ export function usePayment() {
       setTxHash(null);
 
       try {
-        const usdtContract = getUsdtContract(client);
-        const tx = transfer({
-          contract: usdtContract,
-          to: VIP_RECEIVER_ADDRESS,
-          amount: plan.price,
-        });
-        const payResult = await sendTransaction(tx);
+        const { wrapFetchWithPayment } = await import("thirdweb/x402");
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const fetchWithPay = wrapFetchWithPayment(fetch, client, account as any);
 
-        setStatus("confirming");
-        const receipt = await waitForReceipt({
-          client,
-          chain: BSC_CHAIN,
-          transactionHash: payResult.transactionHash,
-        });
+        const resp = await fetchWithPay(
+          `${supabaseUrl}/functions/v1/vip-subscribe`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              planKey,
+              walletAddress: account.address,
+            }),
+          },
+        );
 
-        if (receipt.status === "reverted") {
-          throw new Error("Transaction reverted");
+        if (!resp.ok && resp.status !== 200) {
+          const errBody = await resp.json().catch(() => ({ error: "Payment failed" }));
+          throw new Error(errBody.error || `Payment failed (${resp.status})`);
         }
 
-        const confirmedHash = receipt.transactionHash;
-        setTxHash(confirmedHash);
+        const result = await resp.json();
+        const confirmedHash = result.txHash || "";
+        if (confirmedHash) setTxHash(confirmedHash);
         setStatus("recording");
-        return confirmedHash;
+        return result;
       } catch (err: any) {
         const message = err?.message || "Payment failed";
         setError(message);
@@ -222,7 +223,7 @@ export function usePayment() {
         throw err;
       }
     },
-    [account, client, sendTransaction],
+    [account, client],
   );
 
   return {
