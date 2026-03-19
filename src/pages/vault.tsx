@@ -290,10 +290,7 @@ export default function Vault() {
             ) : (
               <div className="space-y-1">
                 {positions.map((pos, idx) => {
-                  const now = new Date();
                   const start = new Date(pos.startDate!);
-                  const end = pos.endDate ? new Date(pos.endDate) : null;
-                  const remainingDays = end ? Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
                   const planConfig = VAULT_PLANS[pos.planType as keyof typeof VAULT_PLANS];
                   const lockDays = planConfig?.days || 0;
 
@@ -307,8 +304,8 @@ export default function Vault() {
                       <span className="font-medium">${Number(pos.principal).toFixed(2)}</span>
                       <span className="text-muted-foreground">{start.toLocaleDateString()}</span>
                       <span className="text-muted-foreground">{lockDays}d</span>
-                      <span className={remainingDays > 0 ? "text-yellow-400" : "text-neon-value"}>
-                        {pos.status === "ACTIVE" ? `${remainingDays}d` : pos.status}
+                      <span className={pos.status === "ACTIVE" ? "text-yellow-400" : "text-neon-value"}>
+                        {pos.status === "ACTIVE" ? `${lockDays}d` : pos.status}
                       </span>
                       <div>
                         {pos.status === "ACTIVE" ? (

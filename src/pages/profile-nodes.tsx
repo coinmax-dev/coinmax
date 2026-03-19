@@ -15,12 +15,9 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 
 type TabKey = "purchase" | "earnings";
 
-function getMilestoneDaysLeft(startDate: string | null, deadlineDays: number): number {
-  if (!startDate) return deadlineDays;
-  const start = new Date(startDate).getTime();
-  const deadline = start + deadlineDays * 24 * 60 * 60 * 1000;
-  const now = Date.now();
-  return Math.max(0, Math.ceil((deadline - now) / (1000 * 60 * 60 * 24)));
+// Node system not yet activated — show original deadline days (no countdown)
+function getMilestoneDaysLeft(_startDate: string | null, deadlineDays: number): number {
+  return deadlineDays;
 }
 
 export default function ProfileNodesPage() {
