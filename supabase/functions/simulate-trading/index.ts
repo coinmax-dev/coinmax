@@ -696,7 +696,7 @@ serve(async (req) => {
         if (!cp) continue;
 
         // Determine time limit based on strategy
-        const stratTimeLimit = t.strategy_type === "scalping" ? 2 : t.strategy_type === "mean_reversion" ? 6 : t.strategy_type === "breakout" ? 8 : t.strategy_type === "swing" ? 24 : 12;
+        const stratTimeLimit = t.strategy_type === "scalping" ? 2 : t.strategy_type === "grid" ? 4 : t.strategy_type === "avellaneda" ? 4 : t.strategy_type === "mean_reversion" ? 6 : t.strategy_type === "pattern" ? 6 : t.strategy_type === "breakout" ? 8 : t.strategy_type === "momentum" ? 8 : t.strategy_type === "swing" ? 24 : t.strategy_type === "dca" ? 48 : 12;
         const timeLimitMs = stratTimeLimit * 3600_000;
 
         let cr: string | null = null;
