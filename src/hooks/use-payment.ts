@@ -188,30 +188,57 @@ export function usePayment() {
       const receiverAddress = import.meta.env.VITE_VIP_RECEIVER_ADDRESS;
       if (!receiverAddress) throw new Error("VIP receiver address not configured");
 
+      const clientId = import.meta.env.VITE_THIRDWEB_CLIENT_ID;
+
       setStatus("paying");
       setError(null);
       setTxHash(null);
 
       try {
-        const { Bridge } = await import("thirdweb/bridge");
+        // Step 1: Get bridge quote from thirdweb REST API
+        // amount = destination USDC amount (6 decimals)
+        const destAmount = String(plan.price * 1_000_000);
+        const quoteUrl = `https://bridge.thirdweb.com/v1/prepare` +
+          `?originChainId=56` +
+          `&originTokenAddress=${USDT_ADDRESS}` +
+          `&destinationChainId=42161` +
+          `&destinationTokenAddress=0xaf88d065e77c8cC2239327C5EDb3A432268e5831` +
+          `&amount=${destAmount}` +
+          `&sender=${account.address}` +
+          `&receiver=${receiverAddress}`;
 
-        // Prepare cross-chain transfer: BSC USDT → Arb USDC
-        const preparedQuote = await Bridge.prepare({
-          client,
-          originChainId: 56,         // BSC
-          originTokenAddress: USDT_ADDRESS, // BSC USDT
-          destinationChainId: 42161,  // Arbitrum
-          destinationTokenAddress: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // Arb USDC
-          amount: BigInt(plan.price) * BigInt(10 ** 6), // USDC 6 decimals
-          sender: account.address,
-          receiver: receiverAddress,
+        const quoteResp = await fetch(quoteUrl, {
+          headers: { "x-client-id": clientId },
         });
 
-        // Execute all steps (approve + bridge txs)
+        if (!quoteResp.ok) {
+          const err = await quoteResp.text();
+          throw new Error(`Bridge quote failed: ${err}`);
+        }
+
+        const quote = await quoteResp.json();
+        const steps = quote.data?.steps || quote.steps || [];
+
+        if (!steps.length) {
+          throw new Error("No bridge steps returned");
+        }
+
+        // Step 2: Execute each transaction in order
         let lastTxHash = "";
-        for (const step of preparedQuote.steps) {
-          for (const tx of step.transactions) {
-            const result = await sendTransaction(tx as any);
+        for (const step of steps) {
+          const txs = step.transactions || [];
+          for (const tx of txs) {
+            setStatus("approving");
+
+            // Send the raw transaction via thirdweb
+            const txData = {
+              to: tx.to as `0x${string}`,
+              data: tx.data as `0x${string}`,
+              value: BigInt(tx.value || "0"),
+              chainId: tx.chainId || 56,
+            };
+
+            const result = await sendTransaction(txData as any);
 
             setStatus("confirming");
             const receipt = await waitForReceipt({
@@ -229,7 +256,7 @@ export function usePayment() {
 
         setTxHash(lastTxHash);
 
-        // Activate VIP via edge function
+        // Step 3: Activate VIP via edge function
         setStatus("recording");
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const resp = await fetch(`${supabaseUrl}/functions/v1/vip-subscribe`, {
