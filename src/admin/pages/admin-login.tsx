@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Lock, User, AlertCircle, Loader2 } from "lucide-react";
+import { Lock, User, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 
 interface AdminLoginPageProps {
   onLogin: (username: string, password: string) => Promise<string | null>;
@@ -12,6 +12,7 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,12 +86,12 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("admin.passwordPlaceholder", "Enter password")}
                 required
-                className="w-full h-11 pl-10 pr-4 rounded-xl text-sm text-white placeholder:text-white/25 outline-none transition-colors"
+                className="w-full h-11 pl-10 pr-10 rounded-xl text-sm text-white placeholder:text-white/25 outline-none transition-colors"
                 style={{
                   background: "rgba(255,255,255,0.05)",
                   border: "1px solid rgba(255,255,255,0.08)",
@@ -102,6 +103,17 @@ export default function AdminLoginPage({ onLogin }: AdminLoginPageProps) {
                   (e.target.style.borderColor = "rgba(255,255,255,0.08)")
                 }
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-md transition-colors hover:bg-white/10"
+                tabIndex={-1}
+              >
+                {showPassword
+                  ? <EyeOff className="h-4 w-4 text-white/40" />
+                  : <Eye className="h-4 w-4 text-white/40" />
+                }
+              </button>
             </div>
           </div>
 
