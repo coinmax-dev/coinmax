@@ -56,10 +56,10 @@ const PREDICTION_TIMEFRAMES = [
 
 // ── Price & candle fetching ─────────────────────────────────
 
-async function fetchPrices(): Promise<Record<string, number>> {
+async function fetchPrices(assets: string[] = DEFAULT_ASSETS): Promise<Record<string, number>> {
   const prices: Record<string, number> = {};
   await Promise.all(
-    ASSETS.map(async (asset) => {
+    assets.map(async (asset) => {
       try {
         const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${asset}USDT`);
         if (res.ok) { const d = await res.json(); const p = parseFloat(d.price); if (p > 0) prices[asset] = p; }
@@ -679,7 +679,7 @@ serve(async (req) => {
     results.config = cfg;
 
     const ASSETS = cfg.assets;
-    const prices = await fetchPrices();
+    const prices = await fetchPrices(ASSETS);
     results.prices = prices;
     if (Object.keys(prices).length === 0) return new Response(JSON.stringify({ error: "No prices" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
