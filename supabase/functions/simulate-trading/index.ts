@@ -26,7 +26,7 @@ const DEFAULT_POSITION_SIZE_USD = 1000;
 const DEFAULT_MAX_POSITIONS = 15;
 const DEFAULT_MAX_LEVERAGE = 5;
 const DEFAULT_COOLDOWN_MIN = 5;
-const DEFAULT_STRATEGIES = ["trend_following", "mean_reversion", "breakout", "scalping", "momentum", "swing", "grid", "dca", "pattern", "avellaneda"];
+const DEFAULT_STRATEGIES = ["trend_following", "mean_reversion", "breakout", "scalping", "momentum", "swing", "grid", "dca", "pattern", "avellaneda", "position_executor", "twap", "market_making", "arbitrage"];
 
 interface SimConfig {
   positionSize: number;
@@ -590,6 +590,143 @@ function strategyAvellaneda(ind: TechIndicators): StrategySignal | null {
   return null;
 }
 
+// 11. Position Executor: Triple barrier with trailing stop (Hummingbot PositionExecutor)
+function strategyPositionExecutor(ind: TechIndicators): StrategySignal | null {
+  const { rsi, mom, macd, adx, vol, ema9, ema21, bb } = ind;
+
+  // Strong directional signal with multi-indicator confirmation
+  const bullScore = (ema9 > ema21 ? 1 : 0) + (macd.histogram > 0 ? 1 : 0) + (rsi < 60 ? 1 : 0) + (mom > 0.1 ? 1 : 0) + (adx > 20 ? 1 : 0);
+  const bearScore = (ema9 < ema21 ? 1 : 0) + (macd.histogram < 0 ? 1 : 0) + (rsi > 40 ? 1 : 0) + (mom < -0.1 ? 1 : 0) + (adx > 20 ? 1 : 0);
+
+  if (bullScore >= 4) {
+    const conf = Math.min(90, 55 + bullScore * 6 + adx * 0.3);
+    return {
+      strategy: "position_executor", side: "LONG", confidence: conf,
+      leverage: Math.min(5, Math.round(conf / 22)),
+      slPct: Math.max(0.02, vol * 0.025), // 2% SL with trailing
+      tpPct: Math.max(0.06, vol * 0.08),  // 6% TP — high R:R
+      timeLimit: 36,
+      reason: `PositionExec: ${bullScore}/5指标确认多, ADX=${adx.toFixed(0)}, 带追踪止损`,
+    };
+  }
+  if (bearScore >= 4) {
+    const conf = Math.min(90, 55 + bearScore * 6 + adx * 0.3);
+    return {
+      strategy: "position_executor", side: "SHORT", confidence: conf,
+      leverage: Math.min(5, Math.round(conf / 22)),
+      slPct: Math.max(0.02, vol * 0.025),
+      tpPct: Math.max(0.06, vol * 0.08),
+      timeLimit: 36,
+      reason: `PositionExec: ${bearScore}/5指标确认空, ADX=${adx.toFixed(0)}, 带追踪止损`,
+    };
+  }
+  return null;
+}
+
+// 12. TWAP: Time-weighted accumulation during favorable conditions (Hummingbot TWAPExecutor)
+function strategyTWAP(ind: TechIndicators): StrategySignal | null {
+  const { rsi, mom, vol, bb, adx, ema9, ema21 } = ind;
+
+  // TWAP accumulates during oversold/overbought with low volatility
+  if (vol < 1.5 && rsi < 33 && bb.pctB < 0.2 && adx < 35) {
+    const conf = Math.min(82, 52 + (33 - rsi) * 1.0 + (1 - bb.pctB) * 5);
+    return {
+      strategy: "twap", side: "LONG", confidence: conf,
+      leverage: 1,
+      slPct: Math.max(0.035, vol * 0.04),  // Wider SL for accumulation
+      tpPct: Math.max(0.05, vol * 0.06),
+      timeLimit: 72,  // Long hold — TWAP accumulation
+      reason: `TWAP累积买入: RSI=${rsi.toFixed(0)}, BB%B=${bb.pctB.toFixed(2)}, 低波动累积`,
+    };
+  }
+  if (vol < 1.5 && rsi > 67 && bb.pctB > 0.8 && adx < 35) {
+    const conf = Math.min(82, 52 + (rsi - 67) * 1.0 + bb.pctB * 5);
+    return {
+      strategy: "twap", side: "SHORT", confidence: conf,
+      leverage: 1,
+      slPct: Math.max(0.035, vol * 0.04),
+      tpPct: Math.max(0.05, vol * 0.06),
+      timeLimit: 72,
+      reason: `TWAP累积卖出: RSI=${rsi.toFixed(0)}, BB%B=${bb.pctB.toFixed(2)}, 低波动分批`,
+    };
+  }
+  return null;
+}
+
+// 13. Market Making: Dual-side spread capture (Hummingbot MarketMakingController)
+function strategyMarketMaking(ind: TechIndicators): StrategySignal | null {
+  const { vol, adx, bb, rsi, atr, price } = ind;
+
+  // MM needs: low directional strength + reasonable volatility for spread capture
+  if (adx > 25) return null; // Too directional for MM
+  if (vol < 0.3) return null; // Not enough vol to capture spread
+
+  const spreadPct = Math.max(0.1, vol * 0.4); // Spread proportional to vol
+
+  if (bb.pctB < 0.45 && rsi < 52) {
+    const conf = Math.min(78, 52 + (25 - adx) * 0.8 + vol * 3);
+    return {
+      strategy: "market_making", side: "LONG", confidence: conf,
+      leverage: 2,
+      slPct: Math.max(0.015, spreadPct / 100 * 2),
+      tpPct: Math.max(0.01, spreadPct / 100),
+      timeLimit: 12,
+      reason: `做市买入: Spread=${spreadPct.toFixed(2)}%, ADX=${adx.toFixed(0)}, Vol=${vol.toFixed(2)}`,
+    };
+  }
+  if (bb.pctB > 0.55 && rsi > 48) {
+    const conf = Math.min(78, 52 + (25 - adx) * 0.8 + vol * 3);
+    return {
+      strategy: "market_making", side: "SHORT", confidence: conf,
+      leverage: 2,
+      slPct: Math.max(0.015, spreadPct / 100 * 2),
+      tpPct: Math.max(0.01, spreadPct / 100),
+      timeLimit: 12,
+      reason: `做市卖出: Spread=${spreadPct.toFixed(2)}%, ADX=${adx.toFixed(0)}, Vol=${vol.toFixed(2)}`,
+    };
+  }
+  return null;
+}
+
+// 14. Arbitrage: Cross-timeframe price divergence simulation (Hummingbot ArbitrageExecutor)
+function strategyArbitrage(ind: TechIndicators, ind1h: TechIndicators | null): StrategySignal | null {
+  if (!ind1h) return null;
+  const { rsi, mom, price, vol } = ind;
+
+  // Divergence between 5m and 1h signals
+  const shortTermBull = rsi < 40 && mom > 0;
+  const longTermBull = ind1h.rsi > 45 && ind1h.mom > 0.05;
+  const shortTermBear = rsi > 60 && mom < 0;
+  const longTermBear = ind1h.rsi < 55 && ind1h.mom < -0.05;
+
+  // Convergence trade: when short-term oversold but long-term bullish
+  if (shortTermBull && longTermBull) {
+    const divergence = Math.abs(rsi - ind1h.rsi);
+    const conf = Math.min(85, 55 + divergence * 0.5 + Math.abs(ind1h.mom) * 8);
+    return {
+      strategy: "arbitrage", side: "LONG", confidence: conf,
+      leverage: 3,
+      slPct: Math.max(0.012, vol * 0.015),
+      tpPct: Math.max(0.025, vol * 0.035),
+      timeLimit: 16,
+      reason: `时间框架套利: 5M超卖(RSI=${rsi.toFixed(0)})+1H看多(RSI=${ind1h.rsi.toFixed(0)}), 价差收敛`,
+    };
+  }
+  if (shortTermBear && longTermBear) {
+    const divergence = Math.abs(rsi - ind1h.rsi);
+    const conf = Math.min(85, 55 + divergence * 0.5 + Math.abs(ind1h.mom) * 8);
+    return {
+      strategy: "arbitrage", side: "SHORT", confidence: conf,
+      leverage: 3,
+      slPct: Math.max(0.012, vol * 0.015),
+      tpPct: Math.max(0.025, vol * 0.035),
+      timeLimit: 16,
+      reason: `时间框架套利: 5M超买(RSI=${rsi.toFixed(0)})+1H看空(RSI=${ind1h.rsi.toFixed(0)}), 价差收敛`,
+    };
+  }
+  return null;
+}
+
 // ── Model vote simulation (kept for predictions) ────────────
 
 interface ModelVote { model: string; direction: "BULLISH" | "BEARISH" | "NEUTRAL"; confidence: number; weight: number; }
@@ -796,6 +933,10 @@ serve(async (req) => {
       if (cfg.strategies.includes("dca"))              { const s = strategyDCA(ind5m);             if (s) stratSignals.push(s); }
       if (cfg.strategies.includes("pattern"))          { const s = strategyPattern(ind5m, candles5m); if (s) stratSignals.push(s); }
       if (cfg.strategies.includes("avellaneda"))       { const s = strategyAvellaneda(ind5m);      if (s) stratSignals.push(s); }
+      if (cfg.strategies.includes("position_executor")){ const s = strategyPositionExecutor(ind5m);if (s) stratSignals.push(s); }
+      if (cfg.strategies.includes("twap"))             { const s = strategyTWAP(ind5m);            if (s) stratSignals.push(s); }
+      if (cfg.strategies.includes("market_making"))    { const s = strategyMarketMaking(ind5m);    if (s) stratSignals.push(s); }
+      if (cfg.strategies.includes("arbitrage"))        { const s = strategyArbitrage(ind5m, ind1h); if (s) stratSignals.push(s); }
       results.strategies_evaluated += cfg.strategies.length;
 
       // Cap leverage to config max
