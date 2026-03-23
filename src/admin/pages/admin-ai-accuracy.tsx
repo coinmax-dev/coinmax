@@ -5,7 +5,7 @@ import { Brain, Target, TrendingUp, TrendingDown, Minus, RefreshCw } from "lucid
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 
-const ASSETS = ["BTC", "ETH", "SOL", "BNB", "DOGE", "XRP"];
+const ASSETS = ["BTC", "ETH", "SOL", "BNB", "DOGE", "XRP", "ADA", "AVAX", "LINK", "DOT"];
 const TIMEFRAMES = ["5m", "15m", "30m", "1H", "4H", "1D"];
 const PERIODS = ["7d", "30d", "all"];
 const PERIOD_LABELS: Record<string, string> = { "7d": "7天", "30d": "30天", all: "全部" };
