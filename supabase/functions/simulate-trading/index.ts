@@ -553,8 +553,8 @@ function strategyDCA(ind: TechIndicators): StrategySignal | null {
     return {
       strategy: "dca", side: "LONG", confidence: conf,
       leverage: 1, // DCA is always 1x
-      slPct: Math.max(0.04, vol * 0.04), // Wider SL for DCA
-      tpPct: Math.max(0.02, vol * 0.025),
+      slPct: Math.max(0.02, vol * 0.025),
+      tpPct: Math.max(0.04, vol * 0.05),
       timeLimit: 48, // DCA holds longer
       reason: `DCA抄底: RSI=${rsi.toFixed(0)}, Mom=${mom.toFixed(2)}%, BB%B=${bb.pctB.toFixed(2)}`,
     };
@@ -565,8 +565,8 @@ function strategyDCA(ind: TechIndicators): StrategySignal | null {
     return {
       strategy: "dca", side: "SHORT", confidence: conf,
       leverage: 1,
-      slPct: Math.max(0.04, vol * 0.04),
-      tpPct: Math.max(0.02, vol * 0.025),
+      slPct: Math.max(0.02, vol * 0.025),
+      tpPct: Math.max(0.04, vol * 0.05),
       timeLimit: 48,
       reason: `DCA做空: RSI=${rsi.toFixed(0)}, Mom=${mom.toFixed(2)}%, BB%B=${bb.pctB.toFixed(2)}`,
     };
@@ -683,8 +683,8 @@ function strategyAvellaneda(ind: TechIndicators): StrategySignal | null {
     return {
       strategy: "avellaneda", side: "LONG", confidence: conf,
       leverage: 2,
-      slPct: Math.max(0.015, optimalSpread / 100 * 1.5),
-      tpPct: Math.max(0.01, optimalSpread / 100),
+      slPct: Math.max(0.012, optimalSpread / 100),
+      tpPct: Math.max(0.025, optimalSpread / 100 * 2),
       timeLimit: 4,
       reason: `Avellaneda: 偏差=${deviation.toFixed(2)}%, 最优价差=${optimalSpread.toFixed(2)}%, RSI=${rsi.toFixed(0)}`,
     };
@@ -694,8 +694,8 @@ function strategyAvellaneda(ind: TechIndicators): StrategySignal | null {
     return {
       strategy: "avellaneda", side: "SHORT", confidence: conf,
       leverage: 2,
-      slPct: Math.max(0.015, optimalSpread / 100 * 1.5),
-      tpPct: Math.max(0.01, optimalSpread / 100),
+      slPct: Math.max(0.012, optimalSpread / 100),
+      tpPct: Math.max(0.025, optimalSpread / 100 * 2),
       timeLimit: 4,
       reason: `Avellaneda: 偏差=${deviation.toFixed(2)}%, 最优价差=${optimalSpread.toFixed(2)}%, RSI=${rsi.toFixed(0)}`,
     };
@@ -906,8 +906,8 @@ function strategyVWAPReversion(ind: TechIndicators): StrategySignal | null {
     const conf = Math.min(80, 52 + Math.abs(deviation) * 8 + (48 - rsi) * 0.3);
     return {
       strategy: "vwap_reversion", side: "LONG", confidence: conf,
-      leverage: 2, slPct: Math.max(0.012, vol * 0.015),
-      tpPct: Math.max(0.015, Math.abs(deviation) / 100 * 0.8), timeLimit: 4,
+      leverage: 2, slPct: Math.max(0.01, vol * 0.012),
+      tpPct: Math.max(0.025, Math.abs(deviation) / 100 * 1.5), timeLimit: 4,
       reason: `VWAP回归做多: 偏差=${deviation.toFixed(2)}%, RSI=${rsi.toFixed(0)}`,
     };
   }
@@ -916,8 +916,8 @@ function strategyVWAPReversion(ind: TechIndicators): StrategySignal | null {
     const conf = Math.min(80, 52 + Math.abs(deviation) * 8 + (rsi - 52) * 0.3);
     return {
       strategy: "vwap_reversion", side: "SHORT", confidence: conf,
-      leverage: 2, slPct: Math.max(0.012, vol * 0.015),
-      tpPct: Math.max(0.015, Math.abs(deviation) / 100 * 0.8), timeLimit: 4,
+      leverage: 2, slPct: Math.max(0.01, vol * 0.012),
+      tpPct: Math.max(0.025, Math.abs(deviation) / 100 * 1.5), timeLimit: 4,
       reason: `VWAP回归做空: 偏差=${deviation.toFixed(2)}%, RSI=${rsi.toFixed(0)}`,
     };
   }
