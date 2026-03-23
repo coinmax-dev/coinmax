@@ -341,8 +341,8 @@ function strategyTrendFollowing(ind: TechIndicators): StrategySignal | null {
   const emaBullish = ema9 > ema21;
   const emaBearish = ema9 < ema21;
 
-  if (emaBullish && macd.histogram > 0 && mom > 0.02) {
-    const conf = Math.min(90, 55 + adx * 0.4 + Math.abs(mom) * 5);
+  if (emaBullish && macd.histogram > 0 && mom > 0.05 && adx > 18) {
+    const conf = Math.min(88, 52 + adx * 0.4 + Math.abs(mom) * 4);
     return {
       strategy: "trend_following", side: "LONG", confidence: conf,
       leverage: conf > 75 ? 3 : 2,
@@ -352,8 +352,8 @@ function strategyTrendFollowing(ind: TechIndicators): StrategySignal | null {
       reason: `EMA9>21, ADX=${adx.toFixed(0)}, MACD+, Mom=${mom.toFixed(2)}%`,
     };
   }
-  if (emaBearish && macd.histogram < 0 && mom < -0.02) {
-    const conf = Math.min(90, 55 + adx * 0.4 + Math.abs(mom) * 5);
+  if (emaBearish && macd.histogram < 0 && mom < -0.05 && adx > 18) {
+    const conf = Math.min(88, 52 + adx * 0.4 + Math.abs(mom) * 4);
     return {
       strategy: "trend_following", side: "SHORT", confidence: conf,
       leverage: conf > 75 ? 3 : 2,
@@ -399,7 +399,7 @@ function strategyMeanReversion(ind: TechIndicators): StrategySignal | null {
 function strategyBreakout(ind: TechIndicators): StrategySignal | null {
   const { price, bb, volRatio, adx, mom, vol } = ind;
 
-  if (bb.pctB > 0.85 && mom > 0.1) {
+  if (bb.pctB > 0.88 && mom > 0.15 && volRatio > 1.2) {
     const conf = Math.min(85, 55 + volRatio * 4 + adx * 0.25 + Math.abs(mom) * 5);
     return {
       strategy: "breakout", side: "LONG", confidence: conf,
@@ -410,7 +410,7 @@ function strategyBreakout(ind: TechIndicators): StrategySignal | null {
       reason: `接近BB上轨, BB%B=${bb.pctB.toFixed(2)}, Mom=${mom.toFixed(2)}%`,
     };
   }
-  if (bb.pctB < 0.15 && mom < -0.1) {
+  if (bb.pctB < 0.12 && mom < -0.15 && volRatio > 1.2) {
     const conf = Math.min(85, 55 + volRatio * 4 + adx * 0.25 + Math.abs(mom) * 5);
     return {
       strategy: "breakout", side: "SHORT", confidence: conf,
@@ -459,8 +459,8 @@ function strategyScalping(ind: TechIndicators): StrategySignal | null {
 function strategyMomentum(ind: TechIndicators): StrategySignal | null {
   const { rsi, mom, mom10, macd, volRatio, adx, ema9, ema21, vol } = ind;
 
-  const allBullish = mom > 0.15 && rsi > 50 && rsi < 80 && macd.histogram > 0 && ema9 > ema21;
-  const allBearish = mom < -0.15 && rsi < 50 && rsi > 20 && macd.histogram < 0 && ema9 < ema21;
+  const allBullish = mom > 0.2 && rsi > 50 && rsi < 75 && macd.histogram > 0 && ema9 > ema21 && adx > 20;
+  const allBearish = mom < -0.2 && rsi < 50 && rsi > 25 && macd.histogram < 0 && ema9 < ema21 && adx > 20;
 
   if (allBullish) {
     const conf = Math.min(92, 60 + adx * 0.4 + volRatio * 3 + Math.abs(mom) * 5);
@@ -871,7 +871,7 @@ function strategyStochastic(ind: TechIndicators): StrategySignal | null {
 function strategyIchimoku(ind: TechIndicators): StrategySignal | null {
   const { ema9, ema21, sma50, price, adx, mom, vol, rsi } = ind;
   // Tenkan (ema9) > Kijun (ema21), price above cloud (sma50), bullish
-  if (ema9 > ema21 && price > sma50 && price > ema9 && mom > 0.05 && rsi > 40 && rsi < 75) {
+  if (ema9 > ema21 && price > sma50 && price > ema9 && mom > 0.1 && rsi > 45 && rsi < 70 && adx > 20) {
     const conf = Math.min(88, 55 + adx * 0.3 + Math.abs(mom) * 4 + ((price - sma50) / sma50 * 200));
     return {
       strategy: "ichimoku", side: "LONG", confidence: conf,
@@ -882,7 +882,7 @@ function strategyIchimoku(ind: TechIndicators): StrategySignal | null {
     };
   }
   // Bearish: below cloud, tenkan < kijun
-  if (ema9 < ema21 && price < sma50 && price < ema9 && mom < -0.05 && rsi > 25 && rsi < 60) {
+  if (ema9 < ema21 && price < sma50 && price < ema9 && mom < -0.1 && rsi > 30 && rsi < 55 && adx > 20) {
     const conf = Math.min(88, 55 + adx * 0.3 + Math.abs(mom) * 4 + ((sma50 - price) / sma50 * 200));
     return {
       strategy: "ichimoku", side: "SHORT", confidence: conf,
@@ -1355,8 +1355,16 @@ serve(async (req) => {
       if (cfg.strategies.includes("bb_squeeze"))        { const s = strategyBBSqueeze(ind5m);        if (s) stratSignals.push(s); }
       results.strategies_evaluated += cfg.strategies.length;
 
-      // Cap leverage to config max
+      // ── HTF trend filter: penalize signals against 1h trend ──
+      const htfTrend = ind1h ? (ind1h.ema9 > ind1h.ema21 ? "BULLISH" : "BEARISH") : "NEUTRAL";
       for (const sig of stratSignals) {
+        // Going LONG in bearish HTF or SHORT in bullish HTF → cut confidence
+        if ((sig.side === "LONG" && htfTrend === "BEARISH") || (sig.side === "SHORT" && htfTrend === "BULLISH")) {
+          sig.confidence *= 0.7; // 30% penalty for counter-trend
+          sig.leverage = Math.max(1, sig.leverage - 1); // reduce leverage
+        }
+        // Cap leverage: max 2x unless confidence > 75
+        sig.leverage = sig.confidence > 75 ? Math.min(sig.leverage, 3) : Math.min(sig.leverage, 2);
         sig.leverage = Math.min(sig.leverage, cfg.maxLeverage);
       }
 
@@ -1423,8 +1431,8 @@ serve(async (req) => {
         const comboKey = `${asset}_${sig.strategy}`;
         if (openCombos.has(comboKey)) continue;
 
-        // Only open if confidence is high enough
-        if (sig.confidence < 50) continue;
+        // Only open if confidence is high enough (raised from 50 to 62)
+        if (sig.confidence < 62) continue;
 
         const side = sig.side;
         const sl = side === "LONG"
