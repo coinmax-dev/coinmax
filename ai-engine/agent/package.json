@@ -1,0 +1,13 @@
+{
+  "name": "coinmax-ai-agent",
+  "version": "1.0.0",
+  "description": "CoinMax AI Trading Agent - runs on Mac Mini with local LLMs",
+  "type": "module",
+  "scripts": {
+    "start": "node trading-agent.js",
+    "once": "node trading-agent.js --once"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.3"
+  }
+}
