@@ -1139,51 +1139,55 @@ interface ModelVote { model: string; direction: "BULLISH" | "BEARISH" | "NEUTRAL
 
 function simulateModelVote(name: string, rsi: number, mom: number, macd: { histogram: number }, bb: { pctB: number }, vol: number): { direction: "BULLISH" | "BEARISH" | "NEUTRAL"; confidence: number } {
   let ls = 0, ss = 0;
-  const n1 = (Math.random() - 0.5) * 6, n2 = (Math.random() - 0.5) * 6;
+  const n1 = (Math.random() - 0.5) * 8, n2 = (Math.random() - 0.5) * 8;
 
+  // Each model has a distinct "personality" — some lean bearish, some bullish
+  // This ensures diverse opinions so both LONG and SHORT trades can open
   switch (name) {
     case "GPT-4o":
-      // Multi-factor balanced model — good at trend detection
+      // Trend follower — follows momentum, neutral bias
       if (rsi < 40) ls += 15; else if (rsi > 60) ss += 15;
-      if (mom > 0.15) ls += 20; else if (mom < -0.15) ss += 20;
-      if (macd.histogram > 0) ls += 15; else ss += 15;
-      if (bb.pctB < 0.3) ls += 10; else if (bb.pctB > 0.7) ss += 10;
+      if (mom > 0.1) ls += 18; else if (mom < -0.1) ss += 18;
+      if (macd.histogram > 0) ls += 10; else ss += 10;
       ls += n1; ss += n2; break;
     case "Claude":
-      // Conservative model — focuses on strong signals, MACD + momentum
-      if (rsi < 35) ls += 20; else if (rsi > 65) ss += 20;
-      if (mom > 0.2) ls += 15; else if (mom < -0.2) ss += 15;
-      if (macd.histogram > 0.001) ls += 20; else if (macd.histogram < -0.001) ss += 20;
-      if (vol > 0.8) { ls += 5; ss += 5; } // volatile = more decisive
-      ls += n1 * 0.8; ss += n2 * 0.8; break;
+      // Contrarian / risk-aware — tends to see overextension, leans bearish
+      // When RSI > 50 (even mildly overbought), starts seeing risk
+      if (rsi > 50) ss += 12; else if (rsi < 50) ls += 12;
+      if (rsi > 65) ss += 15; if (rsi < 35) ls += 15;
+      if (bb.pctB > 0.6) ss += 15; else if (bb.pctB < 0.4) ls += 15;
+      if (mom > 0.3) ss += 8; // sees rally as overextended
+      else if (mom < -0.3) ls += 8; // sees dip as opportunity
+      ls += n1 * 0.7; ss += n2 * 0.7; break;
     case "Gemini":
-      // Volatility-aware model — acts on any notable vol, not just extreme
-      if (vol > 0.5 && mom > 0.1) ls += 20; else if (vol > 0.5 && mom < -0.1) ss += 20;
-      if (rsi < 42) ls += 15; else if (rsi > 58) ss += 15;
-      if (bb.pctB < 0.25) ls += 15; else if (bb.pctB > 0.75) ss += 15;
+      // Volatility scalper — bearish bias, profits from drops
+      ss += 8; // slight permanent bear lean
+      if (vol > 0.5) ss += 10;
+      if (rsi > 55) ss += 12; else if (rsi < 45) ls += 12;
+      if (bb.pctB > 0.5) ss += 10; else if (bb.pctB < 0.5) ls += 10;
+      if (mom < 0) ss += 10; else if (mom > 0.2) ls += 5;
       ls += n1; ss += n2; break;
     case "DeepSeek":
-      // Technical purist — RSI + MACD + BB combo
-      if (rsi < 40) ls += 20; else if (rsi > 60) ss += 20;
-      if (mom > 0.2) ls += 15; else if (mom < -0.2) ss += 15;
-      if (macd.histogram > 0) ls += 15; else ss += 15;
-      if (bb.pctB < 0.35) ls += 10; else if (bb.pctB > 0.65) ss += 10;
+      // Technical purist — balanced but respects overbought/oversold
+      if (rsi < 45) ls += 15; else if (rsi > 55) ss += 15;
+      if (macd.histogram > 0.001) ls += 12; else if (macd.histogram < -0.001) ss += 12;
+      if (bb.pctB < 0.3) ls += 12; else if (bb.pctB > 0.7) ss += 12;
+      if (mom > 0.15) ls += 8; else if (mom < -0.15) ss += 8;
       ls += n1 * 0.9; ss += n2 * 0.9; break;
     case "Llama":
-      // Mean-reversion focused — catches extremes
-      if (rsi < 35) ls += 25; else if (rsi > 65) ss += 25;
-      if (bb.pctB < 0.2) ls += 20; else if (bb.pctB > 0.8) ss += 20;
-      if (mom > 0.3) ls += 10; else if (mom < -0.3) ss += 10;
+      // Momentum chaser — bullish bias, follows the crowd
+      ls += 6; // slight permanent bull lean
+      if (rsi < 40) ls += 20; else if (rsi > 70) ss += 20;
+      if (mom > 0) ls += 15; else if (mom < -0.2) ss += 10;
+      if (bb.pctB < 0.3) ls += 12; else if (bb.pctB > 0.8) ss += 12;
       ls += n1; ss += n2; break;
     default:
-      // Fallback for any unknown model
-      if (rsi < 40) ls += 15; else if (rsi > 60) ss += 15;
-      if (mom > 0.2) ls += 15; else if (mom < -0.2) ss += 15;
+      if (rsi < 45) ls += 12; else if (rsi > 55) ss += 12;
       ls += n1; ss += n2; break;
   }
 
   const net = ls - ss, abs = Math.abs(net);
-  if (abs < 5) return { direction: "NEUTRAL", confidence: Math.min(55, 40 + Math.random() * 15) };
+  if (abs < 4) return { direction: "NEUTRAL", confidence: Math.min(55, 40 + Math.random() * 15) };
   if (net > 0) return { direction: "BULLISH", confidence: Math.min(95, 50 + abs * 1.2 + Math.random() * 8) };
   return { direction: "BEARISH", confidence: Math.min(95, 50 + abs * 1.2 + Math.random() * 8) };
 }
@@ -1334,9 +1338,35 @@ serve(async (req) => {
       }
     }
 
+    // ── Daily drawdown check: stop opening new trades if today's PnL < -20% ──
+    const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0);
+    const { data: todayClosed } = await supabase
+      .from("paper_trades")
+      .select("pnl, pnl_pct")
+      .eq("status", "CLOSED")
+      .gte("closed_at", todayStart.toISOString());
+
+    const todayPnlUsd = todayClosed?.reduce((s, t) => s + (t.pnl || 0), 0) || 0;
+    const todayTrades = todayClosed?.length || 0;
+    const todayAvgPnlPct = todayTrades > 0
+      ? (todayClosed?.reduce((s, t) => s + (t.pnl_pct || 0), 0) || 0) / todayTrades
+      : 0;
+
+    // Total capital at risk = positionSize * maxPositions
+    const totalCapital = cfg.positionSize * cfg.maxPositions;
+    const todayDrawdownPct = totalCapital > 0 ? (todayPnlUsd / totalCapital) * 100 : 0;
+
+    const MAX_DAILY_DRAWDOWN_PCT = cfg.maxDrawdownPct || 20;
+    const dailyKillSwitch = todayDrawdownPct < -MAX_DAILY_DRAWDOWN_PCT;
+
+    if (dailyKillSwitch) {
+      results.errors.push(`DAILY KILL SWITCH: today PnL $${todayPnlUsd.toFixed(2)} (${todayDrawdownPct.toFixed(1)}%) exceeds -${MAX_DAILY_DRAWDOWN_PCT}% limit. No new trades.`);
+    }
+
     // Process ALL assets
     for (const asset of ASSETS) {
       if (!prices[asset]) continue;
+      if (dailyKillSwitch) continue; // Skip all new trades
       const currentPrice = prices[asset];
 
       // Fetch multi-timeframe candles
@@ -1498,12 +1528,18 @@ serve(async (req) => {
         else if (aiSupport === 2) sig.confidence *= 0.9;
 
         const side = sig.side;
+        // Hard cap: SL max 2%, TP min 3%, leverage max 5x
+        // This ensures per-trade max loss = 2% * 5x = 10% of position
+        const cappedSlPct = Math.min(sig.slPct, 0.02);
+        const cappedTpPct = Math.max(sig.tpPct, 0.03);
+        const cappedLeverage = Math.min(sig.leverage, cfg.maxLeverage);
+
         const sl = side === "LONG"
-          ? currentPrice * (1 - sig.slPct)
-          : currentPrice * (1 + sig.slPct);
+          ? currentPrice * (1 - cappedSlPct)
+          : currentPrice * (1 + cappedSlPct);
         const tp = side === "LONG"
-          ? currentPrice * (1 + sig.tpPct)
-          : currentPrice * (1 - sig.tpPct);
+          ? currentPrice * (1 + cappedTpPct)
+          : currentPrice * (1 - cappedTpPct);
         const size = parseFloat((cfg.positionSize / currentPrice).toFixed(8));
 
         const tradeId = crypto.randomUUID();
@@ -1521,7 +1557,7 @@ serve(async (req) => {
         const { error: tErr } = await supabase.from("paper_trades").insert({
           id: tradeId, signal_id: signalId, asset, side,
           entry_price: currentPrice, size,
-          leverage: sig.leverage,
+          leverage: cappedLeverage,
           stop_loss: parseFloat(sl.toFixed(2)),
           take_profit: parseFloat(tp.toFixed(2)),
           strategy_type: sig.strategy,
