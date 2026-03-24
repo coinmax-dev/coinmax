@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { copyText } from "@/lib/copy";
 import { Card, CardContent } from "@/components/ui/card";
@@ -41,6 +42,7 @@ import { EXCHANGES, HEDGE_CONFIG, LOCAL_STRATEGIES } from "@/lib/data";
 
 export default function StrategyPage() {
   const { t } = useTranslation();
+  const [, navigate] = useLocation();
   const account = useActiveAccount();
   const { toast } = useToast();
   const walletAddr = account?.address || "";
@@ -401,10 +403,10 @@ export default function StrategyPage() {
                       const model = modelMap[s.id];
                       if (model) {
                         // Navigate to copy trading with pre-selected model
-                        window.location.href = `/copy-trading?model=${encodeURIComponent(model)}`;
+                        navigate(`/copy-trading?model=${encodeURIComponent(model)}`);
                       } else {
                         // HyperLiquid vault or other — go to vault page
-                        window.location.href = "/vault";
+                        navigate("/vault");
                       }
                     }}
                   />

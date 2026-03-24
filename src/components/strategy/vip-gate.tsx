@@ -61,18 +61,25 @@ export function VipGate({ walletAddress, children }: VipGateProps) {
   const handleActivateTrial = async () => {
     setActivating(true);
     try {
-      const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from("profiles").update({
-        is_vip: true,
-        vip_expires_at: trialEnd,
-        vip_trial_used: true,
-      }).eq("wallet_address", walletAddress);
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-vip-trial`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ wallet: walletAddress }),
+        }
+      );
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
 
       toast({ title: "试用已激活", description: "7天免费VIP已开通，可以绑定交易所开始跟单" });
       setShowTrialDialog(false);
       queryClient.invalidateQueries({ queryKey: ["vip-status", walletAddress] });
-    } catch {
-      toast({ title: "激活失败", variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: "激活失败", description: e.message, variant: "destructive" });
     } finally {
       setActivating(false);
     }

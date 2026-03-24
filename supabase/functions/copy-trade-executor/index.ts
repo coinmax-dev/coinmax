@@ -647,6 +647,25 @@ serve(async (req) => {
       for (const cfg of (configs || [])) {
         results.configs_matched++;
 
+        // ── 2.5. VIP check — skip if expired ──
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("is_vip, vip_expires_at")
+          .eq("wallet_address", cfg.wallet_address)
+          .single();
+
+        const vipActive = profile?.is_vip && profile?.vip_expires_at &&
+          new Date(profile.vip_expires_at) > new Date();
+
+        if (!vipActive) {
+          // Auto-deactivate config
+          await supabase.from("user_trade_configs")
+            .update({ is_active: false })
+            .eq("id", cfg.id);
+          results.errors.push(`${cfg.wallet_address}: VIP expired, config deactivated`);
+          continue;
+        }
+
         // ── 3. Risk validation ──
         // Check existing position count
         const { count: openCount } = await supabase
