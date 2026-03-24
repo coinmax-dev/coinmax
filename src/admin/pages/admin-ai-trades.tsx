@@ -209,22 +209,30 @@ export default function AdminAITrades() {
     }
   };
 
-  // Fetch live prices from Binance
+  // Fetch live prices (Binance + CoinGecko fallback)
+  const CG_IDS: Record<string, string> = { BTC:"bitcoin",ETH:"ethereum",SOL:"solana",BNB:"binancecoin",DOGE:"dogecoin",XRP:"ripple",ADA:"cardano",AVAX:"avalanche-2",LINK:"chainlink",DOT:"polkadot" };
   useEffect(() => {
-    async function fetchPrices() {
+    async function fetchPricesData() {
       const assets = ["BTC", "ETH", "SOL", "BNB", "DOGE", "XRP", "ADA", "AVAX", "LINK", "DOT"];
       const results: Record<string, number> = {};
-      await Promise.all(assets.map(async (a) => {
+      // Try Binance batch
+      try {
+        const symbols = assets.map(a => `"${a}USDT"`).join(",");
+        const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=[${symbols}]`);
+        if (res.ok) { const data = await res.json(); for (const d of data) { const a = d.symbol.replace("USDT",""); const p = parseFloat(d.price); if (p > 0) results[a] = p; } }
+      } catch {}
+      // Fallback CoinGecko
+      if (Object.keys(results).length < 5) {
         try {
-          const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${a}USDT`);
-          const data = await res.json();
-          if (data?.price) results[a] = parseFloat(data.price);
-        } catch { /* ignore */ }
-      }));
+          const ids = assets.map(a => CG_IDS[a]).filter(Boolean).join(",");
+          const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+          if (res.ok) { const data = await res.json(); for (const a of assets) { const cg = CG_IDS[a]; if (cg && data[cg]?.usd && !results[a]) results[a] = data[cg].usd; } }
+        } catch {}
+      }
       setPrices(results);
     }
-    fetchPrices();
-    const interval = setInterval(fetchPrices, 15000);
+    fetchPricesData();
+    const interval = setInterval(fetchPricesData, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -325,20 +333,31 @@ export default function AdminAITrades() {
     enabled: !!adminUser,
   });
 
-  // Compute summary stats
+  // Compute summary stats including unrealized PnL
   const summary = useMemo(() => {
+    let unrealizedPnl = 0;
+    if (openTrades) {
+      for (const t of openTrades) {
+        const cp = prices[t.asset];
+        if (cp && cp > 0) {
+          const mul = t.side === "LONG" ? 1 : -1;
+          unrealizedPnl += (cp - t.entry_price) * mul * t.size * t.leverage;
+        }
+      }
+    }
     return {
       openCount: openTrades?.length ?? 0,
       signalCount: signals?.length ?? 0,
       todayPnl: globalStats?.todayPnl ?? 0,
       totalPnl: globalStats?.totalPnl ?? 0,
+      unrealizedPnl,
       winRate: globalStats?.winRate ?? 0,
       totalClosed: globalStats?.totalClosed ?? 0,
       wins: globalStats?.wins ?? 0,
       dailyAvgPnl: globalStats?.dailyAvgPnl ?? 0,
       tradingDays: globalStats?.tradingDays ?? 0,
     };
-  }, [openTrades, signals, globalStats]);
+  }, [openTrades, signals, globalStats, prices]);
 
   // Filter open trades by asset + model
   const filteredOpen = useMemo(() => {
@@ -371,13 +390,18 @@ export default function AdminAITrades() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
           <p className="text-xs text-foreground/35 mb-1">持仓数 / 金额</p>
           <p className="text-xl font-bold">{summary.openCount}<span className="text-sm text-foreground/40 ml-1">${((openTrades?.reduce((s, t) => s + t.size * t.entry_price, 0) ?? 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></p>
         </div>
+        <div className={`rounded-2xl border p-4 ${summary.unrealizedPnl >= 0 ? "border-green-500/15 bg-green-500/[0.03]" : "border-red-500/15 bg-red-500/[0.03]"}`}>
+          <p className="text-xs text-foreground/35 mb-1">当前未实现盈亏</p>
+          <p className={`text-xl font-bold ${pnlColor(summary.unrealizedPnl)}`}>{formatPnl(summary.unrealizedPnl)}</p>
+          <p className="text-[11px] text-foreground/25 mt-0.5">{summary.openCount}个持仓中</p>
+        </div>
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-          <p className="text-xs text-foreground/35 mb-1">今日盈亏</p>
+          <p className="text-xs text-foreground/35 mb-1">今日已实现</p>
           <p className={`text-xl font-bold ${pnlColor(summary.todayPnl)}`}>{formatPnl(summary.todayPnl)}</p>
         </div>
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
