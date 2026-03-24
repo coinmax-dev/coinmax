@@ -19,6 +19,7 @@ import { AIParamAdvisor } from "@/components/strategy/ai-param-advisor";
 import { RiskControlPanel } from "@/components/strategy/risk-control";
 import { ApiKeyBind } from "@/components/strategy/api-key-bind";
 import { AICoinPicker } from "@/components/strategy/ai-coin-picker";
+import { VipGate } from "@/components/strategy/vip-gate";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -197,11 +198,13 @@ export function CopyTradingFlow({
         </div>
       )}
 
-      {/* Step 1: Bind exchange */}
+      {/* Step 1: VIP check → Bind exchange */}
       {step === "bind" && (
         <div className="space-y-4">
-          <ApiKeyBind userId={userId} />
-          <NavButtons onNext={() => goTo("config")} nextLabel="下一步：选择策略" />
+          <VipGate walletAddress={userId || ""}>
+            <ApiKeyBind userId={userId} />
+            <NavButtons onNext={() => goTo("config")} nextLabel="下一步：选择策略" />
+          </VipGate>
         </div>
       )}
 
