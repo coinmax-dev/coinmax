@@ -146,6 +146,39 @@ export default function AdminAIAccuracy() {
     enabled: !!adminUser,
   });
 
+  // Real AI analysis from ai_market_analysis
+  const { data: liveAnalysis } = useQuery({
+    queryKey: ["admin", "ai-live-analysis"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ai_market_analysis")
+        .select("asset, model, direction, confidence, reasoning, market_sentiment, created_at")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!adminUser,
+    refetchInterval: 60000,
+  });
+
+  // AI Memory learning stats
+  const { data: memoryStats } = useQuery({
+    queryKey: ["admin", "ai-memory-stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ai_memory")
+        .select("outcome, learning_score, asset")
+        .neq("outcome", "pending");
+      if (error) return null;
+      const total = data?.length ?? 0;
+      const correct = data?.filter(d => d.outcome === "correct").length ?? 0;
+      const avgScore = total > 0 ? data!.reduce((s, d) => s + (Number(d.learning_score) || 0), 0) / total : 0;
+      return { total, correct, accuracy: total > 0 ? (correct / total * 100) : 0, avgScore };
+    },
+    enabled: !!adminUser,
+  });
+
   const overallAccuracy = summary && summary.resolved > 0
     ? ((summary.correct / summary.resolved) * 100).toFixed(1)
     : "—";
@@ -182,6 +215,56 @@ export default function AdminAIAccuracy() {
           <p className="text-xl font-bold text-green-400">{overallAccuracy}%</p>
         </div>
       </div>
+
+      {/* AI Memory Learning Stats */}
+      {memoryStats && memoryStats.total > 0 && (
+        <div className="rounded-2xl border border-purple-500/15 bg-purple-500/[0.03] p-4">
+          <h2 className="text-sm font-bold text-foreground/60 mb-3">🧠 AI 向量记忆学习</h2>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="text-center">
+              <p className="text-xs text-foreground/30">已验证预测</p>
+              <p className="text-lg font-bold">{memoryStats.total}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-foreground/30">正确</p>
+              <p className="text-lg font-bold text-green-400">{memoryStats.correct}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-foreground/30">准确率</p>
+              <p className={`text-lg font-bold ${memoryStats.accuracy >= 55 ? "text-green-400" : memoryStats.accuracy >= 45 ? "text-yellow-400" : "text-red-400"}`}>{memoryStats.accuracy.toFixed(1)}%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-foreground/30">学习分数</p>
+              <p className={`text-lg font-bold ${memoryStats.avgScore >= 0 ? "text-green-400" : "text-red-400"}`}>{memoryStats.avgScore > 0 ? "+" : ""}{memoryStats.avgScore.toFixed(3)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Real-time AI Analysis */}
+      {liveAnalysis && liveAnalysis.length > 0 && (
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+          <div className="px-4 py-3 border-b border-white/[0.06]">
+            <h2 className="text-sm font-bold text-foreground/70">🤖 AI 实时分析（5 模型 + OpenClaw Agent）</h2>
+          </div>
+          <div className="divide-y divide-white/[0.04] max-h-[300px] overflow-y-auto">
+            {liveAnalysis.filter(a => a.asset !== "SCREENING").map((a, i) => (
+              <div key={i} className="px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-foreground/70 w-10">{a.asset}</span>
+                  <span className="text-[10px] text-foreground/40 w-20 truncate">{a.model}</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    a.direction === "BULLISH" ? "text-green-400 bg-green-500/10" :
+                    a.direction === "BEARISH" ? "text-red-400 bg-red-500/10" :
+                    "text-foreground/40 bg-white/[0.04]"
+                  }`}>{a.direction === "BULLISH" ? "看涨" : a.direction === "BEARISH" ? "看跌" : "中性"} {a.confidence}%</span>
+                </div>
+                <span className="text-[10px] text-foreground/20 max-w-[200px] truncate">{a.reasoning}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Per-timeframe accuracy */}
       {tfAccuracy && tfAccuracy.length > 0 && (
