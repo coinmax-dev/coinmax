@@ -23,11 +23,10 @@ export const PREDICTION_GRID_CONFIG = {
 };
 
 export const VAULT_PLANS = {
-  "5_DAYS": { days: 5, dailyRate: 0.005, label: "5 Days", apr: "182.5%", minAmount: 50, platformFee: 0.10 },
-  "45_DAYS": { days: 45, dailyRate: 0.007, label: "45 Days", apr: "255.5%", minAmount: 50, platformFee: 0.10 },
-  "90_DAYS": { days: 90, dailyRate: 0.009, label: "90 Days", apr: "328.5%", minAmount: 50, platformFee: 0.10 },
-  "180_DAYS": { days: 180, dailyRate: 0.012, label: "180 Days", apr: "438%", minAmount: 50, platformFee: 0.10 },
-  "360_DAYS": { days: 360, dailyRate: 0.015, label: "360 Days", apr: "547.5%", minAmount: 50, platformFee: 0.10 },
+  "5_DAYS":   { days: 5,   dailyRate: 0.005, label: "5天",   apr: "182.5%", minAmount: 50, platformFee: 0.10, planIndex: 0 },
+  "45_DAYS":  { days: 45,  dailyRate: 0.007, label: "45天",  apr: "255.5%", minAmount: 50, platformFee: 0.10, planIndex: 1 },
+  "90_DAYS":  { days: 90,  dailyRate: 0.009, label: "90天",  apr: "328.5%", minAmount: 50, platformFee: 0.10, planIndex: 2 },
+  "180_DAYS": { days: 180, dailyRate: 0.012, label: "180天", apr: "438%",   minAmount: 50, platformFee: 0.10, planIndex: 3 },
 } as const;
 
 export const EARLY_BIRD_DEPOSIT_RATE = 0.10;

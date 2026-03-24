@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Lock, ArrowDownToLine, ArrowUpFromLine, Sparkles, AlertCircle, Loader2, ChevronRight } from "lucide-react";
 import { VaultChart } from "@/components/vault/vault-chart";
 import { VaultStats } from "@/components/vault/vault-stats";
+import { VaultDepositDialog } from "@/components/vault/vault-deposit-dialog";
 import { useActiveAccount } from "thirdweb/react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getVaultPositions, getTransactions, getVaultRewards, vaultDeposit, vaultWithdraw } from "@/lib/api";
@@ -458,7 +459,7 @@ export default function Vault() {
         <div className="mx-auto max-w-lg lg:max-w-2xl flex gap-2 sm:gap-3">
           <Button
             className="flex-1 min-w-0 bg-cyan-600 text-white border-cyan-700 text-xs sm:text-sm px-2 sm:px-4 h-9 sm:h-10"
-            onClick={() => toast({ title: t("common.comingSoon") })}
+            onClick={() => setDepositOpen(true)}
             data-testid="button-deposit-vault"
           >
             <ArrowDownToLine className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
@@ -476,83 +477,7 @@ export default function Vault() {
         </div>
       </div>
 
-      <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-        <DialogContent className="bg-card border-border max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">{t("vault.depositToVault")}</DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              {t("vault.selectPlan")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block">{t("vault.selectPlan")}</label>
-              <Select value={selectedPlan} onValueChange={setSelectedPlan}>
-                <SelectTrigger data-testid="select-plan">
-                  <SelectValue placeholder={t("vault.choosePlan")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(VAULT_PLANS).map(([key, plan]) => (
-                    <SelectItem key={key} value={key} data-testid={`select-plan-${key}`}>
-                      {plan.label} - {plan.apr} APR
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block">{t("vault.amountUSDT")}</label>
-              <Input
-                type="number"
-                placeholder={t("vault.enterAmount")}
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                min="1"
-                step="1"
-                data-testid="input-deposit-amount"
-              />
-            </div>
-            {selectedPlan && (
-              <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1">
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">{t("vault.dailyRate")}</span>
-                  <span className="text-neon-value">
-                    {(VAULT_PLANS[selectedPlan as keyof typeof VAULT_PLANS]?.dailyRate * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">{t("vault.lockPeriod")}</span>
-                  <span>{VAULT_PLANS[selectedPlan as keyof typeof VAULT_PLANS]?.days} days</span>
-                </div>
-                {depositAmount && !isNaN(parseFloat(depositAmount)) && (
-                  <div className="flex justify-between gap-2 pt-1 border-t border-border/30">
-                    <span className="text-muted-foreground">{t("vault.estTotalYield")}</span>
-                    <span className="text-neon-value font-medium">
-                      {usdcToMA(parseFloat(depositAmount) * VAULT_PLANS[selectedPlan as keyof typeof VAULT_PLANS]?.dailyRate * VAULT_PLANS[selectedPlan as keyof typeof VAULT_PLANS]?.days).toFixed(2)} MA
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            {payment.status !== "idle" && payment.status !== "success" && (
-              <div className="w-full flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span>{getPaymentStatusLabel(payment.status)}</span>
-              </div>
-            )}
-            <Button
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 border-emerald-500/50 text-white"
-              onClick={handleDeposit}
-              disabled={depositMutation.isPending || !walletAddress}
-              data-testid="button-confirm-deposit"
-            >
-              {depositMutation.isPending ? getPaymentStatusLabel(payment.status) || t("common.processing") : !walletAddress ? t("common.connectWalletFirst") : t("vault.confirmDeposit")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <VaultDepositDialog open={depositOpen} onOpenChange={setDepositOpen} />
 
       <Dialog open={redeemOpen} onOpenChange={setRedeemOpen}>
         <DialogContent className="bg-card border-border max-w-sm">
