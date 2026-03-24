@@ -191,8 +191,8 @@ export const LOCAL_STRATEGIES: LocalStrategy[] = [
   },
   {
     id: "openclaw-qwen",
-    name: "OpenClaw Qwen",
-    description: "Qwen conservative hedging with high win rate",
+    name: "OpenClaw Claude",
+    description: "Claude conservative risk-aware analysis with high precision",
     leverage: "3x",
     winRateRange: [90, 94],
     monthlyReturnRange: [13, 17],
@@ -205,8 +205,8 @@ export const LOCAL_STRATEGIES: LocalStrategy[] = [
   },
   {
     id: "openclaw-grok",
-    name: "OpenClaw Grok",
-    description: "Grok real-time sentiment + technical fusion strategy",
+    name: "OpenClaw Llama",
+    description: "Llama mean-reversion + BB squeeze local AI strategy",
     leverage: "5x",
     winRateRange: [87, 91],
     monthlyReturnRange: [18, 22],

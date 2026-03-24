@@ -13,7 +13,11 @@ import { Settings, BarChart3 } from "lucide-react";
 export default function CopyTradingPage() {
   const account = useActiveAccount();
   const walletAddress = account?.address || "";
-  const [tab, setTab] = useState<"dashboard" | "settings">("dashboard");
+
+  // If navigated from strategy card with ?model=xxx, go to settings tab
+  const urlParams = new URLSearchParams(window.location.search);
+  const preSelectedModel = urlParams.get("model");
+  const [tab, setTab] = useState<"dashboard" | "settings">(preSelectedModel ? "settings" : "dashboard");
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-24 lg:pb-8">
@@ -69,7 +73,7 @@ export default function CopyTradingPage() {
         ) : tab === "dashboard" ? (
           <CopyTradingDashboard wallet={walletAddress} />
         ) : (
-          <CopyTradingFlow userId={walletAddress} />
+          <CopyTradingFlow userId={walletAddress} preSelectedModel={preSelectedModel || undefined} />
         )}
       </div>
     </div>

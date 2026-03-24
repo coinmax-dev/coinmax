@@ -390,8 +390,22 @@ export default function StrategyPage() {
                     strategy={s}
                     index={i}
                     onSubscribe={() => {
-                      setSelectedStrategy(s);
-                      setSubscribeOpen(true);
+                      // Map strategy id to model name for copy trading
+                      const modelMap: Record<string, string> = {
+                        "openclaw-gpt": "GPT-4o",
+                        "openclaw-gemini": "Gemini",
+                        "openclaw-deepseek": "DeepSeek",
+                        "openclaw-qwen": "Claude",
+                        "openclaw-grok": "Llama",
+                      };
+                      const model = modelMap[s.id];
+                      if (model) {
+                        // Navigate to copy trading with pre-selected model
+                        window.location.href = `/copy-trading?model=${encodeURIComponent(model)}`;
+                      } else {
+                        // HyperLiquid vault or other — go to vault page
+                        window.location.href = "/vault";
+                      }
                     }}
                   />
                 ))}

@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 type CopyStep = "bind" | "config" | "risk" | "confirm";
 
 interface CopyTradingFlowProps {
-  /** profiles.id (UUID) — required for saving configs */
+  /** wallet address — required for saving configs */
   userId?: string;
   /** Show step navigation at top */
   showSteps?: boolean;
@@ -36,6 +36,8 @@ interface CopyTradingFlowProps {
   readOnly?: boolean;
   /** Initial step */
   initialStep?: CopyStep;
+  /** Pre-selected model from strategy card click */
+  preSelectedModel?: string;
   /** Callback when step changes */
   onStepChange?: (step: CopyStep) => void;
 }
@@ -46,10 +48,13 @@ export function CopyTradingFlow({
   compact = false,
   readOnly = false,
   initialStep = "bind",
+  preSelectedModel,
   onStepChange,
 }: CopyTradingFlowProps) {
   const [step, setStep] = useState<CopyStep>(initialStep);
-  const [selectedModels, setSelectedModels] = useState<string[]>(["gpt-4o", "claude-haiku", "gemini-flash"]);
+  const [selectedModels, setSelectedModels] = useState<string[]>(
+    preSelectedModel ? [preSelectedModel] : ["GPT-4o", "Claude", "Gemini", "DeepSeek", "Llama"]
+  );
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([
     "trend_following", "momentum", "breakout", "mean_reversion", "bb_squeeze",
   ]);
