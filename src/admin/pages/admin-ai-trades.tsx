@@ -976,7 +976,7 @@ export default function AdminAITrades() {
               <div className="bg-white/[0.03] rounded-lg p-2">
                 <p className="text-foreground/25">止盈</p>
                 <p className="text-primary font-bold">3% - 6%</p>
-                <p className="text-[9px] text-foreground/15">R:R >= 2:1</p>
+                <p className="text-[9px] text-foreground/15">{"R:R >= 2:1"}</p>
               </div>
               <div className="bg-white/[0.03] rounded-lg p-2">
                 <p className="text-foreground/25">最大回撤</p>
