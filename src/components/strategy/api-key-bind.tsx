@@ -6,11 +6,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://jqgimdgtpwnunrlwexib.supabase.co";
-const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxZ2ltZGd0cHdudW5ybHdleGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4Mjg5OTAsImV4cCI6MjA4NjQwNDk5MH0.0b1K4Td9vkNYy40etWSbcqgg2fdpkjkD7_Z6Z1KJHUQ";
 
 type SupportedExchange = "binance" | "bybit" | "okx" | "bitget" | "hyperliquid" | "dydx";
 
@@ -56,7 +53,6 @@ export function ApiKeyBind({ userId }: { userId?: string }) {
   // Load stored keys
   useEffect(() => {
     if (!userId) return;
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
     supabase
       .from("user_exchange_keys")
       .select("id, exchange, label, masked_key, testnet, is_valid, last_validated, created_at")
@@ -83,8 +79,6 @@ export function ApiKeyBind({ userId }: { userId?: string }) {
     setError("");
 
     try {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
-
       // Call edge function to validate and store key
       const { data, error: fnError } = await supabase.functions.invoke("bind-exchange-key", {
         body: {
@@ -116,7 +110,6 @@ export function ApiKeyBind({ userId }: { userId?: string }) {
     if (!userId) return;
     if (!confirm(`确定要删除 ${exchange} 的 API Key 吗？`)) return;
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
     await supabase
       .from("user_exchange_keys")
       .delete()

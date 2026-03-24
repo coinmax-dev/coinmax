@@ -6,11 +6,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://jqgimdgtpwnunrlwexib.supabase.co";
-const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxZ2ltZGd0cHdudW5ybHdleGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4Mjg5OTAsImV4cCI6MjA4NjQwNDk5MH0.0b1K4Td9vkNYy40etWSbcqgg2fdpkjkD7_Z6Z1KJHUQ";
 
 interface RiskConfig {
   maxPositionSizeUsd: number;
@@ -52,16 +49,27 @@ const EXECUTION_MODES = [
   { value: "FULL_AUTO", label: "全自动", desc: "完全自动化执行" },
 ];
 
-export function RiskControlPanel({ userId }: { userId?: string }) {
+interface RiskControlProps {
+  userId?: string;
+  initialOverrides?: Partial<RiskConfig>;
+}
+
+export function RiskControlPanel({ userId, initialOverrides }: RiskControlProps) {
   const [config, setConfig] = useState<RiskConfig>(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [killSwitchActive, setKillSwitchActive] = useState(false);
 
+  // Apply AI-suggested param overrides
+  useEffect(() => {
+    if (initialOverrides) {
+      setConfig(prev => ({ ...prev, ...initialOverrides }));
+    }
+  }, [initialOverrides]);
+
   // Load user's risk config
   useEffect(() => {
     if (!userId) return;
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
     supabase
       .from("user_risk_config")
@@ -94,7 +102,6 @@ export function RiskControlPanel({ userId }: { userId?: string }) {
     if (!userId) return;
     setSaving(true);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
     await supabase.from("user_risk_config").upsert({
       user_id: userId,
       max_position_size_usd: config.maxPositionSizeUsd,
@@ -127,7 +134,6 @@ export function RiskControlPanel({ userId }: { userId?: string }) {
     }
 
     if (userId) {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
       await supabase.from("user_risk_config").upsert({
         user_id: userId,
         kill_switch: newState,
