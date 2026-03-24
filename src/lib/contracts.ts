@@ -23,6 +23,17 @@ export const VIP_RECEIVER_ADDRESS = import.meta.env.VITE_VIP_RECEIVER_ADDRESS ||
 export const SWAP_ROUTER_ADDRESS = import.meta.env.VITE_SWAP_ROUTER_ADDRESS || "0x5650383D9f8d8f80fc972b8F49A3cc31d3A7F7E3";
 export const NODE_V2_CONTRACT_ADDRESS = import.meta.env.VITE_NODE_V2_CONTRACT_ADDRESS || "0x17DDad4C9c2fD61859D37dD40300c419cBdd4cE2";
 
+// ── V3 Contract addresses (Modular vault system) ──
+export const MA_TOKEN_ADDRESS = import.meta.env.VITE_MA_TOKEN_ADDRESS || "0xE3d19D3299B0C2D6c5FDB74dBb79b102449Edc36";
+export const CUSD_ADDRESS = import.meta.env.VITE_CUSD_ADDRESS || "0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6";
+export const PRICE_ORACLE_ADDRESS = import.meta.env.VITE_PRICE_ORACLE_ADDRESS || "0x3EC635802091b9F95b2891f3fd2504499f710145";
+export const VAULT_V3_ADDRESS = import.meta.env.VITE_VAULT_V3_ADDRESS || "0xC3E05890dB946B311b00AB64cA255FdcC3643F0a";
+export const ENGINE_ADDRESS = import.meta.env.VITE_ENGINE_ADDRESS || "0x696a19562B30aD4F0f85C93f2369F044757849aB";
+export const RELEASE_ADDRESS = import.meta.env.VITE_RELEASE_ADDRESS || "0xC80724a4133c90824A64914323fE856019D52B67";
+export const GATEWAY_ADDRESS = import.meta.env.VITE_GATEWAY_ADDRESS || "0x62ac5FabC1a3bFd26B423F42FFb0934D4D3721eb";
+export const SPLITTER_ADDRESS = import.meta.env.VITE_SPLITTER_ADDRESS || "0xcfF14557337368E4A9E09586B0833C5Bbf323845";
+export const MA_DECIMALS = 18;
+
 // Convert USD amount to USDT units (6 decimals)
 export function usdToUsdtUnits(amount: number): bigint {
   return BigInt(Math.round(amount * 10 ** USDT_DECIMALS));
@@ -61,6 +72,24 @@ export function getSwapRouterContract(client: ThirdwebClient) {
 export function getNodeV2Contract(client: ThirdwebClient) {
   if (!NODE_V2_CONTRACT_ADDRESS) throw new Error("NodeV2 contract not configured");
   return getContract({ client, chain: BSC_CHAIN, address: NODE_V2_CONTRACT_ADDRESS });
+}
+
+// ── V3 contract getters ──
+
+export function getMATokenContract(client: ThirdwebClient) {
+  return getContract({ client, chain: BSC_CHAIN, address: MA_TOKEN_ADDRESS });
+}
+
+export function getPriceOracleContract(client: ThirdwebClient) {
+  return getContract({ client, chain: BSC_CHAIN, address: PRICE_ORACLE_ADDRESS });
+}
+
+export function getVaultV3Contract(client: ThirdwebClient) {
+  return getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
+}
+
+export function getGatewayContract(client: ThirdwebClient) {
+  return getContract({ client, chain: BSC_CHAIN, address: GATEWAY_ADDRESS });
 }
 
 // ── ABIs (minimal, only the pay functions) ──

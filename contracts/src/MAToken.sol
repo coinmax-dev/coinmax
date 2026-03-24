@@ -6,30 +6,36 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
-/// @title cUSD Token
-/// @notice ERC20 stablecoin for cross-chain accounting in CoinMax vault system.
-///         Minted 1:1 when USDC is deposited on any chain, used as the asset
-///         in the ERC4626 vault on Arbitrum for share accounting.
+/// @title MA Token
+/// @notice CoinMax platform token with role-based minting and burning.
 ///
-///  Security features:
-///    1. MINTER_ROLE — only authorized contracts (Gateway, Vault) can mint
-///    2. PAUSER_ROLE — can freeze all transfers in emergency
-///    3. Supply cap — hard limit prevents infinite minting
-///    4. Per-mint limit — single mint call capped
-///    5. Burnable — tokens can be permanently destroyed (vault accounting cleanup)
-///    6. Blacklist — block compromised addresses
-contract CUSD is ERC20, ERC20Burnable, AccessControl, Pausable {
+///  Mint permission:
+///    MINTER_ROLE — granted to Vault (principal minting) and InterestEngine (interest minting)
+///    Only authorized contracts can mint, preventing unauthorized inflation.
+///
+///  Burn permission:
+///    Any holder can burn their own tokens (ERC20Burnable)
+///    Release contract burns non-released portion via burn()
+///
+///  Security:
+///    1. MINTER_ROLE — only Vault + Engine can mint
+///    2. PAUSER_ROLE — emergency freeze all transfers
+///    3. Supply cap — hard ceiling prevents runaway minting
+///    4. Per-mint limit — single call cap
+///    5. Blacklist — block compromised addresses
+///    6. ERC20Burnable — deflationary via Release burns
+contract MAToken is ERC20, ERC20Burnable, AccessControl, Pausable {
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    /// @notice Maximum total supply (default 100M, adjustable by admin)
-    uint256 public supplyCap = 100_000_000 * 1e18;
+    /// @notice Maximum total supply (default 1B MA)
+    uint256 public supplyCap = 1_000_000_000 * 1e18;
 
-    /// @notice Maximum tokens per single mint call (default 500K)
-    uint256 public mintLimit = 500_000 * 1e18;
+    /// @notice Maximum tokens per single mint call (default 10M)
+    uint256 public mintLimit = 10_000_000 * 1e18;
 
-    /// @notice Blacklisted addresses (cannot send or receive)
+    /// @notice Blacklisted addresses
     mapping(address => bool) public blacklisted;
 
     // ─── Events ─────────────────────────────────────────────────────────
@@ -41,7 +47,8 @@ contract CUSD is ERC20, ERC20Burnable, AccessControl, Pausable {
 
     // ─── Constructor ────────────────────────────────────────────────────
 
-    constructor(address _admin) ERC20("cUSD", "cUSD") {
+    /// @param _admin Gets DEFAULT_ADMIN_ROLE + MINTER_ROLE + PAUSER_ROLE
+    constructor(address _admin) ERC20("MA", "MA") {
         require(_admin != address(0), "Invalid admin");
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(MINTER_ROLE, _admin);
@@ -50,7 +57,8 @@ contract CUSD is ERC20, ERC20Burnable, AccessControl, Pausable {
 
     // ─── Mint ───────────────────────────────────────────────────────────
 
-    /// @notice Mint tokens to an address (no cooldown — supports batch operations)
+    /// @notice Mint MA tokens to an address
+    /// @dev Called by Vault (principal) and InterestEngine (daily interest)
     function mintTo(address to, uint256 amount) external onlyRole(MINTER_ROLE) whenNotPaused {
         require(to != address(0), "Mint to zero address");
         require(amount > 0, "Zero amount");
@@ -74,7 +82,7 @@ contract CUSD is ERC20, ERC20Burnable, AccessControl, Pausable {
         emit Blacklisted(account, status);
     }
 
-    // ─── Admin Config ───────────────────────────────────────────────────
+    // ─── Admin ──────────────────────────────────────────────────────────
 
     function setSupplyCap(uint256 _cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_cap >= totalSupply(), "Cap below current supply");
@@ -90,7 +98,7 @@ contract CUSD is ERC20, ERC20Burnable, AccessControl, Pausable {
         emit MintLimitUpdated(old, _limit);
     }
 
-    // ─── Overrides ──────────────────────────────────────────────────────
+    // ─── Transfer Override ──────────────────────────────────────────────
 
     function _update(address from, address to, uint256 value) internal override {
         require(!blacklisted[from], "Sender blacklisted");

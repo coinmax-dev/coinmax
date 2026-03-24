@@ -1,350 +1,435 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.27;
 
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
 
-/// @notice Interface for cUSDT token (thirdweb Token with mintTo)
-interface ICUSDToken {
+/// @notice cUSD token interface (mintTo)
+interface ICUSDGateway {
     function mintTo(address to, uint256 amount) external;
-    function burn(uint256 amount) external;
-    function transfer(address to, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
 }
 
-/// @notice Interface for CoinMaxNodesV2
-interface INodesV2 {
-    function purchaseNodeFrom(
-        address payer,
-        string calldata nodeType,
-        uint256 cUsdtAmount,
-        uint256 originalUsdtAmount
-    ) external;
+/// @notice CoinMaxVault interface (depositFor)
+interface ICoinMaxVaultGateway {
+    function depositFor(address user, uint256 cUsdAmount, uint256 planIndex) external;
 }
 
-/// @notice Interface for CoinMaxVaultV2
-interface IVaultV2 {
-    function depositFrom(
-        address depositor,
-        uint256 cUsdtAmount,
-        uint256 originalUsdtAmount,
-        uint256 planIndex
-    ) external;
+/// @notice Generic DEX router (PancakeSwap V3 / Uniswap V3 / Camelot)
+interface IDEXRouter {
+    struct ExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint160 sqrtPriceLimitX96;
+    }
+    function exactInputSingle(
+        ExactInputSingleParams calldata params
+    ) external payable returns (uint256 amountOut);
 }
 
-/// @title CoinMax Gateway
-/// @notice Entry point for users: accepts USDT, mints cUSDT 1:1, then routes to
-///         NodesV2 (node subscription) or VaultV2 (vault deposit).
+/// @notice Cross-chain bridge adapter interface
+interface IBridgeAdapter {
+    function sendMessage(
+        uint32 dstChainId,
+        bytes calldata payload,
+        bytes calldata options
+    ) external payable returns (bytes32 messageId);
+
+    function estimateFee(
+        uint32 dstChainId,
+        bytes calldata payload,
+        bytes calldata options
+    ) external view returns (uint256 nativeFee);
+}
+
+/// @title CoinMax Gateway (Clone-Ready, Multi-Chain)
+/// @notice Entry point for deposits on any chain. Deployed as minimal clone
+///         via CoinMaxFactory for each chain (BSC, ARB, Base).
 ///
-///  Flow:  User USDT → Gateway mints cUSDT 1:1 → NodesV2 / VaultV2
+///  On SOURCE chains (BSC, Base):
+///    User USDT → DEX swap → USDC → treasury → cross-chain msg to ARB
 ///
-///  Why this guarantees 1:1:
-///    - cUSDT is a thirdweb Token contract, this Gateway has MINTER_ROLE
-///    - Every 1 USDT deposited = exactly 1 cUSDT minted (same decimals)
-///    - No AMM, no slippage, no price deviation
-///    - USDT is held by this contract (or forwarded to treasury)
-///    - cUSDT total supply always equals total USDT collected
+///  On VAULT chain (ARB):
+///    Receives cross-chain msg → mint cUSD → Vault.depositFor()
+///    Also accepts direct deposits on ARB
 ///
-///  Redemption (optional future):
-///    - User burns cUSDT → Gateway sends back USDT 1:1
-///    - Ensures cUSDT is always fully backed
-contract CoinMaxGateway is Ownable, ReentrancyGuard, Pausable {
+///  Roles:
+///    DEFAULT_ADMIN_ROLE — owner / multisig
+///    SERVER_ROLE        — thirdweb Engine wallet (relay cross-chain messages)
+///    RELAYER_ROLE       — bridge adapter callback
+///
+///  Clone deployment (per chain):
+///    impl = new CoinMaxGateway();
+///    clone = Clones.clone(impl);
+///    CoinMaxGateway(clone).initialize(...);
+contract CoinMaxGateway is
+    Initializable,
+    AccessControlUpgradeable,
+    ReentrancyGuard,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
-    // ─── Storage ────────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //  ROLES
+    // ═══════════════════════════════════════════════════════════════════
 
-    /// @notice USDT token (input from user)
+    /// @notice thirdweb Engine Server Wallet (cross-chain relay, emergency)
+    bytes32 public constant SERVER_ROLE = keccak256("SERVER_ROLE");
+
+    /// @notice Bridge adapter callback role
+    bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  STORAGE
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Whether this gateway is on the vault chain (ARB)
+    bool public isVaultChain;
+
     IERC20 public usdt;
+    IERC20 public usdc;
+    IDEXRouter public dexRouter;
+    uint24 public poolFee;
 
-    /// @notice cUSDT token (thirdweb Token — minted 1:1 for USDT)
-    ICUSDToken public cUsdt;
-
-    /// @notice NodesV2 contract for node subscriptions
-    INodesV2 public nodesV2;
-
-    /// @notice VaultV2 contract for vault deposits
-    IVaultV2 public vaultV2;
-
-    /// @notice Treasury address — USDT backing is forwarded here
+    /// @notice Treasury wallet on THIS chain — receives USDC
     address public treasury;
 
-    /// @notice Whether USDT backing is forwarded to treasury (true) or held in this contract (false)
-    bool public forwardToTreasury;
+    // ─── Vault Chain Only ───────────────────────────────────────────
+    ICUSDGateway public cUsd;
+    ICoinMaxVaultGateway public vault;
 
-    /// @notice Total USDT deposited (= total cUSDT ever minted)
-    uint256 public totalUsdtDeposited;
+    // ─── Source Chain Only ──────────────────────────────────────────
+    IBridgeAdapter public bridgeAdapter;
+    uint32 public vaultChainId;
 
-    /// @notice Whether redemption (cUSDT → USDT) is enabled
-    bool public redemptionEnabled;
+    // ─── Protection ─────────────────────────────────────────────────
+    uint256 public maxSlippageBps;
+    uint256 public maxDepositAmount;
+    uint256 public cooldownPeriod;
+    mapping(address => uint256) public lastDepositTime;
 
-    // ─── Events ─────────────────────────────────────────────────────────
+    /// @notice Trusted remote gateway addresses (source chain → bytes32)
+    mapping(bytes32 => bool) public trustedRemotes;
 
-    event SwapAndDepositToVault(
+    // ─── Gap ────────────────────────────────────────────────────────
+    uint256[30] private __gap;
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  EVENTS
+    // ═══════════════════════════════════════════════════════════════════
+
+    event DepositInitiated(
         address indexed user,
-        uint256 usdtAmount,
-        uint256 cUsdtMinted,
+        uint256 usdtIn,
+        uint256 usdcOut,
         uint256 planIndex,
+        bool crossChain,
         uint256 timestamp
     );
-
-    event SwapAndPurchaseNode(
+    event CrossChainDepositReceived(
         address indexed user,
-        uint256 usdtAmount,
-        uint256 cUsdtMinted,
-        string nodeType,
-        uint256 timestamp
-    );
-
-    event DirectDepositToVault(
-        address indexed user,
-        uint256 cUsdtAmount,
+        uint256 usdcAmount,
         uint256 planIndex,
+        uint32 srcChainId,
         uint256 timestamp
     );
-
-    event DirectPurchaseNode(
-        address indexed user,
-        uint256 cUsdtAmount,
-        string nodeType,
-        uint256 timestamp
-    );
-
-    event CUsdtMinted(address indexed user, uint256 usdtAmount, uint256 cUsdtAmount);
-    event CUsdtRedeemed(address indexed user, uint256 cUsdtBurned, uint256 usdtReturned);
     event ConfigUpdated(string param);
 
-    // ─── Constructor ────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════
+    //  INITIALIZER
+    // ═══════════════════════════════════════════════════════════════════
 
-    /// @param _usdt USDT token address
-    /// @param _cUsdt cUSDT token address (thirdweb Token — Gateway needs MINTER_ROLE)
-    /// @param _nodesV2 CoinMaxNodesV2 contract address
-    /// @param _vaultV2 CoinMaxVaultV2 contract address
-    /// @param _treasury Treasury address to receive USDT backing
-    constructor(
-        address _usdt,
-        address _cUsdt,
-        address _nodesV2,
-        address _vaultV2,
-        address _treasury
-    ) Ownable(msg.sender) {
-        require(_usdt != address(0), "Invalid USDT");
-        require(_cUsdt != address(0), "Invalid cUSDT");
-        require(_nodesV2 != address(0), "Invalid NodesV2");
-        require(_vaultV2 != address(0), "Invalid VaultV2");
-        require(_treasury != address(0), "Invalid treasury");
-
-        usdt = IERC20(_usdt);
-        cUsdt = ICUSDToken(_cUsdt);
-        nodesV2 = INodesV2(_nodesV2);
-        vaultV2 = IVaultV2(_vaultV2);
-        treasury = _treasury;
-        forwardToTreasury = true;
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
-    // ─── Core: USDT → cUSDT → Vault ───────────────────────────────────
+    /// @param _isVaultChain true if ARB (vault chain)
+    /// @param _usdt USDT address on this chain
+    /// @param _usdc USDC address on this chain
+    /// @param _dexRouter DEX router address
+    /// @param _poolFee DEX pool fee tier
+    /// @param _treasury Treasury wallet on this chain
+    /// @param _admin Admin address
+    /// @param _serverWallet thirdweb Engine wallet
+    function initialize(
+        bool _isVaultChain,
+        address _usdt,
+        address _usdc,
+        address _dexRouter,
+        uint24 _poolFee,
+        address _treasury,
+        address _admin,
+        address _serverWallet
+    ) external initializer {
+        require(_usdt != address(0), "Invalid USDT");
+        require(_usdc != address(0), "Invalid USDC");
+        require(_dexRouter != address(0), "Invalid DEX");
+        require(_treasury != address(0), "Invalid treasury");
+        require(_admin != address(0), "Invalid admin");
 
-    /// @notice Pay USDT → mint cUSDT 1:1 → deposit into VaultV2
-    /// @param usdtAmount Amount of USDT to pay (18 decimals on BSC)
-    /// @param planIndex Staking plan index in VaultV2
+        __AccessControl_init();
+        // ReentrancyGuard (OZ5) does not need init
+        __Pausable_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        if (_serverWallet != address(0)) {
+            _grantRole(SERVER_ROLE, _serverWallet);
+            _grantRole(RELAYER_ROLE, _serverWallet);
+        }
+
+        isVaultChain = _isVaultChain;
+        usdt = IERC20(_usdt);
+        usdc = IERC20(_usdc);
+        dexRouter = IDEXRouter(_dexRouter);
+        poolFee = _poolFee;
+        treasury = _treasury;
+
+        maxSlippageBps = 10;              // 0.1% for stables
+        maxDepositAmount = 100_000e18;
+        cooldownPeriod = 30;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  CORE: DEPOSIT TO VAULT
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Deposit USDT → swap → route to vault
+    /// @param usdtAmount USDT amount
+    /// @param planIndex Staking plan index
+    /// @param minUsdcOut Min USDC from swap (slippage)
+    /// @param bridgeOptions Cross-chain options (ignored on vault chain)
     function depositVault(
         uint256 usdtAmount,
-        uint256 planIndex
-    ) external nonReentrant whenNotPaused {
+        uint256 planIndex,
+        uint256 minUsdcOut,
+        bytes calldata bridgeOptions
+    ) external payable nonReentrant whenNotPaused {
         require(usdtAmount > 0, "Zero amount");
+        require(usdtAmount <= maxDepositAmount, "Exceeds max");
+        require(
+            block.timestamp >= lastDepositTime[msg.sender] + cooldownPeriod,
+            "Cooldown active"
+        );
 
-        // 1. Pull USDT from user
-        usdt.safeTransferFrom(msg.sender, address(this), usdtAmount);
-
-        // 2. Mint cUSDT 1:1 to this contract
-        uint256 cUsdtAmount = usdtAmount; // exactly 1:1
-        cUsdt.mintTo(address(this), cUsdtAmount);
-
-        // 3. Forward USDT backing to treasury
-        _handleUsdtBacking(usdtAmount);
-
-        // 4. Approve cUSDT to VaultV2 and deposit
-        cUsdt.approve(address(vaultV2), cUsdtAmount);
-        vaultV2.depositFrom(msg.sender, cUsdtAmount, usdtAmount, planIndex);
-
-        totalUsdtDeposited += usdtAmount;
-
-        emit CUsdtMinted(msg.sender, usdtAmount, cUsdtAmount);
-        emit SwapAndDepositToVault(msg.sender, usdtAmount, cUsdtAmount, planIndex, block.timestamp);
-    }
-
-    // ─── Core: USDT → cUSDT → Node ────────────────────────────────────
-
-    /// @notice Pay USDT → mint cUSDT 1:1 → purchase node in NodesV2
-    /// @param usdtAmount Amount of USDT to pay (18 decimals on BSC)
-    /// @param nodeType Node type identifier (e.g. "MINI", "MAX")
-    function purchaseNode(
-        uint256 usdtAmount,
-        string calldata nodeType
-    ) external nonReentrant whenNotPaused {
-        require(usdtAmount > 0, "Zero amount");
-
-        // 1. Pull USDT from user
-        usdt.safeTransferFrom(msg.sender, address(this), usdtAmount);
-
-        // 2. Mint cUSDT 1:1
-        uint256 cUsdtAmount = usdtAmount;
-        cUsdt.mintTo(address(this), cUsdtAmount);
-
-        // 3. Forward USDT backing
-        _handleUsdtBacking(usdtAmount);
-
-        // 4. Approve cUSDT to NodesV2 and purchase
-        cUsdt.approve(address(nodesV2), cUsdtAmount);
-        nodesV2.purchaseNodeFrom(msg.sender, nodeType, cUsdtAmount, usdtAmount);
-
-        totalUsdtDeposited += usdtAmount;
-
-        emit CUsdtMinted(msg.sender, usdtAmount, cUsdtAmount);
-        emit SwapAndPurchaseNode(msg.sender, usdtAmount, cUsdtAmount, nodeType, block.timestamp);
-    }
-
-    // ─── Core: Direct cUSDT (user already has cUSDT) ──────────────────
-
-    /// @notice Deposit cUSDT directly into VaultV2 (skip mint)
-    function directDepositVault(
-        uint256 cUsdtAmount,
-        uint256 planIndex
-    ) external nonReentrant whenNotPaused {
-        require(cUsdtAmount > 0, "Zero amount");
-
-        IERC20(address(cUsdt)).safeTransferFrom(msg.sender, address(this), cUsdtAmount);
-        cUsdt.approve(address(vaultV2), cUsdtAmount);
-        vaultV2.depositFrom(msg.sender, cUsdtAmount, cUsdtAmount, planIndex);
-
-        emit DirectDepositToVault(msg.sender, cUsdtAmount, planIndex, block.timestamp);
-    }
-
-    /// @notice Purchase node with cUSDT directly (skip mint)
-    function directPurchaseNode(
-        uint256 cUsdtAmount,
-        string calldata nodeType
-    ) external nonReentrant whenNotPaused {
-        require(cUsdtAmount > 0, "Zero amount");
-
-        IERC20(address(cUsdt)).safeTransferFrom(msg.sender, address(this), cUsdtAmount);
-        cUsdt.approve(address(nodesV2), cUsdtAmount);
-        nodesV2.purchaseNodeFrom(msg.sender, nodeType, cUsdtAmount, cUsdtAmount);
-
-        emit DirectPurchaseNode(msg.sender, cUsdtAmount, nodeType, block.timestamp);
-    }
-
-    // ─── Core: Standalone Mint / Redeem ─────────────────────────────────
-
-    /// @notice Mint cUSDT by depositing USDT 1:1 (standalone, no node/vault action)
-    /// @param usdtAmount Amount of USDT to convert
-    function mint(uint256 usdtAmount) external nonReentrant whenNotPaused {
-        require(usdtAmount > 0, "Zero amount");
+        uint256 floor = (usdtAmount * (10000 - maxSlippageBps)) / 10000;
+        require(minUsdcOut >= floor, "Slippage too high");
 
         usdt.safeTransferFrom(msg.sender, address(this), usdtAmount);
+        uint256 usdcReceived = _swapToUsdc(usdtAmount, minUsdcOut);
 
-        uint256 cUsdtAmount = usdtAmount; // 1:1
-        cUsdt.mintTo(msg.sender, cUsdtAmount);
+        usdc.safeTransfer(treasury, usdcReceived);
+        lastDepositTime[msg.sender] = block.timestamp;
 
-        _handleUsdtBacking(usdtAmount);
-        totalUsdtDeposited += usdtAmount;
-
-        emit CUsdtMinted(msg.sender, usdtAmount, cUsdtAmount);
-    }
-
-    /// @notice Redeem cUSDT back to USDT 1:1 (burn cUSDT, receive USDT)
-    /// @param cUsdtAmount Amount of cUSDT to redeem
-    function redeem(uint256 cUsdtAmount) external nonReentrant whenNotPaused {
-        require(redemptionEnabled, "Redemption disabled");
-        require(cUsdtAmount > 0, "Zero amount");
-
-        // Check contract has enough USDT to cover redemption
-        uint256 usdtBalance = usdt.balanceOf(address(this));
-        require(usdtBalance >= cUsdtAmount, "Insufficient USDT reserves");
-
-        // Pull cUSDT from user and burn
-        IERC20(address(cUsdt)).safeTransferFrom(msg.sender, address(this), cUsdtAmount);
-        cUsdt.burn(cUsdtAmount);
-
-        // Send USDT back 1:1
-        usdt.safeTransfer(msg.sender, cUsdtAmount);
-
-        emit CUsdtRedeemed(msg.sender, cUsdtAmount, cUsdtAmount);
-    }
-
-    // ─── View ───────────────────────────────────────────────────────────
-
-    /// @notice Get USDT reserves held by this contract (for redemption backing)
-    function getUsdtReserves() external view returns (uint256) {
-        return usdt.balanceOf(address(this));
-    }
-
-    /// @notice Get current cUSDT total supply
-    function getCUsdtSupply() external view returns (uint256) {
-        return IERC20(address(cUsdt)).totalSupply();
-    }
-
-    // ─── Internal ───────────────────────────────────────────────────────
-
-    /// @dev Forward USDT to treasury or keep in contract as backing
-    function _handleUsdtBacking(uint256 amount) internal {
-        if (forwardToTreasury && treasury != address(0)) {
-            usdt.safeTransfer(treasury, amount);
+        if (isVaultChain) {
+            _mintAndDeposit(msg.sender, usdcReceived, planIndex);
+        } else {
+            _sendCrossChainDeposit(msg.sender, usdcReceived, planIndex, bridgeOptions);
         }
-        // else: USDT stays in this contract as reserve for redemptions
+
+        emit DepositInitiated(
+            msg.sender, usdtAmount, usdcReceived, planIndex, !isVaultChain, block.timestamp
+        );
     }
 
-    // ─── Admin ──────────────────────────────────────────────────────────
+    /// @notice Deposit USDC directly (no swap)
+    function depositVaultUsdc(
+        uint256 usdcAmount,
+        uint256 planIndex,
+        bytes calldata bridgeOptions
+    ) external payable nonReentrant whenNotPaused {
+        require(usdcAmount > 0, "Zero amount");
+        require(usdcAmount <= maxDepositAmount, "Exceeds max");
 
-    function setTreasury(address _treasury) external onlyOwner {
-        require(_treasury != address(0), "Invalid address");
-        treasury = _treasury;
+        usdc.safeTransferFrom(msg.sender, treasury, usdcAmount);
+        lastDepositTime[msg.sender] = block.timestamp;
+
+        if (isVaultChain) {
+            _mintAndDeposit(msg.sender, usdcAmount, planIndex);
+        } else {
+            _sendCrossChainDeposit(msg.sender, usdcAmount, planIndex, bridgeOptions);
+        }
+
+        emit DepositInitiated(
+            msg.sender, 0, usdcAmount, planIndex, !isVaultChain, block.timestamp
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  CROSS-CHAIN: RECEIVE (vault chain only)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Receive cross-chain deposit from source chain.
+    ///         Called by bridge adapter or Server Wallet relay.
+    function receiveCrossChainDeposit(
+        uint32 srcChainId,
+        bytes32 srcSender,
+        bytes calldata payload
+    ) external whenNotPaused {
+        require(isVaultChain, "Only vault chain");
+        require(
+            hasRole(RELAYER_ROLE, msg.sender) || hasRole(SERVER_ROLE, msg.sender),
+            "Unauthorized"
+        );
+        require(trustedRemotes[srcSender], "Untrusted remote");
+
+        (address user, uint256 usdcAmount, uint256 planIndex) = abi.decode(
+            payload, (address, uint256, uint256)
+        );
+        require(user != address(0) && usdcAmount > 0, "Invalid payload");
+
+        _mintAndDeposit(user, usdcAmount, planIndex);
+
+        emit CrossChainDepositReceived(
+            user, usdcAmount, planIndex, srcChainId, block.timestamp
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  VIEW
+    // ═══════════════════════════════════════════════════════════════════
+
+    function estimateDepositFee(
+        uint256 usdcAmount,
+        uint256 planIndex,
+        bytes calldata bridgeOptions
+    ) external view returns (uint256) {
+        require(!isVaultChain, "No fee on vault chain");
+        bytes memory payload = abi.encode(msg.sender, usdcAmount, planIndex);
+        return bridgeAdapter.estimateFee(vaultChainId, payload, bridgeOptions);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  INTERNAL
+    // ═══════════════════════════════════════════════════════════════════
+
+    function _swapToUsdc(uint256 amountIn, uint256 amountOutMin) internal returns (uint256) {
+        usdt.safeIncreaseAllowance(address(dexRouter), amountIn);
+        return dexRouter.exactInputSingle(
+            IDEXRouter.ExactInputSingleParams({
+                tokenIn: address(usdt),
+                tokenOut: address(usdc),
+                fee: poolFee,
+                recipient: address(this),
+                amountIn: amountIn,
+                amountOutMinimum: amountOutMin,
+                sqrtPriceLimitX96: 0
+            })
+        );
+    }
+
+    function _mintAndDeposit(address user, uint256 usdcAmount, uint256 planIndex) internal {
+        cUsd.mintTo(address(this), usdcAmount);
+        IERC20(address(cUsd)).approve(address(vault), usdcAmount);
+        vault.depositFor(user, usdcAmount, planIndex);
+    }
+
+    function _sendCrossChainDeposit(
+        address user,
+        uint256 usdcAmount,
+        uint256 planIndex,
+        bytes calldata bridgeOptions
+    ) internal {
+        require(address(bridgeAdapter) != address(0), "Bridge not set");
+        bytes memory payload = abi.encode(user, usdcAmount, planIndex);
+        bridgeAdapter.sendMessage{value: msg.value}(vaultChainId, payload, bridgeOptions);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  ADMIN
+    // ═══════════════════════════════════════════════════════════════════
+
+    function setCUsd(address _cUsd) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_cUsd != address(0), "Invalid");
+        cUsd = ICUSDGateway(_cUsd);
+        emit ConfigUpdated("cUsd");
+    }
+
+    function setVault(address _vault) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_vault != address(0), "Invalid");
+        vault = ICoinMaxVaultGateway(_vault);
+        emit ConfigUpdated("vault");
+    }
+
+    function setBridgeAdapter(address _bridge) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_bridge != address(0), "Invalid");
+        bridgeAdapter = IBridgeAdapter(_bridge);
+        emit ConfigUpdated("bridgeAdapter");
+    }
+
+    function setVaultChainId(uint32 _chainId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        vaultChainId = _chainId;
+        emit ConfigUpdated("vaultChainId");
+    }
+
+    function setTrustedRemote(bytes32 remote, bool trusted) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        trustedRemotes[remote] = trusted;
+        emit ConfigUpdated("trustedRemote");
+    }
+
+    function setTreasury(address _t) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_t != address(0), "Invalid");
+        treasury = _t;
         emit ConfigUpdated("treasury");
     }
 
-    function setForwardToTreasury(bool _forward) external onlyOwner {
-        forwardToTreasury = _forward;
-        emit ConfigUpdated("forwardToTreasury");
+    function setDexRouter(address _r) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_r != address(0), "Invalid");
+        dexRouter = IDEXRouter(_r);
+        emit ConfigUpdated("dexRouter");
     }
 
-    function setRedemptionEnabled(bool _enabled) external onlyOwner {
-        redemptionEnabled = _enabled;
-        emit ConfigUpdated("redemptionEnabled");
+    function setPoolFee(uint24 _fee) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        poolFee = _fee;
+        emit ConfigUpdated("poolFee");
     }
 
-    function setNodesV2(address _nodesV2) external onlyOwner {
-        require(_nodesV2 != address(0), "Invalid address");
-        nodesV2 = INodesV2(_nodesV2);
-        emit ConfigUpdated("nodesV2");
+    function setMaxSlippageBps(uint256 _bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_bps > 0 && _bps <= 100, "1-100");
+        maxSlippageBps = _bps;
     }
 
-    function setVaultV2(address _vaultV2) external onlyOwner {
-        require(_vaultV2 != address(0), "Invalid address");
-        vaultV2 = IVaultV2(_vaultV2);
-        emit ConfigUpdated("vaultV2");
+    function setMaxDepositAmount(uint256 _amt) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_amt > 0, "Invalid");
+        maxDepositAmount = _amt;
     }
 
-    function setCUsdt(address _cUsdt) external onlyOwner {
-        require(_cUsdt != address(0), "Invalid address");
-        cUsdt = ICUSDToken(_cUsdt);
-        emit ConfigUpdated("cUsdt");
+    function setCooldownPeriod(uint256 _s) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_s <= 300, "Max 5 min");
+        cooldownPeriod = _s;
     }
 
-    function setUsdt(address _usdt) external onlyOwner {
-        require(_usdt != address(0), "Invalid address");
-        usdt = IERC20(_usdt);
-        emit ConfigUpdated("usdt");
+    function setUsdt(address _t) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_t != address(0), "Invalid");
+        usdt = IERC20(_t);
     }
 
-    function pause() external onlyOwner { _pause(); }
-    function unpause() external onlyOwner { _unpause(); }
-
-    /// @notice Emergency: recover tokens stuck in this contract
-    function emergencyWithdraw(address token, address to, uint256 amount) external onlyOwner {
-        require(to != address(0), "Invalid address");
-        IERC20(token).safeTransfer(to, amount);
+    function setUsdc(address _t) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_t != address(0), "Invalid");
+        usdc = IERC20(_t);
     }
+
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) { _pause(); }
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) { _unpause(); }
+
+    function emergencyWithdraw(address token, address to, uint256 amt) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(to != address(0), "Invalid");
+        IERC20(token).safeTransfer(to, amt);
+    }
+
+    function emergencyWithdrawNative(address payable to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(to != address(0), "Invalid");
+        (bool ok,) = to.call{value: address(this).balance}("");
+        require(ok, "Failed");
+    }
+
+    receive() external payable {}
 }

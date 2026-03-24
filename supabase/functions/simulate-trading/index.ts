@@ -1139,36 +1139,53 @@ interface ModelVote { model: string; direction: "BULLISH" | "BEARISH" | "NEUTRAL
 
 function simulateModelVote(name: string, rsi: number, mom: number, macd: { histogram: number }, bb: { pctB: number }, vol: number): { direction: "BULLISH" | "BEARISH" | "NEUTRAL"; confidence: number } {
   let ls = 0, ss = 0;
-  const n1 = (Math.random() - 0.5) * 8, n2 = (Math.random() - 0.5) * 8;
+  const n1 = (Math.random() - 0.5) * 6, n2 = (Math.random() - 0.5) * 6;
 
   switch (name) {
-    case "DeepSeek":
-      if (rsi < 35) ls += 30; else if (rsi > 65) ss += 30;
-      if (mom > 0.3) ls += 25; else if (mom < -0.3) ss += 25;
-      if (macd.histogram > 0) ls += 20; else ss += 20;
-      ls += n1; ss += n2; break;
-    case "Llama 3.1":
-      if (rsi < 30) ls += 35; else if (rsi > 70) ss += 35;
-      if (bb.pctB < 0.2) ls += 25; else if (bb.pctB > 0.8) ss += 25;
-      ls += n1 * 1.2; ss += n2 * 1.2; break;
     case "GPT-4o":
-      if (rsi < 25) ls += 20; else if (rsi > 75) ss += 20;
-      if (mom > 0.3) ls += 15; else if (mom < -0.3) ss += 15;
-      ls += n1 * 1.5; ss += n2 * 1.5; break;
-    case "Gemini":
-      if (vol > 1.5 && mom > 0) ls += 25; else if (vol > 1.5 && mom < 0) ss += 25;
+      // Multi-factor balanced model — good at trend detection
       if (rsi < 40) ls += 15; else if (rsi > 60) ss += 15;
-      ls += n1 * 1.3; ss += n2 * 1.3; break;
-    case "Grok":
-      if (rsi > 70) ls += 10; else if (rsi < 30) ss += 10;
-      if (mom > 0.5) ss += 15; else if (mom < -0.5) ls += 15;
-      ls += n1 * 1.8; ss += n2 * 1.8; break;
+      if (mom > 0.15) ls += 20; else if (mom < -0.15) ss += 20;
+      if (macd.histogram > 0) ls += 15; else ss += 15;
+      if (bb.pctB < 0.3) ls += 10; else if (bb.pctB > 0.7) ss += 10;
+      ls += n1; ss += n2; break;
+    case "Claude":
+      // Conservative model — focuses on strong signals, MACD + momentum
+      if (rsi < 35) ls += 20; else if (rsi > 65) ss += 20;
+      if (mom > 0.2) ls += 15; else if (mom < -0.2) ss += 15;
+      if (macd.histogram > 0.001) ls += 20; else if (macd.histogram < -0.001) ss += 20;
+      if (vol > 0.8) { ls += 5; ss += 5; } // volatile = more decisive
+      ls += n1 * 0.8; ss += n2 * 0.8; break;
+    case "Gemini":
+      // Volatility-aware model — acts on any notable vol, not just extreme
+      if (vol > 0.5 && mom > 0.1) ls += 20; else if (vol > 0.5 && mom < -0.1) ss += 20;
+      if (rsi < 42) ls += 15; else if (rsi > 58) ss += 15;
+      if (bb.pctB < 0.25) ls += 15; else if (bb.pctB > 0.75) ss += 15;
+      ls += n1; ss += n2; break;
+    case "DeepSeek":
+      // Technical purist — RSI + MACD + BB combo
+      if (rsi < 40) ls += 20; else if (rsi > 60) ss += 20;
+      if (mom > 0.2) ls += 15; else if (mom < -0.2) ss += 15;
+      if (macd.histogram > 0) ls += 15; else ss += 15;
+      if (bb.pctB < 0.35) ls += 10; else if (bb.pctB > 0.65) ss += 10;
+      ls += n1 * 0.9; ss += n2 * 0.9; break;
+    case "Llama":
+      // Mean-reversion focused — catches extremes
+      if (rsi < 35) ls += 25; else if (rsi > 65) ss += 25;
+      if (bb.pctB < 0.2) ls += 20; else if (bb.pctB > 0.8) ss += 20;
+      if (mom > 0.3) ls += 10; else if (mom < -0.3) ss += 10;
+      ls += n1; ss += n2; break;
+    default:
+      // Fallback for any unknown model
+      if (rsi < 40) ls += 15; else if (rsi > 60) ss += 15;
+      if (mom > 0.2) ls += 15; else if (mom < -0.2) ss += 15;
+      ls += n1; ss += n2; break;
   }
 
   const net = ls - ss, abs = Math.abs(net);
-  if (abs < 8) return { direction: "NEUTRAL", confidence: Math.min(55, 40 + Math.random() * 15) };
-  if (net > 0) return { direction: "BULLISH", confidence: Math.min(95, 50 + abs * 1.5 + Math.random() * 5) };
-  return { direction: "BEARISH", confidence: Math.min(95, 50 + abs * 1.5 + Math.random() * 5) };
+  if (abs < 5) return { direction: "NEUTRAL", confidence: Math.min(55, 40 + Math.random() * 15) };
+  if (net > 0) return { direction: "BULLISH", confidence: Math.min(95, 50 + abs * 1.2 + Math.random() * 8) };
+  return { direction: "BEARISH", confidence: Math.min(95, 50 + abs * 1.2 + Math.random() * 8) };
 }
 
 // ── Consensus (kept for signals + predictions) ──────────────

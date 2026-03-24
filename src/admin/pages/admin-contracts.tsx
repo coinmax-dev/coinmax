@@ -17,6 +17,14 @@ import {
   NODE_CONTRACT_ADDRESS,
   USDT_ADDRESS,
   USDC_ADDRESS,
+  MA_TOKEN_ADDRESS,
+  CUSD_ADDRESS,
+  PRICE_ORACLE_ADDRESS,
+  VAULT_V3_ADDRESS,
+  ENGINE_ADDRESS,
+  RELEASE_ADDRESS,
+  GATEWAY_ADDRESS,
+  SPLITTER_ADDRESS,
 } from "@/lib/contracts";
 
 // ── Known deployed addresses ──
@@ -440,6 +448,93 @@ export default function AdminContracts() {
 
   const fundManager = useOnChainData(FUND_MANAGER_ADDRESS, readFundManager, !!client && isSuperAdmin);
 
+  // ── V3 Vault on-chain data ──
+  const readV3Vault = useCallback(async (): Promise<ConfigItem[]> => {
+    if (!client || !VAULT_V3_ADDRESS) return [];
+    const c = getContract({ client, chain: bsc, address: VAULT_V3_ADDRESS });
+    const read = (method: string, outputs: string, params?: any[]) =>
+      readContract({ contract: c, method: `function ${method} view returns (${outputs})`, params: params as any });
+
+    try {
+      const [totalMA, totalCUsd, plansCount, maPrice] = await Promise.all([
+        read("totalMAStaked()", "uint256"),
+        read("totalCUsdDeposited()", "uint256"),
+        read("getPlansCount()", "uint256"),
+        read("maPrice()", "uint256"),
+      ]);
+
+      const items: ConfigItem[] = [
+        { label: "MA 总质押", value: `${formatBigAmount(BigInt(String(totalMA)))} MA` },
+        { label: "cUSD 总存入", value: `${formatBigAmount(BigInt(String(totalCUsd)))} cUSD` },
+        { label: "MA 价格", value: `$${(Number(maPrice) / 1e6).toFixed(4)}` },
+        { label: "质押计划数", value: String(Number(plansCount)) },
+      ];
+
+      // Read each plan
+      const count = Number(plansCount);
+      for (let i = 0; i < count; i++) {
+        try {
+          const plan = await read("getStakePlan(uint256)", "uint256 duration, uint256 dailyRate, bool active", [BigInt(i)]);
+          const duration = Number((plan as any)[0]) / 86400;
+          const rate = Number((plan as any)[1]);
+          const active = (plan as any)[2];
+          items.push({
+            label: `计划 ${i}: ${duration}天 ${(rate / 100).toFixed(1)}%/日`,
+            value: String(active),
+            type: "bool",
+          });
+        } catch { /* skip */ }
+      }
+
+      return items;
+    } catch (err: any) {
+      return [{ label: "错误", value: err?.message || "读取失败" }];
+    }
+  }, [client]);
+
+  const v3Vault = useOnChainData(VAULT_V3_ADDRESS, readV3Vault, !!client && isSuperAdmin);
+
+  // ── V3 Oracle on-chain data ──
+  const readV3Oracle = useCallback(async (): Promise<ConfigItem[]> => {
+    if (!client || !PRICE_ORACLE_ADDRESS) return [];
+    const c = getContract({ client, chain: bsc, address: PRICE_ORACLE_ADDRESS });
+    const read = (method: string, outputs: string) =>
+      readContract({ contract: c, method: `function ${method} view returns (${outputs})`, params: [] });
+
+    try {
+      const [price, lastUpdate, heartbeat, maxChange, minP, maxP, mode, histLen] = await Promise.all([
+        read("price()", "uint256"),
+        read("lastUpdateTime()", "uint256"),
+        read("heartbeat()", "uint256"),
+        read("maxChangeRate()", "uint256"),
+        read("minPrice()", "uint256"),
+        read("maxPrice()", "uint256"),
+        read("mode()", "uint8"),
+        read("getHistoryLength()", "uint256"),
+      ]);
+
+      const modes = ["手动", "TWAP", "混合"];
+      const lastTime = new Date(Number(lastUpdate) * 1000);
+      const stale = Date.now() / 1000 > Number(lastUpdate) + Number(heartbeat);
+
+      return [
+        { label: "当前价格", value: `$${(Number(price) / 1e6).toFixed(4)}` },
+        { label: "模式", value: modes[Number(mode)] || "未知" },
+        { label: "最后更新", value: lastTime.toLocaleString("zh-CN") },
+        { label: "价格状态", value: stale ? "false" : "true", type: "bool" },
+        { label: "心跳超时", value: `${Number(heartbeat) / 3600} 小时` },
+        { label: "最大涨跌", value: `${Number(maxChange) / 100}%` },
+        { label: "价格下限", value: `$${(Number(minP) / 1e6).toFixed(4)}` },
+        { label: "价格上限", value: `$${(Number(maxP) / 1e6).toFixed(2)}` },
+        { label: "历史记录数", value: String(Number(histLen)) },
+      ];
+    } catch (err: any) {
+      return [{ label: "错误", value: err?.message || "读取失败" }];
+    }
+  }, [client]);
+
+  const v3Oracle = useOnChainData(PRICE_ORACLE_ADDRESS, readV3Oracle, !!client && isSuperAdmin);
+
   return (
     <div className="space-y-4 lg:space-y-6">
       <div className="flex items-center justify-between">
@@ -511,6 +606,40 @@ export default function AdminContracts() {
             />
           )}
 
+          {/* V3 Contracts */}
+          <ContractSection
+            title="V3 金库合约 (Vault)"
+            icon={<Shield className="h-4 w-4 text-cyan-400" />}
+            address={VAULT_V3_ADDRESS}
+            items={v3Vault.data}
+            loading={v3Vault.loading}
+            error={v3Vault.error}
+            onRefresh={v3Vault.refresh}
+          />
+
+          <ContractSection
+            title="V3 价格预言机 (Oracle)"
+            icon={<Zap className="h-4 w-4 text-amber-400" />}
+            address={PRICE_ORACLE_ADDRESS}
+            items={v3Oracle.data}
+            loading={v3Oracle.loading}
+            error={v3Oracle.error}
+            onRefresh={v3Oracle.refresh}
+          />
+
+          <ContractSection
+            title="V3 利息引擎 (Engine)"
+            icon={<Zap className="h-4 w-4 text-orange-400" />}
+            address={ENGINE_ADDRESS}
+            items={[
+              { label: "合约地址", value: ENGINE_ADDRESS, type: "address" },
+              { label: "Server Wallet", value: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b", type: "address" },
+            ]}
+            loading={false}
+            onRefresh={() => {}}
+            defaultOpen={false}
+          />
+
           {/* Deployed addresses summary */}
           <ContractSection
             title="已部署合约地址"
@@ -519,6 +648,14 @@ export default function AdminContracts() {
             items={[
               { label: "USDT (BSC)", value: USDT_ADDRESS, type: "address" },
               { label: "USDC (BSC)", value: USDC_ADDRESS, type: "address" },
+              { label: "MA Token (V3)", value: MA_TOKEN_ADDRESS || "未配置", type: MA_TOKEN_ADDRESS ? "address" : "text" },
+              { label: "cUSD (V3)", value: CUSD_ADDRESS || "未配置", type: CUSD_ADDRESS ? "address" : "text" },
+              { label: "Oracle (V3)", value: PRICE_ORACLE_ADDRESS || "未配置", type: PRICE_ORACLE_ADDRESS ? "address" : "text" },
+              { label: "Vault (V3)", value: VAULT_V3_ADDRESS || "未配置", type: VAULT_V3_ADDRESS ? "address" : "text" },
+              { label: "Engine (V3)", value: ENGINE_ADDRESS || "未配置", type: ENGINE_ADDRESS ? "address" : "text" },
+              { label: "Release (V3)", value: RELEASE_ADDRESS || "未配置", type: RELEASE_ADDRESS ? "address" : "text" },
+              { label: "Gateway (V3)", value: GATEWAY_ADDRESS || "未配置", type: GATEWAY_ADDRESS ? "address" : "text" },
+              { label: "Splitter (V3)", value: SPLITTER_ADDRESS || "未配置", type: SPLITTER_ADDRESS ? "address" : "text" },
               { label: "SwapRouter V2", value: SWAP_ROUTER_ADDRESS || "未配置", type: SWAP_ROUTER_ADDRESS ? "address" : "text" },
               { label: "NodesV2", value: NODE_V2_CONTRACT_ADDRESS || "未配置", type: NODE_V2_CONTRACT_ADDRESS ? "address" : "text" },
               { label: "NodesV1", value: NODE_CONTRACT_ADDRESS || "未配置", type: NODE_CONTRACT_ADDRESS ? "address" : "text" },

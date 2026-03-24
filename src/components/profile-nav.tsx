@@ -1,12 +1,13 @@
 import { useLocation, Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { User, Server, GitBranch, ArrowLeftRight, History, Bell, Settings, TrendingUp, ChevronRight } from "lucide-react";
+import { User, Server, GitBranch, ArrowLeftRight, History, Bell, Settings, TrendingUp, ChevronRight, Coins } from "lucide-react";
 
 const PROFILE_MENU = [
   { path: "/profile", labelKey: "profile.overviewTab", icon: User, exact: true },
   { path: "/profile/nodes", labelKey: "profile.nodeDetailsTitle", icon: Server },
   { path: "/profile/nodes/earnings", labelKey: "profile.nodeEarningsDetail", icon: TrendingUp },
   { path: "/profile/referral", labelKey: "profile.referralTeam", icon: GitBranch },
+  { path: "/profile/ma", labelKey: "profile.maToken", icon: Coins },
   { path: "/profile/swap", labelKey: "profile.swap", icon: ArrowLeftRight },
   { path: "/profile/transactions", labelKey: "profile.transactionHistory", icon: History },
   { path: "/profile/notifications", labelKey: "profile.notifications", icon: Bell },
