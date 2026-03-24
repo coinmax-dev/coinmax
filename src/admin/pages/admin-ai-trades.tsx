@@ -47,6 +47,8 @@ interface PaperTrade {
   exit_price: number | null;
   size: number;
   leverage: number;
+  ai_reasoning: string | null;
+  ai_models_consensus: any[] | null;
   stop_loss: number;
   take_profit: number;
   pnl: number | null;
@@ -471,6 +473,22 @@ export default function AdminAITrades() {
                         <span>SL: {formatPrice(t.stop_loss)}</span>
                         <span>TP: {formatPrice(t.take_profit)}</span>
                       </div>
+                      {/* AI Reasoning */}
+                      {t.ai_reasoning && (
+                        <div className="mt-1.5 px-2 py-1.5 rounded-lg bg-primary/[0.04] border border-primary/10">
+                          <p className="text-[10px] text-foreground/35 mb-0.5 font-semibold">🤖 AI 分析</p>
+                          <p className="text-[10px] text-foreground/50 leading-relaxed">{t.ai_reasoning.slice(0, 200)}</p>
+                          {t.ai_models_consensus && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(t.ai_models_consensus as any[]).filter((m: any) => m.reasoning).map((m: any, i: number) => (
+                                <span key={i} className={`text-[9px] px-1.5 py-0.5 rounded ${m.direction === "BULLISH" ? "text-green-400/60 bg-green-500/8" : m.direction === "BEARISH" ? "text-red-400/60 bg-red-500/8" : "text-foreground/30 bg-white/[0.04]"}`}>
+                                  {m.model} {m.direction === "BULLISH" ? "↑" : m.direction === "BEARISH" ? "↓" : "—"} {m.confidence}%
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
