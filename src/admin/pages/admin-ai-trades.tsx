@@ -49,6 +49,7 @@ interface PaperTrade {
   leverage: number;
   ai_reasoning: string | null;
   ai_models_consensus: any[] | null;
+  primary_model: string | null;
   stop_loss: number;
   take_profit: number;
   pnl: number | null;
@@ -366,16 +367,13 @@ export default function AdminAITrades() {
     try { return JSON.parse(t.ai_models_consensus as any); } catch { return []; }
   };
 
-  // Filter open trades by asset + model
+  // Filter open trades by asset + primary model
   const filteredOpen = useMemo(() => {
     if (!openTrades) return [];
     let filtered = openTrades;
     if (assetFilter !== "全部") filtered = filtered.filter(t => t.asset === assetFilter);
     if (modelFilter !== "全部") {
-      filtered = filtered.filter(t => {
-        const consensus = parseConsensus(t);
-        return consensus.some((m: any) => m.model === modelFilter);
-      });
+      filtered = filtered.filter(t => t.primary_model === modelFilter);
     }
     return filtered;
   }, [openTrades, assetFilter, modelFilter]);
@@ -395,8 +393,8 @@ export default function AdminAITrades() {
         </button>
       </div>
 
-      {/* Summary Cards — mobile 2 cols, desktop 4 cols */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      {/* Summary Cards — mobile 2 cols, desktop 3 cols */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
           <p className="text-[10px] text-foreground/35 mb-0.5">持仓 / 金额</p>
           <p className="text-lg font-bold">{summary.openCount}<span className="text-xs text-foreground/40 ml-1">${((openTrades?.reduce((s, t) => s + t.size * t.entry_price, 0) ?? 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></p>
@@ -404,6 +402,7 @@ export default function AdminAITrades() {
         <div className={`rounded-xl border p-3 ${summary.unrealizedPnl >= 0 ? "border-green-500/15 bg-green-500/[0.03]" : "border-red-500/15 bg-red-500/[0.03]"}`}>
           <p className="text-[10px] text-foreground/35 mb-0.5">未实现盈亏</p>
           <p className={`text-lg font-bold ${pnlColor(summary.unrealizedPnl)}`}>{formatPnl(summary.unrealizedPnl)}</p>
+          <p className="text-[9px] text-foreground/20">收益率 {((summary.unrealizedPnl / Math.max(1, (openTrades?.reduce((s, t) => s + t.size * t.entry_price, 0) ?? 1))) * 100).toFixed(2)}%</p>
         </div>
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
           <p className="text-[10px] text-foreground/35 mb-0.5">今日已实现</p>
@@ -413,6 +412,17 @@ export default function AdminAITrades() {
           <p className="text-[10px] text-foreground/35 mb-0.5">累计盈亏</p>
           <p className={`text-lg font-bold ${pnlColor(summary.totalPnl)}`}>{formatPnl(summary.totalPnl)}</p>
           <p className="text-[9px] text-foreground/20">{summary.totalClosed}笔 · 胜率{summary.winRate.toFixed(0)}%</p>
+        </div>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <p className="text-[10px] text-foreground/35 mb-0.5">日均收益率</p>
+          <p className={`text-lg font-bold ${pnlColor(summary.dailyAvgPnl)}`}>
+            {summary.tradingDays > 0 ? `${(summary.dailyAvgPnl / 1000 * 100).toFixed(2)}%` : "—"}
+          </p>
+          <p className="text-[9px] text-foreground/20">{summary.tradingDays}天</p>
+        </div>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+          <p className="text-[10px] text-foreground/35 mb-0.5">信号 / 模型数</p>
+          <p className="text-lg font-bold">{summary.signalCount}<span className="text-xs text-foreground/40 ml-1">/ 5模型</span></p>
         </div>
       </div>
 
@@ -484,7 +494,7 @@ export default function AdminAITrades() {
                           <SideBadge side={t.side} />
                           <span className="text-[10px] text-foreground/25">{t.leverage}x</span>
                           <StrategyBadge type={t.strategy_type} />
-                          {t.ai_reasoning && <span className="text-[9px] text-purple-400/60">🤖</span>}
+                          {t.primary_model && <span className="text-[9px] text-purple-400/60 bg-purple-500/10 px-1 rounded">🤖{t.primary_model}</span>}
                         </div>
                         <span className="text-[10px] text-foreground/20">{timeSince(t.opened_at)}</span>
                       </div>

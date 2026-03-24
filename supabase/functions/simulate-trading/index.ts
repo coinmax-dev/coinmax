@@ -1451,16 +1451,34 @@ serve(async (req) => {
         }
       }
 
-      // ── Open paper trades: one $1000 position per triggered strategy ──
+      // ── AI-gated trade opening: strategy + model consensus ──
+      // Count AI model votes for direction
+      const aiBullish = votes.filter(v => v.direction === "BULLISH").length;
+      const aiBearish = votes.filter(v => v.direction === "BEARISH").length;
+      const bestModel = votes.sort((a, b) => b.confidence - a.confidence)[0];
+
       for (const sig of stratSignals) {
         if (currentOpen + results.paper_trades_opened >= cfg.maxPositions) break;
 
-        // Skip if already have an open position for this asset+strategy
         const comboKey = `${asset}_${sig.strategy}`;
         if (openCombos.has(comboKey)) continue;
 
-        // Only open if confidence is high enough (raised from 50 to 62)
+        // Gate 1: Strategy confidence >= 62
         if (sig.confidence < 62) continue;
+
+        // Gate 2: AI models must agree with strategy direction
+        // At least 2 models must support the direction, or skip
+        const sigDir = sig.side === "LONG" ? "BULLISH" : "BEARISH";
+        const aiSupport = votes.filter(v => v.direction === sigDir).length;
+        if (aiSupport < 2) continue; // Need at least 2/5 models to agree
+
+        // Find the primary model (highest confidence model that agrees)
+        const agreeingModels = votes.filter(v => v.direction === sigDir).sort((a, b) => b.confidence - a.confidence);
+        const primaryModel = agreeingModels[0]?.model || "technical";
+
+        // Boost confidence if AI strongly agrees, penalize if weak
+        if (aiSupport >= 4) sig.confidence = Math.min(95, sig.confidence * 1.1);
+        else if (aiSupport === 2) sig.confidence *= 0.9;
 
         const side = sig.side;
         const sl = side === "LONG"
@@ -1472,15 +1490,16 @@ serve(async (req) => {
         const size = parseFloat((cfg.positionSize / currentPrice).toFixed(8));
 
         const tradeId = crypto.randomUUID();
-        // Build AI reasoning from real model analyses
+        // Build AI reasoning with primary model highlighted
         const modelConsensus = votes.map(v => ({
           model: v.model, direction: v.direction, confidence: v.confidence,
           reasoning: aiAnalysisMap[`${asset}_${v.model}`]?.reasoning || null,
+          isPrimary: v.model === primaryModel,
         }));
-        const aiReasoning = modelConsensus
-          .filter(m => m.reasoning)
-          .map(m => `[${m.model}] ${m.direction} ${m.confidence}%: ${m.reasoning}`)
-          .join(" | ") || sig.reason;
+        const aiReasoning = `[主导: ${primaryModel}] ${aiSupport}/${votes.length}模型${sigDir === "BULLISH" ? "看涨" : "看跌"} | 策略: ${sig.strategy} ${sig.reason} | ` +
+          modelConsensus.filter(m => m.reasoning && m.direction === sigDir)
+            .map(m => `[${m.model}] ${m.confidence}%: ${m.reasoning}`)
+            .join(" | ");
 
         const { error: tErr } = await supabase.from("paper_trades").insert({
           id: tradeId, signal_id: signalId, asset, side,
@@ -1489,6 +1508,7 @@ serve(async (req) => {
           stop_loss: parseFloat(sl.toFixed(2)),
           take_profit: parseFloat(tp.toFixed(2)),
           strategy_type: sig.strategy,
+          primary_model: primaryModel,
           ai_reasoning: aiReasoning,
           ai_models_consensus: modelConsensus,
           status: "OPEN", opened_at: new Date().toISOString(),
