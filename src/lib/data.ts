@@ -86,6 +86,7 @@ export const HEDGE_CONFIG = {
 } as const;
 
 export const VIP_PLANS = {
+  trial: { price: 0, label: "trial", period: "7 days", days: 7 },
   monthly: { price: 49, label: "monthly", period: "1 month", days: 30 },
   halfyear: { price: 149, label: "halfyear", period: "6 months", days: 180 },
 } as const;

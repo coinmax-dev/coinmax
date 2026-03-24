@@ -342,6 +342,16 @@ export async function subscribeVip(walletAddress: string, txHash?: string, planL
   return toCamel(data);
 }
 
+export async function activateVipTrial(walletAddress: string) {
+  const { data, error } = await supabase.rpc("subscribe_vip", {
+    addr: walletAddress,
+    tx_hash: null,
+    plan_label: "trial",
+  });
+  if (error) throw error;
+  return toCamel(data);
+}
+
 export async function purchaseNode(walletAddress: string, nodeType: string, txHash?: string, paymentMode?: string, authCode?: string) {
   // For MAX nodes, validate auth code first
   if (nodeType === "MAX" && authCode) {

@@ -10,6 +10,7 @@ export interface Profile {
   nodeType: string;
   isVip: boolean;
   vipExpiresAt: string | null;
+  vipTrialUsed: boolean;
   totalDeposited: string | null;
   totalWithdrawn: string | null;
   referralEarnings: string | null;

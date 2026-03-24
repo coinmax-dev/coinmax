@@ -423,7 +423,9 @@ export default function StrategyPage() {
         {activeTab === "copytrading" && (
           <CopyTradingSection
             profileId={profile?.id}
-            isVip={true}
+            isVip={!!profile?.isVip}
+            trialUsed={!!profile?.vipTrialUsed}
+            walletAddr={walletAddr}
             onBack={() => setActiveTab("strategies")}
           />
         )}
@@ -1809,24 +1811,84 @@ export default function StrategyPage() {
 
 // ── Copy Trading Section (embedded in strategy page) ──
 
-function CopyTradingSection({ profileId, isVip, onBack }: { profileId?: string; isVip: boolean; onBack: () => void }) {
+function CopyTradingSection({ profileId, isVip, trialUsed, walletAddr, onBack }: {
+  profileId?: string; isVip: boolean; trialUsed: boolean; walletAddr: string; onBack: () => void;
+}) {
+  const { toast: sToast } = useToast();
+  const [activating, setActivating] = useState(false);
+
+  const handleTrial = async () => {
+    if (!walletAddr) return;
+    setActivating(true);
+    try {
+      const { activateVipTrial } = await import("@/lib/api");
+      await activateVipTrial(walletAddr);
+      sToast({ title: "VIP 试用已激活", description: "7天免费跟单体验已开启，刷新页面生效" });
+      // Refresh profile data
+      queryClient.invalidateQueries({ queryKey: ["profile", walletAddr] });
+    } catch (err: any) {
+      sToast({ title: "激活失败", description: err.message, variant: "destructive" });
+    } finally {
+      setActivating(false);
+    }
+  };
+
   if (!isVip) {
     return (
       <div className="space-y-6" style={{ animation: "fadeSlideIn 0.3s ease-out" }}>
         <button onClick={onBack} className="flex items-center gap-1 text-xs text-foreground/40 hover:text-foreground/60 transition-colors">
           <ChevronLeft className="h-3.5 w-3.5" /> 返回策略列表
         </button>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="flex flex-col items-center justify-center py-10 text-center">
           <div className="w-16 h-16 rounded-2xl bg-amber-500/8 flex items-center justify-center mb-4">
             <Key className="h-8 w-8 text-amber-400/40" />
           </div>
-          <h2 className="text-base font-bold text-foreground/60 mb-2">需要 VIP 会员</h2>
-          <p className="text-xs text-foreground/30 max-w-[260px] leading-relaxed mb-4">
-            跟单交易功能仅对 VIP 会员开放。升级后可享受 AI 智能跟单、多策略组合、自动风控等专属功能。
+          <h2 className="text-base font-bold text-foreground/60 mb-2">开启 AI 跟单交易</h2>
+          <p className="text-xs text-foreground/30 max-w-[280px] leading-relaxed mb-5">
+            AI 智能跟单 · 5大模型共识 · 20种策略组合 · 自动风控
           </p>
-          <Badge className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/20 px-3 py-1">
-            请先升级 VIP
-          </Badge>
+
+          {/* Trial button */}
+          {!trialUsed && (
+            <button
+              onClick={handleTrial}
+              disabled={activating || !walletAddr}
+              className="w-full max-w-[260px] py-3 rounded-xl text-sm font-bold text-yellow-400 transition-all hover:bg-yellow-500/10 active:scale-[0.98] disabled:opacity-50 mb-3"
+              style={{ border: "1px solid rgba(234,179,8,0.3)" }}
+            >
+              {activating ? "激活中..." : "免费试用 7 天"}
+            </button>
+          )}
+          {trialUsed && (
+            <p className="text-[11px] text-foreground/25 mb-3">免费试用已使用</p>
+          )}
+
+          {/* Paid plans */}
+          <div className="w-full max-w-[260px] space-y-2">
+            <div className="rounded-xl px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-yellow-500/5 transition-colors"
+              style={{ border: "1px solid rgba(234,179,8,0.2)" }}
+              onClick={() => { window.location.href = "/profile"; }}
+            >
+              <div className="text-left">
+                <p className="text-xs font-bold text-foreground/60">月费会员</p>
+                <p className="text-[10px] text-foreground/25">30天</p>
+              </div>
+              <span className="text-sm font-black text-yellow-400">$49</span>
+            </div>
+            <div className="rounded-xl px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-yellow-500/5 transition-colors"
+              style={{ border: "1px solid rgba(234,179,8,0.2)" }}
+              onClick={() => { window.location.href = "/profile"; }}
+            >
+              <div className="text-left">
+                <p className="text-xs font-bold text-foreground/60">半年会员</p>
+                <p className="text-[10px] text-foreground/25">180天</p>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-sm font-black text-yellow-400">$149</span>
+                <span className="text-[9px] text-emerald-400 font-bold">省49%</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

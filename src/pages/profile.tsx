@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { copyText } from "@/lib/copy";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getProfile, getNodeOverview, getVaultPositions } from "@/lib/api";
+import { getProfile, getNodeOverview, getVaultPositions, activateVipTrial } from "@/lib/api";
 import type { NodeOverview } from "@shared/types";
 import { queryClient } from "@/lib/queryClient";
 import { usePayment, getPaymentStatusLabel } from "@/hooks/use-payment";
@@ -91,6 +91,19 @@ export default function ProfilePage() {
       toast({ title: "Error", description: desc, variant: "destructive" });
       payment.reset();
       setSelectedVipPlan(null);
+    },
+  });
+
+  const trialMutation = useMutation({
+    mutationFn: async () => {
+      return activateVipTrial(walletAddr);
+    },
+    onSuccess: () => {
+      toast({ title: "VIP 试用已激活", description: "7天免费 VIP 跟单体验已开启" });
+      queryClient.invalidateQueries({ queryKey: ["profile", walletAddr] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "激活失败", description: err.message, variant: "destructive" });
     },
   });
 
@@ -369,14 +382,33 @@ export default function ProfilePage() {
               </span>
             </div>
             {isConnected && !profile?.isVip && !showVipPlans && (
-              <button
-                className="px-4 py-1.5 rounded-full text-[12px] font-bold text-black transition-all hover:brightness-110 active:scale-95"
-                style={{ background: "linear-gradient(135deg, #facc15, #eab308)", boxShadow: "0 2px 8px rgba(234,179,8,0.2)" }}
-                onClick={() => setShowVipPlans(true)}
-                data-testid="button-subscribe-vip"
-              >
-                {t("profile.subscribeVip")}
-              </button>
+              <div className="flex items-center gap-2">
+                {!profile?.vipTrialUsed && (
+                  <button
+                    className="px-3 py-1.5 rounded-full text-[11px] font-bold text-yellow-400 transition-all hover:bg-yellow-500/10 active:scale-95 disabled:opacity-50"
+                    style={{ border: "1px solid rgba(234,179,8,0.3)" }}
+                    onClick={() => trialMutation.mutate()}
+                    disabled={trialMutation.isPending}
+                  >
+                    {trialMutation.isPending ? "激活中..." : "免费试用7天"}
+                  </button>
+                )}
+                <button
+                  className="px-4 py-1.5 rounded-full text-[12px] font-bold text-black transition-all hover:brightness-110 active:scale-95"
+                  style={{ background: "linear-gradient(135deg, #facc15, #eab308)", boxShadow: "0 2px 8px rgba(234,179,8,0.2)" }}
+                  onClick={() => setShowVipPlans(true)}
+                  data-testid="button-subscribe-vip"
+                >
+                  {t("profile.subscribeVip")}
+                </button>
+              </div>
+            )}
+            {isConnected && profile?.isVip && profile?.vipExpiresAt && (
+              <span className="text-[10px] text-yellow-400/60">
+                {new Date(profile.vipExpiresAt) > new Date()
+                  ? `到期: ${new Date(profile.vipExpiresAt).toLocaleDateString("zh-CN")}`
+                  : "已过期"}
+              </span>
             )}
             {!isConnected && (
               <span className="text-[11px] px-3 py-1 rounded-full text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>
