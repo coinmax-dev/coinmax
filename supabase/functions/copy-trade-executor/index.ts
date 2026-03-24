@@ -670,7 +670,9 @@ serve(async (req) => {
 
         // Check total position size
         const { data: totalOpen } = await supabase.rpc("get_user_open_position_usd", { p_wallet: cfg.wallet_address });
-        const maxTotal = cfg.node_type === "MAX" ? 50000 : 5000;
+        // VIP $100-$2000: all same features, position limit based on vip amount
+        const vipAmount = cfg.vip_amount || 100;
+        const maxTotal = vipAmount * 25; // $100 VIP → $2500, $2000 VIP → $50000
         if ((totalOpen || 0) + cfg.position_size_usd > maxTotal) {
           results.errors.push(`${cfg.wallet_address}: position total limit`);
           continue;
@@ -862,11 +864,12 @@ async function checkPaperPositions(supabase: any, results: any) {
       // Get config for fee calculation
       const { data: cfg } = await supabase
         .from("user_trade_configs")
-        .select("node_type")
+        .select("vip_amount")
         .eq("id", order.config_id)
         .single();
 
-      const feeRate = cfg?.node_type === "MAX" ? 0.15 : 0.20;
+      // Fee: 20% for all VIP levels (80/20 split)
+      const feeRate = 0.20;
       const feeUsd = pnlUsd > 0 ? pnlUsd * feeRate : 0; // only charge on profit
 
       await supabase.from("copy_trade_orders").update({

@@ -64,6 +64,9 @@ export default function StrategyPage() {
   const [showApiPassphrase, setShowApiPassphrase] = useState(false);
   const [bindTelegramOpen, setBindTelegramOpen] = useState(false);
   const [telegramUsername, setTelegramUsername] = useState("");
+  const [tgBindCode, setTgBindCode] = useState("");
+  const [tgBindLoading, setTgBindLoading] = useState(false);
+  const [tgBound, setTgBound] = useState(false);
   const [predSubTab, setPredSubTab] = useState<"polymarket" | "news" | "ai">("polymarket");
   const [betDialogOpen, setBetDialogOpen] = useState(false);
   const [betMarket, setBetMarket] = useState<{
@@ -1766,13 +1769,14 @@ export default function StrategyPage() {
               </CardContent>
             </Card>
             <div>
-              <label className="text-xs text-muted-foreground mb-1.5 block">{t("strategy.telegramUsername")}</label>
+              <label className="text-xs text-muted-foreground mb-1.5 block">验证码（在 Telegram 发送 /bind 获取）</label>
               <Input
-                placeholder="@your_username"
-                value={telegramUsername}
-                onChange={(e) => setTelegramUsername(e.target.value)}
-                className="text-xs"
-                data-testid="input-telegram-username"
+                placeholder="输入6位验证码"
+                value={tgBindCode}
+                onChange={(e) => setTgBindCode(e.target.value.toUpperCase())}
+                className="text-xs font-mono tracking-widest"
+                maxLength={6}
+                data-testid="input-telegram-code"
               />
             </div>
             <div className="space-y-1 text-[12px] text-muted-foreground">
@@ -1794,13 +1798,35 @@ export default function StrategyPage() {
             <Button variant="outline" onClick={() => setBindTelegramOpen(false)} data-testid="button-cancel-bind-telegram">{t("common.cancel")}</Button>
             <Button
               className="bg-gradient-to-r from-blue-600 to-indigo-500 border-blue-500/50 text-white"
-              onClick={() => {
-                toast({ title: t("common.comingSoon") });
+              disabled={tgBindLoading || tgBindCode.length < 6}
+              onClick={async () => {
+                if (!walletAddr || tgBindCode.length < 6) return;
+                setTgBindLoading(true);
+                try {
+                  const res = await fetch(
+                    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-bind?action=verify`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+                      body: JSON.stringify({ wallet: walletAddr, code: tgBindCode }),
+                    }
+                  );
+                  const result = await res.json();
+                  if (result.error) throw new Error(result.error);
+                  setTgBound(true);
+                  toast({ title: "绑定成功", description: "Telegram 通知已开启" });
+                  setBindTelegramOpen(false);
+                  setTgBindCode("");
+                } catch (e: any) {
+                  toast({ title: "绑定失败", description: e.message || "验证码无效或已过期", variant: "destructive" });
+                } finally {
+                  setTgBindLoading(false);
+                }
               }}
               data-testid="button-confirm-bind-telegram"
             >
               <MessageCircle className="mr-1 h-4 w-4" />
-              {t("strategy.bindTelegramBtn")}
+              {tgBindLoading ? "验证中..." : "绑定 Telegram"}
             </Button>
           </DialogFooter>
         </DialogContent>
