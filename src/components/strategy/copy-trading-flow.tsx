@@ -53,41 +53,110 @@ export function CopyTradingFlow({
     "trend_following", "momentum", "breakout", "mean_reversion", "bb_squeeze",
   ]);
   const [riskOverrides, setRiskOverrides] = useState<any>(undefined);
+  const [executionMode, setExecutionMode] = useState<"paper" | "signal" | "semi-auto" | "full-auto">("paper");
+  const [isActive, setIsActive] = useState(false);
+  const [activating, setActivating] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Load saved config from DB
+  // Load saved config from new copy trading table
   useEffect(() => {
     if (!userId) return;
     supabase
-      .from("user_risk_config")
-      .select("selected_models, selected_strategies")
-      .eq("user_id", userId)
+      .from("user_trade_configs")
+      .select("models_follow, strategies_follow, coins_follow, execution_mode, exchange, is_active, node_type, position_size_usd, max_leverage, max_positions, stop_loss_pct, take_profit_pct")
+      .eq("wallet_address", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .single()
-      .then(({ data }) => {
-        if (data) {
-          if (data.selected_models?.length) setSelectedModels(data.selected_models);
-          if (data.selected_strategies?.length) setSelectedStrategies(data.selected_strategies);
+      .then(({ data, error }) => {
+        if (data && !error) {
+          if (data.models_follow?.length) setSelectedModels(data.models_follow);
+          if (data.strategies_follow?.length) setSelectedStrategies(data.strategies_follow);
+          if (data.execution_mode) setExecutionMode(data.execution_mode as any);
+          setIsActive(!!data.is_active);
         }
         setConfigLoaded(true);
       });
   }, [userId]);
 
-  // Auto-save model/strategy selections (debounced)
+  // Auto-save model/strategy selections to new table (debounced)
   useEffect(() => {
     if (!userId || !configLoaded || readOnly) return;
     const timer = setTimeout(async () => {
       setSaving(true);
-      await supabase.from("user_risk_config").upsert({
-        user_id: userId,
-        selected_models: selectedModels,
-        selected_strategies: selectedStrategies,
+      // Upsert into user_trade_configs (use wallet_address as key)
+      const { error } = await supabase.from("user_trade_configs").upsert({
+        wallet_address: userId,
+        exchange: "binance", // default, user changes in step 1
+        models_follow: selectedModels,
+        strategies_follow: selectedStrategies,
         updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
+      }, { onConflict: "wallet_address,exchange" }).select().single();
+      // If conflict on unique, try update
+      if (error) {
+        await supabase.from("user_trade_configs")
+          .update({ models_follow: selectedModels, strategies_follow: selectedStrategies })
+          .eq("wallet_address", userId)
+          .order("created_at", { ascending: false })
+          .limit(1);
+      }
       setSaving(false);
-    }, 1000);
+    }, 1500);
     return () => clearTimeout(timer);
   }, [selectedModels, selectedStrategies, userId, configLoaded, readOnly]);
+
+  // Save full config to user_trade_configs and activate
+  const handleActivate = async () => {
+    if (!userId) return;
+    setActivating(true);
+    try {
+      const config = {
+        wallet_address: userId,
+        exchange: "binance", // default, user sets in step 1
+        models_follow: selectedModels,
+        strategies_follow: selectedStrategies,
+        execution_mode: executionMode,
+        position_size_usd: riskOverrides?.maxPositionSizeUsd || 100,
+        max_leverage: riskOverrides?.maxLeverage || 3,
+        max_positions: riskOverrides?.maxConcurrentPositions || 5,
+        max_daily_loss_pct: riskOverrides?.maxDrawdownPct || 10,
+        stop_loss_pct: 3,
+        take_profit_pct: 6,
+        is_active: true,
+      };
+
+      // Check if config exists
+      const { data: existing } = await supabase
+        .from("user_trade_configs")
+        .select("id")
+        .eq("wallet_address", userId)
+        .limit(1)
+        .single();
+
+      if (existing) {
+        await supabase.from("user_trade_configs")
+          .update({ ...config, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("user_trade_configs").insert(config);
+      }
+
+      setIsActive(true);
+    } catch (e) {
+      console.error("Activate failed:", e);
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!userId) return;
+    await supabase.from("user_trade_configs")
+      .update({ is_active: false })
+      .eq("wallet_address", userId);
+    setIsActive(false);
+  };
 
   const goTo = (s: CopyStep) => {
     setStep(s);
@@ -166,7 +235,7 @@ export function CopyTradingFlow({
         </div>
       )}
 
-      {/* Step 4: AI suggestion & confirm */}
+      {/* Step 4: AI suggestion & confirm + activate */}
       {step === "confirm" && (
         <div className="space-y-4">
           <AIParamAdvisor
@@ -182,6 +251,61 @@ export function CopyTradingFlow({
               goTo("risk");
             }}
           />
+
+          {/* Execution Mode Selector */}
+          <div className="rounded-xl bg-white/[0.02] p-4" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+            <h3 className="text-xs font-bold text-foreground/50 mb-3">执行模式</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { id: "paper", label: "模拟跟单", desc: "不下真单，记录模拟盈亏" },
+                { id: "signal", label: "信号通知", desc: "Telegram/App 推送信号" },
+                { id: "semi-auto", label: "半自动", desc: "确认后执行下单" },
+                { id: "full-auto", label: "全自动", desc: "AI 直接下单" },
+              ] as const).map(mode => (
+                <button
+                  key={mode.id}
+                  onClick={() => !readOnly && setExecutionMode(mode.id)}
+                  className={cn(
+                    "p-3 rounded-lg text-left transition-all",
+                    executionMode === mode.id
+                      ? "bg-primary/10 border border-primary/30"
+                      : "bg-white/[0.02] border border-white/5 hover:border-white/10"
+                  )}
+                >
+                  <div className="text-[11px] font-bold text-foreground/70">{mode.label}</div>
+                  <div className="text-[9px] text-foreground/30 mt-0.5">{mode.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Activate Button */}
+          {userId && !readOnly && (
+            <button
+              onClick={handleActivate}
+              disabled={activating}
+              className={cn(
+                "w-full py-3.5 rounded-xl text-sm font-bold transition-all",
+                activating
+                  ? "bg-primary/20 text-primary/60"
+                  : "bg-primary text-black hover:bg-primary/90 active:scale-[0.98]"
+              )}
+            >
+              {activating ? "保存中..." : isActive ? "更新跟单配置" : "开启跟单"}
+            </button>
+          )}
+
+          {isActive && (
+            <div className="text-center">
+              <button
+                onClick={handleDeactivate}
+                className="text-[11px] text-red-400/50 hover:text-red-400 transition-colors"
+              >
+                停止跟单
+              </button>
+            </div>
+          )}
+
           <NavButtons onPrev={() => goTo("risk")} />
         </div>
       )}
