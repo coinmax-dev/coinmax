@@ -412,9 +412,7 @@ export default function StrategyPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={`text-[9px] ${profile?.isVip ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
-                    {profile?.isVip ? "VIP 已解锁" : "VIP 专属"}
-                  </Badge>
+                  <Badge className="text-[9px] bg-green-500/10 text-green-400 border-green-500/20">已开放</Badge>
                   <ChevronRight className="h-4 w-4 text-foreground/20" />
                 </div>
               </div>
@@ -425,7 +423,7 @@ export default function StrategyPage() {
         {activeTab === "copytrading" && (
           <CopyTradingSection
             profileId={profile?.id}
-            isVip={!!profile?.isVip}
+            isVip={true}
             onBack={() => setActiveTab("strategies")}
           />
         )}
