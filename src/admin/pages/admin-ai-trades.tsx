@@ -923,6 +923,69 @@ export default function AdminAITrades() {
             </div>
           </div>
 
+          {/* AI Model Selection */}
+          <div className="rounded-2xl border border-purple-500/15 bg-purple-500/[0.03] p-4 lg:p-5">
+            <h3 className="text-xs font-bold text-foreground/40 mb-1">AI 分析模型</h3>
+            <p className="text-[10px] text-foreground/20 mb-3">开单需要至少 2 个模型同意方向才执行</p>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+              {[
+                { id: "GPT-4o", desc: "OpenAI · 综合分析最强", cost: "~$0.15/M" },
+                { id: "Claude", desc: "Anthropic · 推理能力最强", cost: "~$0.25/M" },
+                { id: "Gemini", desc: "Google · 多模态分析", cost: "免费额度" },
+                { id: "DeepSeek", desc: "深度求索 · 中文最强", cost: "~$0.07/M" },
+                { id: "Llama", desc: "CF Workers · 开源免费", cost: "免费" },
+                { id: "OpenClaw", desc: "本地 Agent · Mac Mini", cost: "本地" },
+              ].map(m => (
+                <div key={m.id} className="px-3 py-2.5 rounded-xl border border-purple-500/15 bg-white/[0.02]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground/60">{m.id}</span>
+                    <span className="text-[9px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">在线</span>
+                  </div>
+                  <p className="text-[9px] text-foreground/25 mt-0.5">{m.desc}</p>
+                  <p className="text-[9px] text-foreground/15">{m.cost}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* AI Suggested Parameters */}
+          <div className="rounded-2xl border border-primary/15 bg-primary/[0.03] p-4 lg:p-5">
+            <h3 className="text-xs font-bold text-foreground/40 mb-1">🤖 AI 建议参数</h3>
+            <p className="text-[10px] text-foreground/20 mb-3">基于当前市场环境和历史表现的建议设置</p>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 text-[11px]">
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">仓位金额</p>
+                <p className="text-primary font-bold">$500 - $1,000</p>
+                <p className="text-[9px] text-foreground/15">极端恐慌时建议小仓</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">杠杆</p>
+                <p className="text-primary font-bold">1x - 3x</p>
+                <p className="text-[9px] text-foreground/15">高波动期降低杠杆</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">最大持仓</p>
+                <p className="text-primary font-bold">15 - 20 个</p>
+                <p className="text-[9px] text-foreground/15">分散风险，不过度集中</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">止损</p>
+                <p className="text-primary font-bold">1.5% - 3%</p>
+                <p className="text-[9px] text-foreground/15">根据 ATR 动态调整</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">止盈</p>
+                <p className="text-primary font-bold">3% - 6%</p>
+                <p className="text-[9px] text-foreground/15">R:R >= 2:1</p>
+              </div>
+              <div className="bg-white/[0.03] rounded-lg p-2">
+                <p className="text-foreground/25">最大回撤</p>
+                <p className="text-primary font-bold">5% - 10%</p>
+                <p className="text-[9px] text-foreground/15">触发后暂停开新仓</p>
+              </div>
+            </div>
+          </div>
+
           {/* Strategy Selection */}
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 lg:p-5">
             <h3 className="text-xs font-bold text-foreground/40 mb-3">启用策略</h3>
