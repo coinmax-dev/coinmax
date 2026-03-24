@@ -404,13 +404,28 @@ export default function ProfilePage() {
                 </button>
               </div>
             )}
-            {isConnected && profile?.isVip && profile?.vipExpiresAt && (
-              <span className="text-[10px] text-yellow-400/60">
-                {new Date(profile.vipExpiresAt) > new Date()
-                  ? `到期: ${new Date(profile.vipExpiresAt).toLocaleDateString("zh-CN")}`
-                  : "已过期"}
-              </span>
-            )}
+            {isConnected && profile?.isVip && profile?.vipExpiresAt && (() => {
+              const expires = new Date(profile.vipExpiresAt);
+              const now = new Date();
+              const daysLeft = Math.max(0, Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+              const isActive = daysLeft > 0;
+              return (
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-mono ${isActive ? (daysLeft <= 3 ? "text-red-400" : "text-yellow-400/60") : "text-red-400"}`}>
+                    {isActive ? `剩余 ${daysLeft} 天` : "已过期"}
+                  </span>
+                  {(daysLeft <= 3 || !isActive) && (
+                    <button
+                      className="px-2.5 py-1 rounded-full text-[9px] font-bold text-black"
+                      style={{ background: "linear-gradient(135deg, #facc15, #eab308)" }}
+                      onClick={() => setShowVipPlans(true)}
+                    >
+                      {isActive ? "续费" : "升级VIP"}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
             {!isConnected && (
               <span className="text-[11px] px-3 py-1 rounded-full text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>
                 {t("common.connectToUnlock")}

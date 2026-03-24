@@ -408,6 +408,7 @@ function Router() {
       <Route path="/profile/nodes" component={ProfileNodesPage} />
       <Route path="/profile/swap" component={ProfileSwapPage} />
       <Route path="/profile/ma" component={ProfileMAPage} />
+      <Route path="/copy-trading" component={CopyTradingPage} />
       <Route path="/profile/nodes/earnings" component={ProfileNodeEarningsPage} />
       <Route path="/market" component={MarketPage} />
       <Route component={NotFound} />
@@ -448,14 +449,6 @@ function RootRouter() {
 
   if (location.startsWith("/provider")) {
     return <ProviderApp />;
-  }
-
-  if (location.startsWith("/copy-trading")) {
-    return (
-      <ThirdwebProvider>
-        <CopyTradingPage />
-      </ThirdwebProvider>
-    );
   }
 
   return <MainApp />;

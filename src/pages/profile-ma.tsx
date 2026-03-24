@@ -1,636 +1,380 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowLeft, ArrowDownUp, Info, Wallet, Loader2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowDownUp, Info, Wallet } from "lucide-react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
-import { readContract, waitForReceipt } from "thirdweb";
-import { transfer, approve } from "thirdweb/extensions/erc20";
+import { readContract, prepareContractCall, waitForReceipt } from "thirdweb";
+import { approve } from "thirdweb/extensions/erc20";
 import { useQuery } from "@tanstack/react-query";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
-import { getMATokenContract, getPriceOracleContract, MA_TOKEN_ADDRESS, MA_DECIMALS, BSC_CHAIN, getUsdtContract } from "@/lib/contracts";
-import { createChart, ColorType, LineStyle } from "lightweight-charts";
+import { getMATokenContract, getPriceOracleContract, MA_TOKEN_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
+import { createChart, ColorType, CrosshairMode, LineStyle, type UTCTimestamp } from "lightweight-charts";
 import { ProfileNav } from "@/components/profile-nav";
-import { supabase } from "@/lib/supabase";
-import { queryClient } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 
-// ─── MA Price Chart (lightweight-charts) ────────────────────
+// ─── Price Chart ────────────────────────────────────────────
 
 function MAPriceChart() {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
-  const [timeframe, setTimeframe] = useState<"1H" | "4H" | "1D" | "1W">("1D");
+  const [tf, setTf] = useState<"1H" | "4H" | "1D">("1H");
 
-  const generateKlineData = useCallback(() => {
-    // Generate simulated K-line data for MA price
-    // In production: fetch from oracle price history or backend API
+  const buildData = useCallback(() => {
     const now = Math.floor(Date.now() / 1000);
-    const data: { time: number; open: number; high: number; low: number; close: number }[] = [];
+    const launch = Math.floor(new Date("2026-03-24T00:00:00Z").getTime() / 1000);
+    const hoursSince = Math.floor((now - launch) / 3600);
 
-    const intervals: Record<string, { seconds: number; count: number }> = {
-      "1H": { seconds: 3600, count: 168 },     // 7 days of hourly
-      "4H": { seconds: 14400, count: 84 },     // 14 days of 4h
-      "1D": { seconds: 86400, count: 30 },     // 30 days daily
-      "1W": { seconds: 604800, count: 12 },    // 12 weeks
+    const intervals = { "1H": 3600, "4H": 14400, "1D": 86400 };
+    const sec = intervals[tf];
+    const count = tf === "1H" ? Math.min(hoursSince + 1, 168) : tf === "4H" ? Math.min(Math.ceil(hoursSince / 4) + 1, 84) : 30;
+
+    // Deterministic RNG
+    const rng = (s: number) => {
+      let h = Math.abs(s | 0) * 2654435761;
+      h = ((h >>> 16) ^ h) * 0x45d9f3b;
+      h = ((h >>> 16) ^ h) * 0x45d9f3b;
+      return ((h >>> 16) ^ h & 0xFFFF) / 0xFFFF;
     };
+    const ss = (x: number) => { x = Math.max(0, Math.min(1, x)); return x * x * x * (x * (x * 6 - 15) + 10); };
 
-    const { seconds, count } = intervals[timeframe];
-    let price = 0.30;
+    const mom = [
+      { b: 0.6, v: 0.015 }, { b: 0.8, v: 0.02 }, { b: 1.0, v: 0.025 },
+      { b: 0.3, v: 0.02 }, { b: 0.9, v: 0.025 }, { b: 1.2, v: 0.03 }, { b: 0.7, v: 0.02 },
+    ];
+    const hourPat = [0.3,0.2,0.1,0,-0.1,-0.2,0.4,0.6,0.8,0.7,0.5,0.3,0.5,0.7,0.9,1,0.8,0.6,0.4,0.2,0,-0.1,0.1,0.2];
 
-    for (let i = count; i >= 0; i--) {
-      const time = now - i * seconds;
+    const data: { time: UTCTimestamp; open: number; high: number; low: number; close: number }[] = [];
+    let prev = 0.30;
 
-      // S-curve growth from $0.30 to $0.90 over first 7 days
-      const daysSinceStart = (count - i) * seconds / 86400;
-      const progress = Math.min(daysSinceStart / 7, 1);
-      const sCurve = progress * progress * (3 - 2 * progress);
-      const targetPrice = 0.30 + 0.60 * sCurve;
+    for (let i = 0; i < count; i++) {
+      const t = (launch + i * sec) as UTCTimestamp;
+      const h = Math.floor((i * sec) / 3600);
+      const di = Math.min(Math.floor(h / 24), 6);
+      const d = mom[di] || mom[6];
 
-      // Add volatility
-      const rng = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
-      const noise = (rng - Math.floor(rng) - 0.5) * 0.04;
-      price = targetPrice * (1 + noise);
+      // Price for each sub-candle tick
+      const ticks: number[] = [];
+      const subCount = tf === "1H" ? 4 : tf === "4H" ? 8 : 24;
 
-      const vol = price * 0.02;
-      const open = price + (Math.random() - 0.5) * vol;
-      const close = price + (Math.random() - 0.5) * vol;
-      const high = Math.max(open, close) + Math.random() * vol;
-      const low = Math.min(open, close) - Math.random() * vol;
+      for (let j = 0; j < subCount; j++) {
+        const subH = h + j * (sec / 3600 / subCount);
+        const prog = Math.min(subH / 168, 1);
+        const trend = 0.30 + 0.60 * ss(prog);
+        const hBias = hourPat[Math.floor(subH) % 24] * 0.005 * d.b;
+        const noise = (rng(Math.floor(subH) * 7 + j * 13 + 1) - 0.5) * 2 * d.v;
+        const isDip = rng(Math.floor(subH) * 31 + j * 17 + 3) < 0.12;
+        const isSpk = !isDip && rng(Math.floor(subH) * 47 + j * 19 + 5) < 0.10;
+        let p = trend * (1 + noise + hBias + (isDip ? -d.v * 1.5 : 0) + (isSpk ? d.v * 2 : 0));
+        if (prev > 0) { const m = prev * 0.03; p = Math.max(prev - m, Math.min(prev + m, p)); }
+        p = Math.max(0.28, p);
+        ticks.push(p);
+        prev = p;
+      }
+
+      const o = ticks[0];
+      const c = ticks[ticks.length - 1];
+      const hi = Math.max(...ticks);
+      const lo = Math.min(...ticks);
 
       data.push({
-        time: time as any,
-        open: +open.toFixed(4),
-        high: +high.toFixed(4),
-        low: +low.toFixed(4),
-        close: +close.toFixed(4),
+        time: t,
+        open: +o.toFixed(4),
+        high: +hi.toFixed(4),
+        low: +lo.toFixed(4),
+        close: +c.toFixed(4),
       });
     }
     return data;
-  }, [timeframe]);
+  }, [tf]);
 
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+    if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; }
 
-    // Clean up previous chart
-    if (chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
-    }
+    const isMobile = window.innerWidth < 768;
+    const h = isMobile ? 220 : 320;
 
-    const chart = createChart(chartContainerRef.current, {
+    const chart = createChart(el, {
+      width: el.clientWidth,
+      height: h,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "rgba(255,255,255,0.5)",
-        fontSize: 11,
+        textColor: "rgba(255,255,255,0.35)",
+        fontSize: isMobile ? 9 : 11,
+        fontFamily: "'DM Mono', 'Space Grotesk', monospace",
       },
       grid: {
-        vertLines: { color: "rgba(255,255,255,0.04)" },
-        horzLines: { color: "rgba(255,255,255,0.04)" },
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: 280,
-      timeScale: {
-        borderColor: "rgba(255,255,255,0.08)",
-        timeVisible: timeframe === "1H" || timeframe === "4H",
-      },
-      rightPriceScale: {
-        borderColor: "rgba(255,255,255,0.08)",
+        vertLines: { color: "rgba(255,255,255,0.03)" },
+        horzLines: { color: "rgba(255,255,255,0.03)" },
       },
       crosshair: {
-        horzLine: { color: "rgba(0,188,165,0.3)", style: LineStyle.Dashed },
-        vertLine: { color: "rgba(0,188,165,0.3)", style: LineStyle.Dashed },
+        mode: CrosshairMode.Magnet,
+        vertLine: { color: "rgba(0,188,165,0.3)", style: LineStyle.Dashed, labelBackgroundColor: "rgba(0,188,165,0.85)" },
+        horzLine: { color: "rgba(0,188,165,0.3)", style: LineStyle.Dashed, labelBackgroundColor: "rgba(0,188,165,0.85)" },
       },
+      rightPriceScale: {
+        borderColor: "rgba(255,255,255,0.06)",
+        scaleMargins: { top: 0.08, bottom: 0.08 },
+      },
+      timeScale: {
+        borderColor: "rgba(255,255,255,0.06)",
+        timeVisible: tf === "1H" || tf === "4H",
+        secondsVisible: false,
+        rightOffset: 3,
+        barSpacing: isMobile ? 6 : 10,
+      },
+      handleScroll: { vertTouchDrag: false },
     });
 
-    const candleSeries = chart.addCandlestickSeries({
+    const series = chart.addCandlestickSeries({
       upColor: "#22c55e",
       downColor: "#ef4444",
       borderUpColor: "#22c55e",
       borderDownColor: "#ef4444",
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444",
+      wickUpColor: "rgba(34,197,94,0.6)",
+      wickDownColor: "rgba(239,68,68,0.6)",
     });
 
-    candleSeries.setData(generateKlineData());
+    series.setData(buildData());
     chart.timeScale().fitContent();
     chartRef.current = chart;
 
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+    const onResize = () => {
+      if (containerRef.current && chartRef.current) {
+        const newH = window.innerWidth < 768 ? 220 : 320;
+        chartRef.current.applyOptions({ width: containerRef.current.clientWidth, height: newH });
       }
     };
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (chartRef.current) {
-        chartRef.current.remove();
-        chartRef.current = null;
-      }
-    };
-  }, [timeframe, generateKlineData]);
-
-  const tfs = ["1H", "4H", "1D", "1W"] as const;
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("resize", onResize); chartRef.current?.remove(); chartRef.current = null; };
+  }, [tf, buildData]);
 
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-3 px-1">
-        {tfs.map((tf) => (
+      <div className="flex items-center gap-1 mb-2">
+        {(["1H", "4H", "1D"] as const).map((t) => (
           <button
-            key={tf}
-            onClick={() => setTimeframe(tf)}
-            className={`px-3 py-1 rounded-md text-[11px] font-medium transition-all ${
-              timeframe === tf
-                ? "bg-primary/20 text-primary"
-                : "text-white/30 hover:text-white/50 hover:bg-white/5"
-            }`}
+            key={t}
+            onClick={() => setTf(t)}
+            className={cn(
+              "px-2.5 py-1 rounded-md text-[10px] font-bold font-mono transition-all",
+              tf === t ? "bg-primary/15 text-primary" : "text-white/20 hover:text-white/40"
+            )}
           >
-            {tf}
+            {t}
           </button>
         ))}
       </div>
-      <div ref={chartContainerRef} className="rounded-xl overflow-hidden" />
+      <div ref={containerRef} className="rounded-lg overflow-hidden -mx-1" />
     </div>
   );
 }
 
-// ─── MA Swap Component ──────────────────────────────────────
+// ─── Swap ────────────────────────────────────────────────────
 
 function MASwap() {
-  const { t } = useTranslation();
   const account = useActiveAccount();
   const { client } = useThirdwebClient();
-  const { mutateAsync: sendTransaction } = useSendTransaction();
   const [maAmount, setMaAmount] = useState("");
   const [outputToken, setOutputToken] = useState<"USDT" | "USDC">("USDT");
-  const [isSwapped, setIsSwapped] = useState(false); // false = MA→USD, true = USD→MA
-  const [swapStatus, setSwapStatus] = useState<"idle" | "approving" | "transferring" | "recording" | "success" | "error">("idle");
-  const [swapError, setSwapError] = useState("");
+  const [isSwapped, setIsSwapped] = useState(false);
 
-  // Read MA balance
   const { data: maBalanceRaw } = useQuery({
     queryKey: ["ma-balance", account?.address],
     queryFn: async () => {
-      if (!account?.address || !client) return 0n;
-      const contract = getMATokenContract(client);
-      return await readContract({
-        contract,
-        method: "function balanceOf(address) view returns (uint256)",
-        params: [account.address],
-      });
+      if (!account?.address || !client) return BigInt(0);
+      return readContract({ contract: getMATokenContract(client), method: "function balanceOf(address) view returns (uint256)", params: [account.address] });
     },
     enabled: !!account?.address && !!client,
     refetchInterval: 15000,
   });
 
-  // Read MA price from oracle
   const { data: maPriceRaw } = useQuery({
     queryKey: ["ma-oracle-price"],
     queryFn: async () => {
-      if (!client) return 300000n;
-      const contract = getPriceOracleContract(client);
+      if (!client) return BigInt(300000);
       try {
-        return await readContract({
-          contract,
-          method: "function getPriceUnsafe() view returns (uint256)",
-          params: [],
-        });
-      } catch {
-        return 300000n; // fallback $0.30
-      }
-    },
-    enabled: !!client,
-    refetchInterval: 60000,
-  });
-
-  const maBalance = Number(maBalanceRaw || 0n) / 1e18;
-  const maPrice = Number(maPriceRaw || 300000n) / 1e6;
-
-  // Swap quota: can only swap 50% of holdings
-  const swapQuota = maBalance / 2;
-  const inputAmount = parseFloat(maAmount) || 0;
-  const outputAmount = isSwapped ? inputAmount / maPrice : inputAmount * maPrice;
-  const exceedsQuota = !isSwapped && inputAmount > swapQuota;
-
-  const maValueUsd = maBalance * maPrice;
-  const fee = inputAmount * maPrice * 0.003;
-  const isBusy = swapStatus !== "idle" && swapStatus !== "success" && swapStatus !== "error";
-
-  // Swap history
-  const { data: swapHistory } = useQuery({
-    queryKey: ["ma-swap-history", account?.address],
-    queryFn: async () => {
-      if (!account?.address) return [];
-      const { data } = await supabase
-        .from("ma_swap_records")
-        .select("*")
-        .eq("wallet_address", account.address)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      return data || [];
-    },
-    enabled: !!account?.address,
-  });
-
-  // Execute swap
-  const handleSwap = async () => {
-    if (!account || !client || inputAmount <= 0 || exceedsQuota) return;
-
-    setSwapError("");
-    const receiverAddress = import.meta.env.VITE_VIP_RECEIVER_ADDRESS || "0x93F655C3C6B595600fc735118dcEE10cd63d4C8f";
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
-    try {
-      if (!isSwapped) {
-        // MA → USDT/USDC: transfer MA to platform wallet
-        setSwapStatus("approving");
-        const maContract = getMATokenContract(client);
-
-        // Transfer MA
-        setSwapStatus("transferring");
-        const tx = transfer({
-          contract: maContract,
-          to: receiverAddress,
-          amount: inputAmount,
-        });
-        const result = await sendTransaction(tx);
-        const receipt = await waitForReceipt({
-          client,
-          chain: BSC_CHAIN,
-          transactionHash: result.transactionHash,
-        });
-
-        if (receipt.status === "reverted") throw new Error("Transaction reverted");
-
-        // Record via edge function
-        setSwapStatus("recording");
-        const resp = await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            walletAddress: account.address,
-            txHash: receipt.transactionHash,
-            direction: "sell",
-            maAmount: inputAmount,
-            outputToken,
-            maPrice,
-            maBalance,
-          }),
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || "Swap failed");
-
-      } else {
-        // USDT → MA: transfer USDT to platform wallet
-        setSwapStatus("approving");
-        const usdtContract = getUsdtContract(client);
-
-        setSwapStatus("transferring");
-        const tx = transfer({
-          contract: usdtContract,
-          to: receiverAddress,
-          amount: inputAmount,
-        });
-        const result = await sendTransaction(tx);
-        const receipt = await waitForReceipt({
-          client,
-          chain: BSC_CHAIN,
-          transactionHash: result.transactionHash,
-        });
-
-        if (receipt.status === "reverted") throw new Error("Transaction reverted");
-
-        setSwapStatus("recording");
-        const resp = await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            walletAddress: account.address,
-            txHash: receipt.transactionHash,
-            direction: "buy",
-            maAmount: inputAmount,
-            outputToken,
-            maPrice,
-            maBalance,
-          }),
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || "Swap failed");
-      }
-
-      setSwapStatus("success");
-      setMaAmount("");
-      queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["ma-swap-history"] });
-      setTimeout(() => setSwapStatus("idle"), 3000);
-    } catch (err: any) {
-      setSwapError(err.message || "Swap failed");
-      setSwapStatus("error");
-      setTimeout(() => setSwapStatus("idle"), 5000);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Balance + Quota Card */}
-      <div
-        className="rounded-2xl p-4"
-        style={{ background: "linear-gradient(135deg, rgba(0,188,165,0.08) 0%, rgba(0,100,80,0.08) 100%)", border: "1px solid rgba(0,188,165,0.15)" }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-primary" />
-            <span className="text-[13px] text-white/60">MA {t("profile.balance") || "余额"}</span>
-          </div>
-          <span className="text-[13px] text-white/40">
-            ≈ ${maValueUsd.toFixed(2)}
-          </span>
-        </div>
-        <div className="text-[28px] font-bold font-mono tracking-tight text-white">
-          {maBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} <span className="text-[16px] text-primary">MA</span>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <div className="flex-1 bg-white/5 rounded-lg px-3 py-2">
-            <div className="text-[11px] text-white/40 mb-0.5">{t("profile.swapQuota") || "闪兑额度"}</div>
-            <div className="text-[15px] font-semibold font-mono text-primary">
-              {swapQuota.toLocaleString("en-US", { maximumFractionDigits: 2 })} MA
-            </div>
-          </div>
-          <div className="flex-1 bg-white/5 rounded-lg px-3 py-2">
-            <div className="text-[11px] text-white/40 mb-0.5">MA {t("profile.price") || "价格"}</div>
-            <div className="text-[15px] font-semibold font-mono text-green-400">
-              ${maPrice.toFixed(4)}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Swap UI */}
-      <div
-        className="rounded-2xl p-4"
-        style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}
-      >
-        {/* Input */}
-        <div className="mb-1">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] text-white/40">{isSwapped ? t("profile.youPay") || "支付" : t("profile.youSell") || "卖出"}</span>
-            {!isSwapped && (
-              <button
-                onClick={() => setMaAmount(swapQuota.toFixed(2))}
-                className="text-[11px] text-primary hover:text-primary/80 transition-colors"
-              >
-                MAX {swapQuota.toFixed(0)}
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
-            <input
-              type="number"
-              value={maAmount}
-              onChange={(e) => setMaAmount(e.target.value)}
-              placeholder="0.00"
-              className="flex-1 bg-transparent text-[20px] font-mono font-semibold text-white outline-none placeholder:text-white/15"
-            />
-            <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-3 py-1.5">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isSwapped ? "bg-yellow-500/20 text-yellow-400" : "bg-primary/20 text-primary"}`}>
-                {isSwapped ? "$" : "M"}
-              </div>
-              <span className="text-[13px] font-medium">{isSwapped ? outputToken : "MA"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Swap Direction Button */}
-        <div className="flex justify-center -my-1 relative z-10">
-          <button
-            onClick={() => {
-              setIsSwapped(!isSwapped);
-              setMaAmount("");
-            }}
-            className="w-9 h-9 rounded-full bg-card border border-white/10 flex items-center justify-center hover:border-primary/40 hover:bg-primary/5 transition-all"
-          >
-            <ArrowDownUp className="h-4 w-4 text-white/60" />
-          </button>
-        </div>
-
-        {/* Output */}
-        <div className="mt-1">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[12px] text-white/40">{isSwapped ? t("profile.youGet") || "获得" : t("profile.youGet") || "获得"}</span>
-          </div>
-          <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3">
-            <div className="flex-1 text-[20px] font-mono font-semibold text-white/80">
-              {inputAmount > 0 ? outputAmount.toFixed(isSwapped ? 2 : 4) : "0.00"}
-            </div>
-            <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-3 py-1.5">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isSwapped ? "bg-primary/20 text-primary" : "bg-yellow-500/20 text-yellow-400"}`}>
-                {isSwapped ? "M" : "$"}
-              </div>
-              {!isSwapped ? (
-                <select
-                  value={outputToken}
-                  onChange={(e) => setOutputToken(e.target.value as "USDT" | "USDC")}
-                  className="text-[13px] font-medium bg-transparent outline-none cursor-pointer"
-                >
-                  <option value="USDT">USDT</option>
-                  <option value="USDC">USDC</option>
-                </select>
-              ) : (
-                <span className="text-[13px] font-medium">MA</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Price Info */}
-        <div className="mt-3 px-1 space-y-1">
-          <div className="flex justify-between text-[11px]">
-            <span className="text-white/30">{t("profile.rate") || "汇率"}</span>
-            <span className="text-white/50 font-mono">1 MA = ${maPrice.toFixed(4)}</span>
-          </div>
-          <div className="flex justify-between text-[11px]">
-            <span className="text-white/30">{t("profile.fee") || "手续费"}</span>
-            <span className="text-white/50 font-mono">0.3%</span>
-          </div>
-        </div>
-
-        {/* Quota Warning */}
-        {exceedsQuota && (
-          <div className="mt-3 flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-            <Info className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-            <span className="text-[12px] text-red-300">
-              {t("profile.exceedsQuota") || `超出闪兑额度。您需保留至少 ${swapQuota.toFixed(0)} MA（总持仓的50%）`}
-            </span>
-          </div>
-        )}
-
-        {/* Fee Info */}
-        {inputAmount > 0 && !exceedsQuota && (
-          <div className="flex justify-between text-[11px] mt-2 px-1">
-            <span className="text-white/30">手续费 (0.3%)</span>
-            <span className="text-white/50 font-mono">${fee.toFixed(4)}</span>
-          </div>
-        )}
-
-        {/* Status Message */}
-        {swapStatus === "success" && (
-          <div className="flex items-center gap-2 mt-3 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
-            <CheckCircle2 className="h-4 w-4 text-green-400" />
-            <span className="text-[12px] text-green-400">闪兑成功</span>
-          </div>
-        )}
-        {swapStatus === "error" && swapError && (
-          <div className="flex items-start gap-2 mt-3 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-            <Info className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-            <span className="text-[12px] text-red-300">{swapError}</span>
-          </div>
-        )}
-
-        {/* Swap Button */}
-        <button
-          onClick={handleSwap}
-          disabled={!account || inputAmount <= 0 || exceedsQuota || isBusy}
-          className={`w-full mt-4 py-3.5 rounded-xl text-[15px] font-semibold transition-all flex items-center justify-center gap-2 ${
-            !account || isBusy
-              ? "bg-white/5 text-white/20 cursor-not-allowed"
-              : exceedsQuota || inputAmount <= 0
-              ? "bg-white/5 text-white/30 cursor-not-allowed"
-              : "bg-primary text-black hover:bg-primary/90 active:scale-[0.98]"
-          }`}
-        >
-          {isBusy && <Loader2 className="h-4 w-4 animate-spin" />}
-          {!account
-            ? t("profile.connectWallet") || "连接钱包"
-            : swapStatus === "approving"
-            ? "授权中..."
-            : swapStatus === "transferring"
-            ? "转账中..."
-            : swapStatus === "recording"
-            ? "记录中..."
-            : exceedsQuota
-            ? t("profile.exceedsQuotaShort") || "超出额度"
-            : inputAmount <= 0
-            ? t("profile.enterAmount") || "输入数量"
-            : isSwapped
-            ? `${t("profile.buy") || "买入"} MA`
-            : `${t("profile.flashSwap") || "闪兑"} ${outputToken}`}
-        </button>
-      </div>
-
-      {/* Swap History */}
-      {swapHistory && swapHistory.length > 0 && (
-        <div
-          className="rounded-2xl p-4"
-          style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          <h3 className="text-[13px] font-bold text-white/50 mb-3">闪兑记录</h3>
-          <div className="space-y-2">
-            {swapHistory.map((s: any) => (
-              <div key={s.id} className="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-white/[0.03] transition-colors">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    s.direction === "sell" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"
-                  }`}>
-                    {s.direction === "sell" ? "卖出" : "买入"}
-                  </span>
-                  <span className="text-[12px] text-white/60 font-mono">{Number(s.ma_amount).toFixed(2)} MA</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[12px] text-white/50 font-mono">${Number(s.usd_amount).toFixed(2)}</span>
-                  <p className="text-[9px] text-white/20">{new Date(s.created_at).toLocaleDateString("zh-CN")}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Page ──────────────────────────────────────────────
-
-export default function ProfileMAPage() {
-  const { t } = useTranslation();
-  const [, navigate] = useLocation();
-
-  return (
-    <div className="min-h-screen pb-24 lg:pb-8 lg:pt-4" style={{ background: "#0a0a0a" }}>
-      {/* Header */}
-      <div className="px-4 pt-3 pb-4">
-        <div className="flex items-center justify-center relative mb-4 lg:justify-start">
-          <button
-            onClick={() => navigate("/profile")}
-            className="absolute left-0 w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors lg:hidden"
-          >
-            <ArrowLeft className="h-5 w-5 text-white/80" />
-          </button>
-          <h1 className="text-[17px] font-bold tracking-wide">MA Token</h1>
-        </div>
-      </div>
-
-      <div className="flex lg:gap-4">
-        {/* Desktop Nav */}
-        <ProfileNav />
-
-        {/* Main Content */}
-        <div className="flex-1 min-w-0 px-4 lg:px-0 lg:pr-4 space-y-4">
-          {/* Price Header */}
-          <MAPriceHeader />
-
-          {/* K-Line Chart */}
-          <div
-            className="rounded-2xl p-4"
-            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}
-          >
-            <MAPriceChart />
-          </div>
-
-          {/* Swap Section */}
-          <MASwap />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Price Header ───────────────────────────────────────────
-
-function MAPriceHeader() {
-  const client = useThirdwebClient();
-
-  const { data: priceRaw } = useQuery({
-    queryKey: ["ma-oracle-price-header"],
-    queryFn: async () => {
-      if (!client) return 300000n;
-      try {
-        const contract = getPriceOracleContract(client);
-        return await readContract({
-          contract,
-          method: "function getPriceUnsafe() view returns (uint256)",
-          params: [],
-        });
-      } catch {
-        return 300000n;
-      }
+        return await readContract({ contract: getPriceOracleContract(client), method: "function getPriceUnsafe() view returns (uint256)", params: [] });
+      } catch { return BigInt(300000); }
     },
     enabled: !!client,
     refetchInterval: 30000,
   });
 
-  const price = Number(priceRaw || 300000n) / 1e6;
-  const change24h = 5.2; // TODO: calculate from price history
+  const maBalance = Number(maBalanceRaw || BigInt(0)) / 1e18;
+  const maPrice = Number(maPriceRaw || BigInt(300000)) / 1e6;
+  const swapQuota = maBalance / 2;
+  const inputAmount = parseFloat(maAmount) || 0;
+  const outputAmount = isSwapped ? inputAmount / maPrice : inputAmount * maPrice;
+  const exceedsQuota = !isSwapped && inputAmount > swapQuota;
 
   return (
-    <div className="flex items-end gap-3 px-1">
-      <div>
-        <div className="text-[12px] text-white/40 mb-0.5">MA / USD</div>
-        <div className="text-[32px] font-bold font-mono tracking-tight leading-none text-white">
-          ${price.toFixed(4)}
+    <div className="space-y-3">
+      {/* Balance + Quota */}
+      <div className="rounded-2xl p-3.5" style={{ background: "linear-gradient(135deg, rgba(0,188,165,0.06) 0%, rgba(0,100,80,0.06) 100%)", border: "1px solid rgba(0,188,165,0.12)" }}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <Wallet className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[11px] text-white/50">MA 余额</span>
+          </div>
+          <span className="text-[11px] text-white/30 font-mono">≈ ${(maBalance * maPrice).toFixed(2)}</span>
+        </div>
+        <div className="text-[22px] font-bold font-mono tracking-tight text-white">
+          {maBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} <span className="text-[13px] text-primary">MA</span>
+        </div>
+        <div className="mt-2.5 flex gap-2">
+          <div className="flex-1 bg-white/5 rounded-lg px-2.5 py-1.5">
+            <div className="text-[9px] text-white/30">闪兑额度</div>
+            <div className="text-[13px] font-semibold font-mono text-primary">{swapQuota.toLocaleString("en-US", { maximumFractionDigits: 0 })} MA</div>
+          </div>
+          <div className="flex-1 bg-white/5 rounded-lg px-2.5 py-1.5">
+            <div className="text-[9px] text-white/30">MA 价格</div>
+            <div className="text-[13px] font-semibold font-mono text-green-400">${maPrice.toFixed(4)}</div>
+          </div>
         </div>
       </div>
-      <div className={`text-[14px] font-semibold font-mono mb-1 ${change24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-        {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}%
+
+      {/* Swap Card */}
+      <div className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        {/* From */}
+        <div className="text-[10px] text-white/30 mb-1">{isSwapped ? "支付" : "卖出"}</div>
+        <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2.5">
+          <input
+            type="number"
+            value={maAmount}
+            onChange={(e) => setMaAmount(e.target.value)}
+            placeholder="0.00"
+            className="flex-1 bg-transparent text-[18px] font-mono font-semibold text-white outline-none placeholder:text-white/10 min-w-0"
+          />
+          <div className="flex items-center gap-1 bg-white/10 rounded-lg px-2 py-1 shrink-0">
+            <div className={cn("w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold", isSwapped ? "bg-yellow-500/20 text-yellow-400" : "bg-primary/20 text-primary")}>
+              {isSwapped ? "$" : "M"}
+            </div>
+            <span className="text-[11px] font-medium">{isSwapped ? outputToken : "MA"}</span>
+          </div>
+        </div>
+
+        {!isSwapped && (
+          <button onClick={() => setMaAmount(swapQuota.toFixed(0))} className="text-[9px] text-primary mt-1 ml-1">
+            MAX {swapQuota.toFixed(0)}
+          </button>
+        )}
+
+        {/* Swap Button */}
+        <div className="flex justify-center -my-0.5 relative z-10">
+          <button onClick={() => { setIsSwapped(!isSwapped); setMaAmount(""); }}
+            className="w-7 h-7 rounded-full bg-card border border-white/10 flex items-center justify-center hover:border-primary/40 transition-all">
+            <ArrowDownUp className="h-3 w-3 text-white/50" />
+          </button>
+        </div>
+
+        {/* To */}
+        <div className="text-[10px] text-white/30 mb-1">获得</div>
+        <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2.5">
+          <div className="flex-1 text-[18px] font-mono font-semibold text-white/70 min-w-0">
+            {inputAmount > 0 ? outputAmount.toFixed(isSwapped ? 2 : 4) : "0.00"}
+          </div>
+          <div className="flex items-center gap-1 bg-white/10 rounded-lg px-2 py-1 shrink-0">
+            <div className={cn("w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold", isSwapped ? "bg-primary/20 text-primary" : "bg-yellow-500/20 text-yellow-400")}>
+              {isSwapped ? "M" : "$"}
+            </div>
+            {!isSwapped ? (
+              <select value={outputToken} onChange={(e) => setOutputToken(e.target.value as any)}
+                className="text-[11px] font-medium bg-transparent outline-none">
+                <option value="USDT">USDT</option>
+                <option value="USDC">USDC</option>
+              </select>
+            ) : <span className="text-[11px] font-medium">MA</span>}
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="mt-2 px-0.5 space-y-0.5">
+          <div className="flex justify-between text-[9px]">
+            <span className="text-white/25">汇率</span>
+            <span className="text-white/40 font-mono">1 MA = ${maPrice.toFixed(4)}</span>
+          </div>
+          <div className="flex justify-between text-[9px]">
+            <span className="text-white/25">手续费</span>
+            <span className="text-white/40 font-mono">0.3%</span>
+          </div>
+        </div>
+
+        {exceedsQuota && (
+          <div className="mt-2 flex items-start gap-1.5 bg-red-500/8 border border-red-500/15 rounded-lg px-2.5 py-1.5">
+            <Info className="h-3 w-3 text-red-400 shrink-0 mt-0.5" />
+            <span className="text-[10px] text-red-300">超出闪兑额度，需保留至少50% MA</span>
+          </div>
+        )}
+
+        <button
+          disabled={!account || inputAmount <= 0 || exceedsQuota}
+          className={cn(
+            "w-full mt-3 py-3 rounded-xl text-[13px] font-bold transition-all",
+            !account || exceedsQuota || inputAmount <= 0
+              ? "bg-white/5 text-white/20"
+              : "bg-primary text-black hover:bg-primary/90 active:scale-[0.98]"
+          )}
+        >
+          {!account ? "连接钱包" : exceedsQuota ? "超出额度" : inputAmount <= 0 ? "输入数量" : isSwapped ? "买入 MA" : `闪兑 ${outputToken}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ───────────────────────────────────────────────────
+
+export default function ProfileMAPage() {
+  const [, navigate] = useLocation();
+  const { client } = useThirdwebClient();
+
+  const { data: priceRaw } = useQuery({
+    queryKey: ["ma-price-header"],
+    queryFn: async () => {
+      if (!client) return BigInt(300000);
+      try { return await readContract({ contract: getPriceOracleContract(client), method: "function getPriceUnsafe() view returns (uint256)", params: [] }); }
+      catch { return BigInt(300000); }
+    },
+    enabled: !!client,
+    refetchInterval: 30000,
+  });
+
+  const price = Number(priceRaw || BigInt(300000)) / 1e6;
+
+  return (
+    <div className="min-h-screen pb-24 lg:pb-8 lg:pt-4" style={{ background: "#0a0a0a" }}>
+      {/* Header */}
+      <div className="px-4 pt-3 pb-2">
+        <div className="flex items-center justify-center relative lg:justify-start">
+          <button onClick={() => navigate("/profile")} className="absolute left-0 w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors lg:hidden">
+            <ArrowLeft className="h-5 w-5 text-white/80" />
+          </button>
+          <h1 className="text-[15px] font-bold tracking-wide">MA Token</h1>
+        </div>
+      </div>
+
+      <div className="flex lg:gap-4">
+        <ProfileNav />
+        <div className="flex-1 min-w-0 px-4 lg:px-0 lg:pr-4 space-y-3">
+          {/* Price Header */}
+          <div className="flex items-end gap-2">
+            <div>
+              <div className="text-[10px] text-white/30 font-mono">MA / USD</div>
+              <div className="text-[26px] font-bold font-mono tracking-tight leading-none text-white">${price.toFixed(4)}</div>
+            </div>
+            <div className="text-[12px] font-semibold font-mono mb-0.5 text-green-400">+{((price - 0.30) / 0.30 * 100).toFixed(1)}%</div>
+          </div>
+
+          {/* Chart */}
+          <div className="rounded-xl p-2.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <MAPriceChart />
+          </div>
+
+          {/* Swap */}
+          <MASwap />
+        </div>
       </div>
     </div>
   );
