@@ -395,6 +395,7 @@
     "notifications": "通知",
     "notificationsDesc": "提醒与消息",
     "maToken": "MA 闪兑",
+    "maTokenDesc": "MA 价格行情 · 闪兑交易",
     "balance": "余额",
     "swapQuota": "闪兑额度",
     "price": "价格",
