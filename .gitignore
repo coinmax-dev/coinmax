@@ -23,3 +23,4 @@ attached_assets/
 
 # Supabase temp
 supabase/.temp/
+ai-engine/agent/.env
