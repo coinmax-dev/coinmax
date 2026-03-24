@@ -14,10 +14,14 @@ import { cn } from "@/lib/utils";
 
 // ─── Price Chart ────────────────────────────────────────────
 
+const UP = "#00e7a0";
+const DOWN = "#ff4976";
+
 function MAPriceChart() {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   const [tf, setTf] = useState<"1H" | "4H" | "1D">("1H");
+  const [chartMode, setChartMode] = useState<"candle" | "area">("area");
 
   const buildData = useCallback(() => {
     const now = Math.floor(Date.now() / 1000);
@@ -93,7 +97,7 @@ function MAPriceChart() {
     if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; }
 
     const isMobile = window.innerWidth < 768;
-    const h = isMobile ? 220 : 320;
+    const h = isMobile ? 240 : 340;
 
     const chart = createChart(el, {
       width: el.clientWidth,
@@ -101,72 +105,117 @@ function MAPriceChart() {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: "rgba(255,255,255,0.35)",
-        fontSize: isMobile ? 9 : 11,
-        fontFamily: "'DM Mono', 'Space Grotesk', monospace",
+        fontSize: isMobile ? 10 : 12,
+        fontFamily: "'Space Grotesk', 'Inter', system-ui, sans-serif",
       },
       grid: {
-        vertLines: { color: "rgba(255,255,255,0.03)" },
-        horzLines: { color: "rgba(255,255,255,0.03)" },
+        vertLines: { color: "rgba(255,255,255,0.025)" },
+        horzLines: { color: "rgba(255,255,255,0.025)" },
       },
       crosshair: {
-        mode: CrosshairMode.Magnet,
-        vertLine: { color: "rgba(0,188,165,0.3)", style: LineStyle.Dashed, labelBackgroundColor: "rgba(0,188,165,0.85)" },
-        horzLine: { color: "rgba(0,188,165,0.3)", style: LineStyle.Dashed, labelBackgroundColor: "rgba(0,188,165,0.85)" },
+        mode: CrosshairMode.Normal,
+        vertLine: { color: "rgba(0,231,160,0.3)", width: 1, style: LineStyle.Dashed, labelBackgroundColor: "rgba(0,231,160,0.85)" },
+        horzLine: { color: "rgba(0,231,160,0.3)", width: 1, style: LineStyle.Dashed, labelBackgroundColor: "rgba(0,231,160,0.85)" },
       },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.06)",
-        scaleMargins: { top: 0.08, bottom: 0.08 },
+        scaleMargins: { top: 0.05, bottom: 0.15 },
       },
       timeScale: {
         borderColor: "rgba(255,255,255,0.06)",
-        timeVisible: tf === "1H" || tf === "4H",
+        timeVisible: true,
         secondsVisible: false,
-        rightOffset: 3,
-        barSpacing: isMobile ? 6 : 10,
+        rightOffset: isMobile ? 4 : 8,
+        barSpacing: isMobile ? 5 : 10,
+        fixLeftEdge: false,
+        fixRightEdge: false,
       },
       handleScroll: { vertTouchDrag: false },
     });
 
-    const series = chart.addCandlestickSeries({
-      upColor: "#22c55e",
-      downColor: "#ef4444",
-      borderUpColor: "#22c55e",
-      borderDownColor: "#ef4444",
-      wickUpColor: "rgba(34,197,94,0.6)",
-      wickDownColor: "rgba(239,68,68,0.6)",
-    });
+    const klineData = buildData();
 
-    series.setData(buildData());
+    if (chartMode === "candle") {
+      const series = chart.addCandlestickSeries({
+        upColor: UP, downColor: DOWN,
+        borderUpColor: UP, borderDownColor: DOWN,
+        wickUpColor: UP, wickDownColor: DOWN,
+      });
+      series.setData(klineData);
+    } else {
+      // Area chart (smoother, better on mobile)
+      const series = chart.addAreaSeries({
+        topColor: "rgba(0,231,160,0.20)",
+        bottomColor: "rgba(0,231,160,0.01)",
+        lineColor: UP,
+        lineWidth: 2,
+        crosshairMarkerRadius: 4,
+        crosshairMarkerBorderColor: UP,
+        crosshairMarkerBackgroundColor: "#0a0f0d",
+      });
+      series.setData(klineData.map(d => ({ time: d.time, value: d.close })));
+    }
+
+    // Volume bars
+    const volSeries = chart.addHistogramSeries({
+      priceFormat: { type: "volume" },
+      priceScaleId: "vol",
+    });
+    chart.priceScale("vol").applyOptions({
+      scaleMargins: { top: 0.85, bottom: 0 },
+    });
+    volSeries.setData(klineData.map(d => ({
+      time: d.time,
+      value: Math.abs(d.close - d.open) * 1e6 + Math.random() * 5000,
+      color: d.close >= d.open ? "rgba(0,231,160,0.15)" : "rgba(255,73,118,0.15)",
+    })));
+
     chart.timeScale().fitContent();
     chartRef.current = chart;
 
     const onResize = () => {
       if (containerRef.current && chartRef.current) {
-        const newH = window.innerWidth < 768 ? 220 : 320;
+        const newH = window.innerWidth < 768 ? 240 : 340;
         chartRef.current.applyOptions({ width: containerRef.current.clientWidth, height: newH });
       }
     };
     window.addEventListener("resize", onResize);
     return () => { window.removeEventListener("resize", onResize); chartRef.current?.remove(); chartRef.current = null; };
-  }, [tf, buildData]);
+  }, [tf, chartMode, buildData]);
 
   return (
     <div>
-      <div className="flex items-center gap-1 mb-2">
-        {(["1H", "4H", "1D"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTf(t)}
-            className={cn(
-              "px-2.5 py-1 rounded-md text-[10px] font-bold font-mono transition-all",
-              tf === t ? "bg-primary/15 text-primary" : "text-white/20 hover:text-white/40"
-            )}
-          >
-            {t}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1">
+          {(["1H", "4H", "1D"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTf(t)}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[10px] font-bold font-mono transition-all",
+                tf === t ? "bg-primary/15 text-primary" : "text-white/20 hover:text-white/40"
+              )}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-0.5">
+          {(["area", "candle"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setChartMode(m)}
+              className={cn(
+                "px-2 py-1 rounded text-[9px] font-medium transition-all",
+                chartMode === m ? "bg-white/10 text-white/60" : "text-white/15 hover:text-white/30"
+              )}
+            >
+              {m === "area" ? "面积" : "K线"}
+            </button>
+          ))}
+        </div>
       </div>
-      <div ref={containerRef} className="rounded-lg overflow-hidden -mx-1" />
+      <div ref={containerRef} className="rounded-lg overflow-hidden" />
     </div>
   );
 }
