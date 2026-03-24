@@ -39,11 +39,10 @@ interface SimConfig {
 }
 
 const AI_MODELS = [
-  { name: "GPT-4o",    defaultWeight: 0.5 },
-  { name: "DeepSeek",  defaultWeight: 0.8 },
-  { name: "Llama 3.1", defaultWeight: 0.6 },
-  { name: "Gemini",    defaultWeight: 0.4 },
-  { name: "Grok",      defaultWeight: 0.4 },
+  { name: "GPT-4o",   defaultWeight: 0.7 },
+  { name: "Claude",   defaultWeight: 0.8 },
+  { name: "Gemini",   defaultWeight: 0.5 },
+  { name: "DeepSeek", defaultWeight: 0.7 },
 ];
 
 const PREDICTION_TIMEFRAMES = [
@@ -1231,6 +1230,22 @@ serve(async (req) => {
     const mw: Record<string, Record<string, { weight: number }>> = {};
     if (accData) for (const r of accData) { if (!mw[r.model]) mw[r.model] = {}; mw[r.model][r.asset] = { weight: r.computed_weight || 0.5 }; }
 
+    // Load real AI market analysis (from ai-market-analysis edge function)
+    const aiAnalysisMap: Record<string, { direction: string; confidence: number; reasoning: string }> = {};
+    const { data: aiData } = await supabase
+      .from("ai_market_analysis")
+      .select("asset, model, direction, confidence, reasoning")
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false });
+    if (aiData) {
+      for (const row of aiData) {
+        const key = `${row.asset}_${row.model}`;
+        if (!aiAnalysisMap[key]) { // latest only per asset+model
+          aiAnalysisMap[key] = { direction: row.direction, confidence: row.confidence, reasoning: row.reasoning };
+        }
+      }
+    }
+
     // Check & close open paper trades
     const { data: openTrades } = await supabase.from("paper_trades").select("*").eq("status", "OPEN");
     if (openTrades) {
@@ -1319,11 +1334,23 @@ serve(async (req) => {
       const ind5m = computeIndicators(candles5m, currentPrice);
       const ind1h = candles1h.length >= 15 ? computeIndicators(candles1h, currentPrice) : null;
 
-      // Model votes (for signal + predictions)
-      const votes: ModelVote[] = AI_MODELS.map(m => {
-        const v = simulateModelVote(m.name, ind5m.rsi, ind5m.mom, ind5m.macd, ind5m.bb, ind5m.vol);
-        return { model: m.name, direction: v.direction, confidence: v.confidence, weight: mw[m.name]?.[asset]?.weight ?? m.defaultWeight };
-      });
+      // Model votes: use real AI analysis if available, fallback to simulated
+      const votes: ModelVote[] = [];
+      for (const m of AI_MODELS) {
+        const realAnalysis = aiAnalysisMap[`${asset}_${m.name}`];
+        if (realAnalysis) {
+          votes.push({
+            model: m.name,
+            direction: realAnalysis.direction as "BULLISH" | "BEARISH" | "NEUTRAL",
+            confidence: realAnalysis.confidence,
+            weight: mw[m.name]?.[asset]?.weight ?? m.defaultWeight,
+          });
+        } else {
+          // Fallback: simulated vote
+          const v = simulateModelVote(m.name, ind5m.rsi, ind5m.mom, ind5m.macd, ind5m.bb, ind5m.vol);
+          votes.push({ model: m.name, direction: v.direction, confidence: v.confidence, weight: mw[m.name]?.[asset]?.weight ?? m.defaultWeight });
+        }
+      }
 
       const consensus = buildConsensus(votes);
       const signalId = crypto.randomUUID();
