@@ -557,58 +557,9 @@ export default function AdminContracts() {
             链上合约配置
           </h2>
 
-          {SWAP_ROUTER_ADDRESS && (
-            <ContractSection
-              title="SwapRouter (V2)"
-              icon={<ArrowRightLeft className="h-4 w-4 text-blue-400" />}
-              address={SWAP_ROUTER_ADDRESS}
-              items={swapRouter.data}
-              loading={swapRouter.loading}
-              error={swapRouter.error}
-              onRefresh={swapRouter.refresh}
-            />
-          )}
-
-          {NODE_V2_CONTRACT_ADDRESS && (
-            <ContractSection
-              title="NodesV2 节点合约"
-              icon={<Zap className="h-4 w-4 text-green-400" />}
-              address={NODE_V2_CONTRACT_ADDRESS}
-              items={nodesV2.data}
-              loading={nodesV2.loading}
-              error={nodesV2.error}
-              onRefresh={nodesV2.refresh}
-            />
-          )}
-
-          {NODE_CONTRACT_ADDRESS && (
-            <ContractSection
-              title="NodesV1 节点合约"
-              icon={<Zap className="h-4 w-4 text-yellow-400" />}
-              address={NODE_CONTRACT_ADDRESS}
-              items={nodesV1.data}
-              loading={nodesV1.loading}
-              error={nodesV1.error}
-              onRefresh={nodesV1.refresh}
-              defaultOpen={false}
-            />
-          )}
-
-          {FUND_MANAGER_ADDRESS && (
-            <ContractSection
-              title="资金分配合约"
-              icon={<Wallet className="h-4 w-4 text-purple-400" />}
-              address={FUND_MANAGER_ADDRESS}
-              items={fundManager.data}
-              loading={fundManager.loading}
-              error={fundManager.error}
-              onRefresh={fundManager.refresh}
-            />
-          )}
-
           {/* V3 Contracts */}
           <ContractSection
-            title="V3 金库合约 (Vault)"
+            title="金库合约 (Vault)"
             icon={<Shield className="h-4 w-4 text-cyan-400" />}
             address={VAULT_V3_ADDRESS}
             items={v3Vault.data}
@@ -618,7 +569,7 @@ export default function AdminContracts() {
           />
 
           <ContractSection
-            title="V3 价格预言机 (Oracle)"
+            title="价格预言机 (Oracle)"
             icon={<Zap className="h-4 w-4 text-amber-400" />}
             address={PRICE_ORACLE_ADDRESS}
             items={v3Oracle.data}
@@ -631,7 +582,7 @@ export default function AdminContracts() {
           {isSuperAdmin && <OracleAdminPanel onPriceUpdated={v3Oracle.refresh} />}
 
           <ContractSection
-            title="V3 利息引擎 (Engine)"
+            title="利息引擎 (Engine)"
             icon={<Zap className="h-4 w-4 text-orange-400" />}
             address={ENGINE_ADDRESS}
             items={[
@@ -643,30 +594,54 @@ export default function AdminContracts() {
             defaultOpen={false}
           />
 
-          {/* Splitter + Vault Flow */}
+          {NODE_V2_CONTRACT_ADDRESS && (
+            <ContractSection
+              title="节点合约 (NodesV2)"
+              icon={<Zap className="h-4 w-4 text-green-400" />}
+              address={NODE_V2_CONTRACT_ADDRESS}
+              items={nodesV2.data}
+              loading={nodesV2.loading}
+              error={nodesV2.error}
+              onRefresh={nodesV2.refresh}
+            />
+          )}
+
+          {SWAP_ROUTER_ADDRESS && (
+            <ContractSection
+              title="SwapRouter"
+              icon={<ArrowRightLeft className="h-4 w-4 text-blue-400" />}
+              address={SWAP_ROUTER_ADDRESS}
+              items={swapRouter.data}
+              loading={swapRouter.loading}
+              error={swapRouter.error}
+              onRefresh={swapRouter.refresh}
+              defaultOpen={false}
+            />
+          )}
+
+          {/* Splitter + Flow Diagrams */}
           {isSuperAdmin && <SplitterPanel />}
           <VaultFlowDiagram />
+          <NodeFlowDiagram />
 
-          {/* Deployed addresses summary */}
+          {/* Deployed addresses */}
           <ContractSection
             title="已部署合约地址"
             icon={<FileCode2 className="h-4 w-4 text-foreground/40" />}
             address=""
             items={[
-              { label: "USDT (BSC)", value: USDT_ADDRESS, type: "address" },
-              { label: "USDC (BSC)", value: USDC_ADDRESS, type: "address" },
-              { label: "MA Token (V3)", value: MA_TOKEN_ADDRESS || "未配置", type: MA_TOKEN_ADDRESS ? "address" : "text" },
-              { label: "cUSD (V3)", value: CUSD_ADDRESS || "未配置", type: CUSD_ADDRESS ? "address" : "text" },
-              { label: "Oracle (V3)", value: PRICE_ORACLE_ADDRESS || "未配置", type: PRICE_ORACLE_ADDRESS ? "address" : "text" },
-              { label: "Vault (V3)", value: VAULT_V3_ADDRESS || "未配置", type: VAULT_V3_ADDRESS ? "address" : "text" },
-              { label: "Engine (V3)", value: ENGINE_ADDRESS || "未配置", type: ENGINE_ADDRESS ? "address" : "text" },
-              { label: "Release (V3)", value: RELEASE_ADDRESS || "未配置", type: RELEASE_ADDRESS ? "address" : "text" },
-              { label: "Gateway (V3)", value: GATEWAY_ADDRESS || "未配置", type: GATEWAY_ADDRESS ? "address" : "text" },
-              { label: "Splitter (V3)", value: SPLITTER_ADDRESS || "未配置", type: SPLITTER_ADDRESS ? "address" : "text" },
-              { label: "SwapRouter V2", value: SWAP_ROUTER_ADDRESS || "未配置", type: SWAP_ROUTER_ADDRESS ? "address" : "text" },
-              { label: "NodesV2", value: NODE_V2_CONTRACT_ADDRESS || "未配置", type: NODE_V2_CONTRACT_ADDRESS ? "address" : "text" },
-              { label: "NodesV1", value: NODE_CONTRACT_ADDRESS || "未配置", type: NODE_CONTRACT_ADDRESS ? "address" : "text" },
-              { label: "FundManager", value: FUND_MANAGER_ADDRESS, type: "address" },
+              { label: "USDT", value: USDT_ADDRESS, type: "address" },
+              { label: "USDC", value: USDC_ADDRESS, type: "address" },
+              { label: "MA Token", value: MA_TOKEN_ADDRESS, type: "address" },
+              { label: "cUSD", value: CUSD_ADDRESS, type: "address" },
+              { label: "Oracle", value: PRICE_ORACLE_ADDRESS, type: "address" },
+              { label: "Vault", value: VAULT_V3_ADDRESS, type: "address" },
+              { label: "Engine", value: ENGINE_ADDRESS, type: "address" },
+              { label: "Release", value: RELEASE_ADDRESS, type: "address" },
+              { label: "Gateway", value: GATEWAY_ADDRESS, type: "address" },
+              { label: "Splitter", value: SPLITTER_ADDRESS, type: "address" },
+              { label: "SwapRouter", value: SWAP_ROUTER_ADDRESS, type: "address" },
+              { label: "NodesV2", value: NODE_V2_CONTRACT_ADDRESS, type: "address" },
             ]}
             loading={false}
             onRefresh={() => {}}
@@ -1017,42 +992,71 @@ function VaultFlowDiagram() {
   ];
 
   return (
+    <FlowDiagram
+      title="金库存入链路"
+      icon={<Wallet className="h-4 w-4 text-primary/60" />}
+      flows={[
+        { label: "资金流向 (USDC)", steps },
+        { label: "MA 铸造流向", steps: vaultSteps },
+      ]}
+    />
+  );
+}
+
+function NodeFlowDiagram() {
+  const nodeSteps = [
+    { label: "用户钱包", addr: "USDT", color: "text-blue-400", bg: "bg-blue-500/10" },
+    { label: "SwapRouter", addr: "0x5650...7E3", color: "text-purple-400", bg: "bg-purple-500/10" },
+    { label: "PancakeSwap", addr: "USDT→USDC", color: "text-pink-400", bg: "bg-pink-500/10" },
+    { label: "NodesV2", addr: "0x17DD...cE2", color: "text-green-400", bg: "bg-green-500/10" },
+    { label: "FundManager", addr: "资金分配", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  ];
+  const nodeResult = [
+    { label: "NodesV2", addr: "记录购买", color: "text-green-400", bg: "bg-green-500/10" },
+    { label: "DB", addr: "node_memberships", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+    { label: "用户", addr: "节点激活", color: "text-amber-400", bg: "bg-amber-500/10" },
+  ];
+
+  return (
+    <FlowDiagram
+      title="节点购买链路"
+      icon={<Zap className="h-4 w-4 text-green-400/60" />}
+      flows={[
+        { label: "资金流向 (USDT → USDC)", steps: nodeSteps },
+        { label: "节点激活", steps: nodeResult },
+      ]}
+    />
+  );
+}
+
+function FlowDiagram({ title, icon, flows }: {
+  title: string;
+  icon: React.ReactNode;
+  flows: { label: string; steps: { label: string; addr: string; color: string; bg: string }[] }[];
+}) {
+  return (
     <div className="rounded-xl border border-white/[0.06] overflow-hidden" style={{ background: "rgba(255,255,255,0.01)" }}>
       <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-2">
-        <Wallet className="h-4 w-4 text-primary/60" />
-        <span className="text-[13px] font-bold text-foreground/80">金库存入链路</span>
+        {icon}
+        <span className="text-[13px] font-bold text-foreground/80">{title}</span>
       </div>
       <div className="p-4 space-y-4">
-        {/* USDC flow */}
-        <div>
-          <p className="text-[10px] text-foreground/30 mb-2">资金流向 (USDC)</p>
-          <div className="flex items-center gap-1 overflow-x-auto pb-1">
-            {steps.map((s, i) => (
-              <div key={i} className="flex items-center shrink-0">
-                <div className={`px-2 py-1.5 rounded-lg ${s.bg} text-center`}>
-                  <div className={`text-[10px] font-bold ${s.color}`}>{s.label}</div>
-                  <div className="text-[8px] text-foreground/25 font-mono">{s.addr}</div>
+        {flows.map((flow, fi) => (
+          <div key={fi}>
+            <p className="text-[10px] text-foreground/30 mb-2">{flow.label}</p>
+            <div className="flex items-center gap-1 overflow-x-auto pb-1">
+              {flow.steps.map((s, i) => (
+                <div key={i} className="flex items-center shrink-0">
+                  <div className={`px-2 py-1.5 rounded-lg ${s.bg} text-center`}>
+                    <div className={`text-[10px] font-bold ${s.color}`}>{s.label}</div>
+                    <div className="text-[8px] text-foreground/25 font-mono">{s.addr}</div>
+                  </div>
+                  {i < flow.steps.length - 1 && <span className="text-[10px] text-foreground/15 mx-0.5">→</span>}
                 </div>
-                {i < steps.length - 1 && <span className="text-[10px] text-foreground/15 mx-0.5">→</span>}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-        {/* MA flow */}
-        <div>
-          <p className="text-[10px] text-foreground/30 mb-2">MA 铸造流向</p>
-          <div className="flex items-center gap-1 overflow-x-auto pb-1">
-            {vaultSteps.map((s, i) => (
-              <div key={i} className="flex items-center shrink-0">
-                <div className={`px-2 py-1.5 rounded-lg ${s.bg} text-center`}>
-                  <div className={`text-[10px] font-bold ${s.color}`}>{s.label}</div>
-                  <div className="text-[8px] text-foreground/25 font-mono">{s.addr}</div>
-                </div>
-                {i < vaultSteps.length - 1 && <span className="text-[10px] text-foreground/15 mx-0.5">→</span>}
-              </div>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
