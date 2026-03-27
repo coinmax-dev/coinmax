@@ -7,9 +7,11 @@ import { readContract, prepareContractCall, waitForReceipt } from "thirdweb";
 import { approve } from "thirdweb/extensions/erc20";
 import { useQuery } from "@tanstack/react-query";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
-import { getMATokenContract, getPriceOracleContract, MA_TOKEN_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
+import { getMATokenContract, getPriceOracleContract, getUsdtContract, MA_TOKEN_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
+import { transfer } from "thirdweb/extensions/erc20";
 import { createChart, ColorType, CrosshairMode, LineStyle, type UTCTimestamp } from "lightweight-charts";
 import { ProfileNav } from "@/components/profile-nav";
+import { queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
 // ─── Price Chart ────────────────────────────────────────────
@@ -225,9 +227,12 @@ function MAPriceChart() {
 function MASwap() {
   const account = useActiveAccount();
   const { client } = useThirdwebClient();
+  const { mutateAsync: sendTransaction } = useSendTransaction();
   const [maAmount, setMaAmount] = useState("");
   const [outputToken, setOutputToken] = useState<"USDT" | "USDC">("USDT");
   const [isSwapped, setIsSwapped] = useState(false);
+  const [swapStatus, setSwapStatus] = useState<"idle" | "transferring" | "recording" | "success" | "error">("idle");
+  const [swapError, setSwapError] = useState("");
 
   const { data: maBalanceRaw } = useQuery({
     queryKey: ["ma-balance", account?.address],
@@ -257,6 +262,67 @@ function MASwap() {
   const inputAmount = parseFloat(maAmount) || 0;
   const outputAmount = isSwapped ? inputAmount / maPrice : inputAmount * maPrice;
   const exceedsQuota = !isSwapped && inputAmount > swapQuota;
+  const fee = inputAmount * maPrice * 0.003;
+  const isBusy = swapStatus === "transferring" || swapStatus === "recording";
+
+  // Swap history
+  const { data: swapHistory } = useQuery({
+    queryKey: ["ma-swap-history", account?.address],
+    queryFn: async () => {
+      if (!account?.address) return [];
+      const { data } = await import("@/lib/supabase").then(m =>
+        m.supabase.from("ma_swap_records").select("*").eq("wallet_address", account!.address).order("created_at", { ascending: false }).limit(10)
+      );
+      return data || [];
+    },
+    enabled: !!account?.address,
+  });
+
+  const handleSwap = async () => {
+    if (!account || !client || inputAmount <= 0 || exceedsQuota) return;
+    const receiverAddress = import.meta.env.VITE_VIP_RECEIVER_ADDRESS || "0x93F655C3C6B595600fc735118dcEE10cd63d4C8f";
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+    setSwapError("");
+    try {
+      setSwapStatus("transferring");
+
+      // MA→USDT: transfer MA; USDT→MA: transfer USDT
+      const contract = isSwapped ? getUsdtContract(client) : getMATokenContract(client);
+      const tx = transfer({ contract, to: receiverAddress, amount: inputAmount });
+      const result = await sendTransaction(tx);
+      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
+      if (receipt.status === "reverted") throw new Error("Transaction reverted");
+
+      // Record via edge function
+      setSwapStatus("recording");
+      const resp = await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: account.address,
+          txHash: receipt.transactionHash,
+          direction: isSwapped ? "buy" : "sell",
+          maAmount: inputAmount,
+          outputToken,
+          maPrice,       // oracle price follows K-line
+          maBalance,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Swap failed");
+
+      setSwapStatus("success");
+      setMaAmount("");
+      queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["ma-swap-history"] });
+      setTimeout(() => setSwapStatus("idle"), 3000);
+    } catch (err: any) {
+      setSwapError(err.message || "Swap failed");
+      setSwapStatus("error");
+      setTimeout(() => setSwapStatus("idle"), 5000);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -357,18 +423,66 @@ function MASwap() {
           </div>
         )}
 
+        {/* Fee + status */}
+        {inputAmount > 0 && !exceedsQuota && (
+          <div className="flex justify-between text-[9px] mt-1 px-0.5">
+            <span className="text-white/25">手续费</span>
+            <span className="text-white/40 font-mono">${fee.toFixed(4)}</span>
+          </div>
+        )}
+
+        {swapStatus === "success" && (
+          <div className="mt-2 text-center text-[11px] text-green-400 bg-green-500/8 rounded-lg py-1.5">闪兑成功</div>
+        )}
+        {swapStatus === "error" && swapError && (
+          <div className="mt-2 text-[10px] text-red-300 bg-red-500/8 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+            <Info className="h-3 w-3 text-red-400 shrink-0 mt-0.5" />
+            {swapError}
+          </div>
+        )}
+
         <button
-          disabled={!account || inputAmount <= 0 || exceedsQuota}
+          onClick={handleSwap}
+          disabled={!account || inputAmount <= 0 || exceedsQuota || isBusy}
           className={cn(
             "w-full mt-3 py-3 rounded-xl text-[13px] font-bold transition-all",
-            !account || exceedsQuota || inputAmount <= 0
+            !account || exceedsQuota || inputAmount <= 0 || isBusy
               ? "bg-white/5 text-white/20"
               : "bg-primary text-black hover:bg-primary/90 active:scale-[0.98]"
           )}
         >
-          {!account ? "连接钱包" : exceedsQuota ? "超出额度" : inputAmount <= 0 ? "输入数量" : isSwapped ? "买入 MA" : `闪兑 ${outputToken}`}
+          {isBusy
+            ? (swapStatus === "transferring" ? "转账中..." : "记录中...")
+            : !account ? "连接钱包"
+            : exceedsQuota ? "超出额度"
+            : inputAmount <= 0 ? "输入数量"
+            : isSwapped ? "买入 MA"
+            : `闪兑 ${outputToken}`}
         </button>
       </div>
+
+      {/* Swap History */}
+      {swapHistory && swapHistory.length > 0 && (
+        <div className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <h3 className="text-[11px] font-bold text-white/40 mb-2">闪兑记录</h3>
+          <div className="space-y-1.5">
+            {swapHistory.map((s: any) => (
+              <div key={s.id} className="flex items-center justify-between px-1.5 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors">
+                <div className="flex items-center gap-1.5">
+                  <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded", s.direction === "sell" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400")}>
+                    {s.direction === "sell" ? "卖出" : "买入"}
+                  </span>
+                  <span className="text-[11px] text-white/50 font-mono">{Number(s.ma_amount).toFixed(2)} MA</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] text-white/40 font-mono">${Number(s.usd_amount).toFixed(2)}</span>
+                  <p className="text-[8px] text-white/15">{new Date(s.created_at).toLocaleDateString("zh-CN")}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
