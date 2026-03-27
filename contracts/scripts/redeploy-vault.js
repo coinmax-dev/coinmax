@@ -37,19 +37,19 @@ async function main() {
   console.log("   Implementation:", implAddr);
 
   // 2. Prepare initialize calldata
-  // initialize(address _cUsd, address _maToken, address _priceOracle, uint256 _initialPrice, address _admin, address _gateway)
+  // initialize(address _cUsd, address _maToken, address _admin, address _gateway, address _engine, uint256 _maPrice)
   const initData = VaultFactory.interface.encodeFunctionData("initialize", [
-    CUSD,        // cUSD
-    MA_TOKEN,    // MA Token
-    ORACLE,      // Price Oracle
-    530000,      // initial MA price ($0.53, 6 decimals)
-    deployer.address, // admin (will transfer to server wallet)
-    GATEWAY,     // gateway
+    CUSD,              // _cUsd
+    MA_TOKEN,          // _maToken
+    deployer.address,  // _admin
+    GATEWAY,           // _gateway
+    ENGINE,            // _engine
+    530000,            // _maPrice ($0.53, 6 decimals)
   ]);
 
   // 3. Deploy proxy
   console.log("\n2. Deploying ERC1967Proxy...");
-  const ProxyFactory = await ethers.getContractFactory("contracts/node_modules/@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy");
+  const ProxyFactory = await ethers.getContractFactory("ERC1967Proxy");
   const proxy = await ProxyFactory.deploy(implAddr, initData);
   await proxy.waitForDeployment();
   const proxyAddr = await proxy.getAddress();
