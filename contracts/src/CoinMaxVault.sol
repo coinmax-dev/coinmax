@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -25,6 +26,21 @@ interface IMAPriceOracle {
 /// @notice Interface for cUSD token (burn for accounting cleanup)
 interface ICUSD {
     function burn(uint256 amount) external;
+}
+
+/// @notice Interface for MA token burn (optional)
+interface IMATokenBurnable {
+    function burn(uint256 amount) external;
+}
+
+/// @notice Cross-chain bridge adapter (for ARB/HyperLiquid vault bridging)
+interface IBridgeAdapterVault {
+    function sendTokens(
+        uint32 dstChainId,
+        address recipient,
+        uint256 amount,
+        bytes calldata options
+    ) external payable returns (bytes32 messageId);
 }
 
 /// @title CoinMax Vault (ERC4626 Upgradeable)
@@ -55,7 +71,8 @@ contract CoinMaxVault is
     ERC4626Upgradeable,
     AccessControlUpgradeable,
     ReentrancyGuard,
-    PausableUpgradeable
+    PausableUpgradeable,
+    UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
 
@@ -106,8 +123,26 @@ contract CoinMaxVault is
     uint256 public totalMAStaked;
     uint256 public totalCUsdDeposited;
 
-    // ─── Gap for future upgrades ────────────────────────────────────
-    uint256[40] private __gap;
+    // ─── V2 Storage (cross-chain + fund distribution) ─────────────
+    //     Uses __gap slots — append only, never reorder
+
+    /// @notice Fund distributor contract (receives USDC for distribution)
+    address public fundDistributor;
+
+    /// @notice Cross-chain bridge adapter (for ARB/HyperLiquid bridging)
+    address public bridgeAdapter;
+
+    /// @notice Destination chain ID for cross-chain vault (e.g. 42161 = Arbitrum)
+    uint32 public dstChainId;
+
+    /// @notice Remote vault address on destination chain
+    address public remoteVault;
+
+    /// @notice Early exit penalty rate in basis points (2000 = 20%)
+    uint256 public earlyExitPenaltyBps;
+
+    // ─── Gap for future upgrades (reduced by 5 for new storage above)
+    uint256[35] private __gap;
 
     // ═══════════════════════════════════════════════════════════════════
     //  EVENTS
@@ -123,6 +158,9 @@ contract CoinMaxVault is
         uint256 timestamp
     );
     event PrincipalClaimed(address indexed user, uint256 stakeIndex, uint256 maAmount);
+    event EarlyPrincipalClaimed(address indexed user, uint256 stakeIndex, uint256 maReleased, uint256 maBurned);
+    event FundsDistributed(address indexed token, uint256 amount, address indexed distributor);
+    event CrossChainBridged(address indexed user, uint256 amount, uint32 dstChainId, address remoteVault);
     event InterestTimeAdvanced(address indexed user, uint256 stakeIndex, uint256 newTime);
     event MAPriceUpdated(uint256 oldPrice, uint256 newPrice);
     event PlanAdded(uint256 index, uint256 duration, uint256 dailyRate);
@@ -159,7 +197,7 @@ contract CoinMaxVault is
         __ERC4626_init(IERC20(_cUsd));
         __ERC20_init("CoinMax Vault Share", "cmVault");
         __AccessControl_init();
-        // ReentrancyGuard (OZ5) does not need init
+        // ReentrancyGuard + UUPSUpgradeable (OZ5) do not need init
         __Pausable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
@@ -263,6 +301,87 @@ contract CoinMaxVault is
         emit PrincipalClaimed(msg.sender, stakeIndex, pos.maAmount);
     }
 
+    /// @notice Early redeem before maturity — user gets (100% - penalty) MA, rest burned
+    /// @param stakeIndex Index of the stake position
+    function earlyClaimPrincipal(uint256 stakeIndex) external nonReentrant whenNotPaused {
+        require(stakeIndex < userStakes[msg.sender].length, "Invalid index");
+        StakePosition storage pos = userStakes[msg.sender][stakeIndex];
+        require(!pos.principalClaimed, "Already claimed");
+
+        StakePlan storage plan = stakePlans[pos.planIndex];
+        require(block.timestamp < pos.startTime + plan.duration, "Already matured, use claimPrincipal");
+
+        pos.principalClaimed = true;
+        totalMAStaked -= pos.maAmount;
+
+        // Configurable penalty (default 2000 = 20%)
+        uint256 penalty = earlyExitPenaltyBps > 0 ? earlyExitPenaltyBps : 2000;
+        uint256 releaseAmount = (pos.maAmount * (10000 - penalty)) / 10000;
+        uint256 burnAmount = pos.maAmount - releaseAmount;
+
+        // Transfer released portion to user
+        maToken.transfer(msg.sender, releaseAmount);
+
+        // Burn penalty portion
+        if (burnAmount > 0) {
+            try IMATokenBurnable(address(maToken)).burn(burnAmount) {}
+            catch {
+                maToken.transfer(address(0x000000000000000000000000000000000000dEaD), burnAmount);
+            }
+        }
+
+        _burn(msg.sender, pos.cUsdShares);
+        ICUSD(asset()).burn(pos.cUsdDeposited);
+
+        emit EarlyPrincipalClaimed(msg.sender, stakeIndex, releaseAmount, burnAmount);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  FUND DISTRIBUTION — send vault funds to distributor
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Send USDC/cUSD from vault to fund distributor contract
+    /// @param token Token to distribute (USDC or cUSD)
+    /// @param amount Amount to send
+    function distributeFunds(
+        address token,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant whenNotPaused {
+        require(fundDistributor != address(0), "Distributor not set");
+        require(amount > 0, "Zero amount");
+
+        IERC20(token).safeTransfer(fundDistributor, amount);
+        emit FundsDistributed(token, amount, fundDistributor);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  CROSS-CHAIN — bridge funds to remote vault (ARB/HyperLiquid)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Bridge USDC to remote vault on destination chain
+    /// @param amount USDC amount to bridge
+    /// @param bridgeOptions Encoded bridge parameters
+    function bridgeToRemoteVault(
+        uint256 amount,
+        bytes calldata bridgeOptions
+    ) external payable onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant whenNotPaused {
+        require(bridgeAdapter != address(0), "Bridge not set");
+        require(remoteVault != address(0), "Remote vault not set");
+        require(dstChainId > 0, "Dst chain not set");
+        require(amount > 0, "Zero amount");
+
+        // Approve bridge adapter to spend USDC
+        address usdc = asset(); // cUSD in this vault, but could also bridge actual USDC
+        IERC20(usdc).approve(bridgeAdapter, amount);
+
+        // Call bridge adapter
+        IBridgeAdapterVault(bridgeAdapter).sendTokens{value: msg.value}(
+            dstChainId, remoteVault, amount, bridgeOptions
+        );
+
+        emit CrossChainBridged(msg.sender, amount, dstChainId, remoteVault);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //  ENGINE INTERFACE — called by CoinMaxInterestEngine
     // ═══════════════════════════════════════════════════════════════════
@@ -361,6 +480,28 @@ contract CoinMaxVault is
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) { _pause(); }
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) { _unpause(); }
+
+    /// @dev Required by UUPSUpgradeable — only admin can upgrade
+    function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+
+    function setFundDistributor(address _d) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_d != address(0), "Invalid");
+        fundDistributor = _d;
+    }
+
+    function setBridgeAdapter(address _b) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bridgeAdapter = _b;
+    }
+
+    function setRemoteVault(address _r, uint32 _chainId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        remoteVault = _r;
+        dstChainId = _chainId;
+    }
+
+    function setEarlyExitPenalty(uint256 _bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_bps <= 5000, "Max 50%");
+        earlyExitPenaltyBps = _bps;
+    }
 
     function emergencyWithdraw(
         address token,
