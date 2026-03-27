@@ -3,12 +3,14 @@ import { ArrowLeft, ArrowDownUp, Info, Wallet } from "lucide-react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
-import { readContract, prepareContractCall, waitForReceipt } from "thirdweb";
+import { readContract, prepareContractCall, waitForReceipt, getContract } from "thirdweb";
 import { approve } from "thirdweb/extensions/erc20";
 import { useQuery } from "@tanstack/react-query";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
-import { getMATokenContract, getUsdtContract, MA_TOKEN_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
+import { getMATokenContract, getUsdtContract, MA_TOKEN_ADDRESS, RELEASE_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
 import { transfer } from "thirdweb/extensions/erc20";
+import { supabase } from "@/lib/supabase";
+import { VAULT_PLANS } from "@/lib/data";
 import { useMaPrice } from "@/hooks/use-ma-price";
 import { createChart, ColorType, CrosshairMode, LineStyle, type UTCTimestamp } from "lightweight-charts";
 import { ProfileNav } from "@/components/profile-nav";
@@ -534,6 +536,12 @@ export default function ProfileMAPage() {
             <MAPriceChart />
           </div>
 
+          {/* Vault Redeem */}
+          <VaultRedeemSection />
+
+          {/* MA Release (profit distribution) */}
+          <MAReleaseSection />
+
           {/* Swap */}
           <MASwap />
         </div>
@@ -541,3 +549,145 @@ export default function ProfileMAPage() {
     </div>
   );
 }
+
+// ─── Vault Redeem ────────────────────────────────────────────
+
+function VaultRedeemSection() {
+  const account = useActiveAccount();
+  const { price: maPrice } = useMaPrice();
+  const [redeeming, setRedeeming] = useState<string | null>(null);
+
+  const { data: positions = [], refetch } = useQuery({
+    queryKey: ["vault-positions-ma", account?.address],
+    queryFn: async () => {
+      if (!account?.address) return [];
+      const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", account.address).single();
+      if (!profile) return [];
+      const { data } = await supabase.from("vault_positions").select("*").eq("user_id", profile.id).eq("status", "ACTIVE").order("created_at", { ascending: false });
+      return data || [];
+    },
+    enabled: !!account?.address,
+  });
+
+  if (!account || positions.length === 0) return null;
+
+  const handleRedeem = async (pos: any) => {
+    setRedeeming(pos.id);
+    try {
+      const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", account!.address).single();
+      if (!profile) throw new Error("Profile not found");
+
+      // Call vault_withdraw RPC
+      const { error } = await supabase.rpc("vault_withdraw", { addr: account!.address, pos_id: pos.id });
+      if (error) throw error;
+
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    } catch (e: any) {
+      console.error("Redeem failed:", e);
+    } finally {
+      setRedeeming(null);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <h3 className="text-[12px] font-bold text-white/50 mb-2">金库锁仓赎回</h3>
+      <div className="space-y-2">
+        {positions.map((pos: any) => {
+          const principal = Number(pos.principal);
+          const totalMA = principal / maPrice;
+          const end = pos.end_date ? new Date(pos.end_date) : null;
+          const now = new Date();
+          const isEarly = end ? now < end : false;
+          const daysLeft = end ? Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400_000)) : 0;
+          const penaltyMA = isEarly ? totalMA * 0.20 : 0;
+          const receiveMA = totalMA - penaltyMA;
+          const planConfig = VAULT_PLANS[pos.plan_type as keyof typeof VAULT_PLANS];
+
+          return (
+            <div key={pos.id} className="rounded-xl bg-white/[0.03] border border-white/[0.05] p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-bold text-white/70">${principal} USDT</span>
+                  <span className="text-[10px] text-white/30">{planConfig?.label || pos.plan_type}</span>
+                </div>
+                <span className={cn("text-[10px] font-semibold", isEarly ? "text-yellow-400" : "text-green-400")}>
+                  {isEarly ? `${daysLeft}天后到期` : "已到期"}
+                </span>
+              </div>
+
+              <div className="text-[10px] space-y-1 text-white/40">
+                <div className="flex justify-between">
+                  <span>铸造 MA</span>
+                  <span className="font-mono text-white/60">{totalMA.toFixed(2)} MA</span>
+                </div>
+                {isEarly && (
+                  <div className="flex justify-between text-red-400/80">
+                    <span>提前罚金 (20%)</span>
+                    <span className="font-mono">-{penaltyMA.toFixed(2)} MA</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-white/60 font-semibold pt-1 border-t border-white/[0.05]">
+                  <span>赎回获得</span>
+                  <span className="font-mono text-primary">{receiveMA.toFixed(2)} MA</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleRedeem(pos)}
+                disabled={redeeming === pos.id}
+                className={cn(
+                  "w-full py-2 rounded-lg text-[11px] font-bold transition-all",
+                  redeeming === pos.id ? "bg-white/5 text-white/20" : "bg-primary/10 text-primary hover:bg-primary/20"
+                )}
+              >
+                {redeeming === pos.id ? "赎回中..." : isEarly ? "提前赎回 (获得80% MA)" : "赎回 (100% MA)"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── MA Release (profit distribution) ────────────────────────
+
+function MAReleaseSection() {
+  const account = useActiveAccount();
+  const { client } = useThirdwebClient();
+
+  const { data: accumulatedRaw } = useQuery({
+    queryKey: ["ma-accumulated-section", account?.address],
+    queryFn: async () => {
+      if (!account?.address || !client || !RELEASE_ADDRESS) return BigInt(0);
+      const contract = getContract({ client, chain: BSC_CHAIN, address: RELEASE_ADDRESS });
+      return readContract({ contract, method: "function accumulated(address) view returns (uint256)", params: [account.address] });
+    },
+    enabled: !!account?.address && !!client && !!RELEASE_ADDRESS,
+    refetchInterval: 15000,
+  });
+
+  const accumulated = Number(accumulatedRaw || BigInt(0)) / 1e18;
+
+  if (!account || accumulated <= 0) return null;
+
+  return (
+    <div className="rounded-2xl p-3.5" style={{ background: "rgba(0,188,165,0.04)", border: "1px solid rgba(0,188,165,0.12)" }}>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[12px] font-bold text-white/50">MA 盈利分红</h3>
+        <span className="text-[13px] font-bold font-mono text-primary">{accumulated.toFixed(2)} MA</span>
+      </div>
+      <p className="text-[10px] text-white/30 mb-2">可提取的利息收益，选择释放方案后进入线性释放</p>
+      <button
+        onClick={() => window.location.href = "/vault"}
+        className="w-full py-2 rounded-lg text-[11px] font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+      >
+        前往金库提取 →
+      </button>
+    </div>
+  );
+}
+

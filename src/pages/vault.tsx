@@ -439,11 +439,11 @@ export default function Vault() {
           <Button
             variant="secondary"
             className="flex-1 min-w-0 text-xs sm:text-sm px-2 sm:px-4 h-9 sm:h-10"
-            onClick={() => setRedeemOpen(true)}
+            onClick={() => window.location.href = "/profile/ma"}
             data-testid="button-redeem-vault"
           >
             <ArrowUpFromLine className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-            <span className="truncate">{t("vault.redeemFromVault")}</span>
+            <span className="truncate">MA 提取 / 赎回</span>
           </Button>
         </div>
       </div>
