@@ -371,19 +371,9 @@ export default function Vault() {
                                 <span className="font-semibold text-sm">${Number(pos.principal).toFixed(0)}</span>
                                 <span className="text-muted-foreground ml-2">{planConfig?.label || pos.planType}</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className={isExpired ? "text-green-400" : "text-yellow-400"}>
-                                  {isExpired ? "可赎回" : `${daysLeft}天后到期`}
-                                </span>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-[10px] h-6 px-2"
-                                  onClick={() => { setSelectedPositionId(pos.id); setRedeemOpen(true); }}
-                                >
-                                  赎回
-                                </Button>
-                              </div>
+                              <span className={isExpired ? "text-green-400" : "text-yellow-400"}>
+                                {isExpired ? "已到期" : `${daysLeft}天后到期`}
+                              </span>
                             </div>
                           );
                         })}
