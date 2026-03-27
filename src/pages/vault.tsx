@@ -118,7 +118,7 @@ export default function Vault() {
   const account = useActiveAccount();
   const walletAddress = account?.address || "";
   const { toast } = useToast();
-  const { formatMA, usdcToMA } = useMaPrice();
+  const { formatMA, usdcToMA, price: maPrice } = useMaPrice();
 
   const [depositOpen, setDepositOpen] = useState(false);
   const [redeemOpen, setRedeemOpen] = useState(false);
@@ -490,34 +490,44 @@ export default function Vault() {
                   const start = new Date(pos.startDate!);
                   const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
                   const principal = Number(pos.principal);
-                  const yieldAmt = principal * Number(pos.dailyRate) * days;
+                  // MA minted at deposit = principal / MA price at deposit time
+                  // For now use current price as approximation
+                  const totalMA = usdcToMA(principal);
+                  const yieldMA = principal * Number(pos.dailyRate) * days / maPrice;
                   const isEarly = pos.endDate && now < new Date(pos.endDate);
-                  const penalty = isEarly ? principal * 0.20 : 0;
-                  const netPrincipal = principal - penalty;
+                  const penaltyMA = isEarly ? totalMA * 0.20 : 0;
+                  const netMA = totalMA - penaltyMA;
                   return (
-                    <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1">
+                    <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1.5">
                       <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground">{t("vault.principal")}</span>
-                        <span>${principal.toFixed(2)}</span>
+                        <span className="text-muted-foreground">存入本金</span>
+                        <span>${principal.toFixed(2)} USDT</span>
                       </div>
                       <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground">{t("vault.yieldDays", { days })}</span>
-                        <span className="text-neon-value">{formatMA(yieldAmt)}</span>
+                        <span className="text-muted-foreground">铸造 MA</span>
+                        <span>{totalMA.toFixed(2)} MA</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">累计利息 ({days}天)</span>
+                        <span className="text-neon-value">+{yieldMA.toFixed(2)} MA</span>
                       </div>
                       {isEarly && (
                         <>
                           <div className="flex justify-between gap-2 text-red-400">
-                            <span>{t("vault.earlyPenalty")}</span>
-                            <span>-${penalty.toFixed(2)} (20%)</span>
+                            <span>提前赎回罚金 (20%)</span>
+                            <span>-{penaltyMA.toFixed(2)} MA</span>
                           </div>
-                          <div className="text-yellow-400 text-[12px]">
-                            {t("vault.earlyWithdrawal")}
+                          <div className="text-[10px] text-yellow-400/80 bg-yellow-500/8 rounded px-2 py-1">
+                            未到期赎回将扣除铸造 MA 的 20%，仅返还 80%
                           </div>
                         </>
                       )}
-                      <div className="flex justify-between gap-2 pt-1 border-t border-border/30">
-                        <span className="text-muted-foreground">{t("vault.total")}</span>
-                        <span className="font-medium">${netPrincipal.toFixed(2)} + {formatMA(yieldAmt)}</span>
+                      <div className="flex justify-between gap-2 pt-1.5 border-t border-border/30">
+                        <span className="font-medium">赎回获得</span>
+                        <span className="font-bold text-primary">{(netMA + yieldMA).toFixed(2)} MA</span>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        ≈ ${((netMA + yieldMA) * maPrice).toFixed(2)} (按当前价 ${maPrice.toFixed(4)})
                       </div>
                     </div>
                   );
