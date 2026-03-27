@@ -513,7 +513,7 @@ export default function ProfileMAPage() {
 
       <div className="flex lg:gap-4">
         <ProfileNav />
-        <div className="flex-1 min-w-0 px-4 lg:px-0 lg:pr-4 space-y-3 max-w-lg mx-auto lg:max-w-none lg:mx-0">
+        <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-0 lg:pr-4 space-y-3 max-w-lg mx-auto lg:max-w-none lg:mx-0 overflow-hidden">
           {/* Price Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-end gap-2">

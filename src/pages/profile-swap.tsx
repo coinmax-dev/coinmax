@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { BridgeWidget } from "thirdweb/react";
 import { getThirdwebClient } from "@/lib/thirdweb";
+import { bsc } from "thirdweb/chains";
 
 export default function ProfileSwapPage() {
   const { t } = useTranslation();
@@ -37,8 +38,8 @@ export default function ProfileSwapPage() {
           >
             <BridgeWidget
               client={client}
+              chain={bsc}
               theme="dark"
-              showThirdwebBranding={false}
             />
           </div>
         ) : (
