@@ -627,6 +627,9 @@ export default function AdminContracts() {
             onRefresh={v3Oracle.refresh}
           />
 
+          {/* Oracle Admin Operations */}
+          {isSuperAdmin && <OracleAdminPanel onPriceUpdated={v3Oracle.refresh} />}
+
           <ContractSection
             title="V3 利息引擎 (Engine)"
             icon={<Zap className="h-4 w-4 text-orange-400" />}
@@ -731,6 +734,188 @@ export default function AdminContracts() {
             })}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Oracle Admin Panel — write operations via thirdweb Server Wallet ──
+
+const THIRDWEB_SECRET = import.meta.env.VITE_THIRDWEB_SECRET_KEY || "";
+const SERVER_WALLET_ADDR = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
+const RELAYER_ADDR = "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA";
+const FEEDER_ROLE_HASH = "0x80a586cc4ecf40a390b370be075aa38ab3cc512c5c1a7bc1007974dbdf2663c7";
+
+async function callServerWallet(calls: { contractAddress: string; method: string; params: string[] }[]) {
+  const res = await fetch("https://api.thirdweb.com/v1/contracts/write", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-secret-key": THIRDWEB_SECRET },
+    body: JSON.stringify({ chainId: 56, from: SERVER_WALLET_ADDR, calls }),
+  });
+  return res.json();
+}
+
+function OracleAdminPanel({ onPriceUpdated }: { onPriceUpdated: () => void }) {
+  const { toast } = useToast();
+  const [newPrice, setNewPrice] = useState("");
+  const [maxChangeRate, setMaxChangeRate] = useState("");
+  const [grantAddress, setGrantAddress] = useState(RELAYER_ADDR);
+  const [busy, setBusy] = useState("");
+
+  const exec = async (label: string, calls: { contractAddress: string; method: string; params: string[] }[]) => {
+    setBusy(label);
+    try {
+      const data = await callServerWallet(calls);
+      const txId = data?.result?.transactionIds?.[0];
+      if (txId) {
+        toast({ title: `${label} 已提交`, description: `TX: ${txId}` });
+        setTimeout(onPriceUpdated, 8000);
+      } else {
+        toast({ title: `${label} 失败`, description: JSON.stringify(data.error || data), variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "错误", description: e.message, variant: "destructive" });
+    } finally {
+      setBusy("");
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-amber-500/15 overflow-hidden" style={{ background: "rgba(234,179,8,0.02)" }}>
+      <div className="px-4 py-3 border-b border-amber-500/10 flex items-center gap-2">
+        <Zap className="h-4 w-4 text-amber-400" />
+        <span className="text-[13px] font-bold text-foreground/80">Oracle 管理操作</span>
+        <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20">Server Wallet</Badge>
+      </div>
+      <div className="p-4 space-y-4">
+        {/* Emergency Set Price */}
+        <div>
+          <label className="text-[11px] text-foreground/40 mb-1 block">紧急设置价格 (emergencySetPrice)</label>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              step="0.0001"
+              placeholder="输入美元价格 (如 0.53)"
+              value={newPrice}
+              onChange={(e) => setNewPrice(e.target.value)}
+              className="text-sm font-mono"
+            />
+            <Button
+              size="sm"
+              disabled={!newPrice || !!busy}
+              onClick={() => {
+                const raw = Math.round(parseFloat(newPrice) * 1e6);
+                exec("设置价格", [{
+                  contractAddress: PRICE_ORACLE_ADDRESS,
+                  method: "function emergencySetPrice(uint256 _price)",
+                  params: [raw.toString()],
+                }]);
+              }}
+            >
+              {busy === "设置价格" ? "提交中..." : "设置"}
+            </Button>
+          </div>
+          <p className="text-[9px] text-foreground/20 mt-1">绕过涨跌幅限制，立即生效。6位精度（530000 = $0.53）</p>
+        </div>
+
+        {/* Set Max Change Rate */}
+        <div>
+          <label className="text-[11px] text-foreground/40 mb-1 block">设置最大涨跌幅 (setMaxChangeRate)</label>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              placeholder="基点 (5000 = 50%)"
+              value={maxChangeRate}
+              onChange={(e) => setMaxChangeRate(e.target.value)}
+              className="text-sm font-mono"
+            />
+            <Button
+              size="sm"
+              disabled={!maxChangeRate || !!busy}
+              onClick={() => exec("设置涨跌幅", [{
+                contractAddress: PRICE_ORACLE_ADDRESS,
+                method: "function setMaxChangeRate(uint256 _bps)",
+                params: [maxChangeRate],
+              }])}
+            >
+              {busy === "设置涨跌幅" ? "提交中..." : "设置"}
+            </Button>
+          </div>
+          <p className="text-[9px] text-foreground/20 mt-1">1000=10%, 5000=50%。影响 updatePrice 的单次最大变化</p>
+        </div>
+
+        {/* Grant FEEDER_ROLE */}
+        <div>
+          <label className="text-[11px] text-foreground/40 mb-1 block">授权 FEEDER_ROLE (grantRole)</label>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="钱包地址"
+              value={grantAddress}
+              onChange={(e) => setGrantAddress(e.target.value)}
+              className="text-sm font-mono"
+            />
+            <Button
+              size="sm"
+              disabled={!grantAddress || !!busy}
+              onClick={() => exec("授权FEEDER", [{
+                contractAddress: PRICE_ORACLE_ADDRESS,
+                method: "function grantRole(bytes32 role, address account)",
+                params: [FEEDER_ROLE_HASH, grantAddress],
+              }])}
+            >
+              {busy === "授权FEEDER" ? "提交中..." : "授权"}
+            </Button>
+          </div>
+          <p className="text-[9px] text-foreground/20 mt-1">默认填中继器地址。FEEDER 可调用 updatePrice</p>
+        </div>
+
+        {/* Quick Sync */}
+        <div className="pt-2 border-t border-white/[0.04]">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!!busy}
+            className="w-full text-amber-400 border-amber-500/20 hover:bg-amber-500/10"
+            onClick={async () => {
+              // Trigger price feed edge function
+              setBusy("同步");
+              try {
+                const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ma-price-feed`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                  },
+                  body: "{}",
+                });
+                const data = await res.json();
+                toast({
+                  title: "价格同步",
+                  description: `${data.onChainBefore || data.prevPrice} → ${data.target || data.newPrice} (${data.status})`,
+                });
+                setTimeout(onPriceUpdated, 8000);
+              } catch (e: any) {
+                toast({ title: "同步失败", description: e.message, variant: "destructive" });
+              } finally {
+                setBusy("");
+              }
+            }}
+          >
+            {busy === "同步" ? "同步中..." : "立即同步 K 线价格 → Oracle"}
+          </Button>
+          <p className="text-[9px] text-foreground/20 mt-1 text-center">
+            触发 ma-price-feed，通过中继器 {RELAYER_ADDR.slice(0, 6)}...{RELAYER_ADDR.slice(-4)} 调用 updatePrice
+          </p>
+        </div>
+
+        {/* Info */}
+        <div className="text-[10px] text-foreground/20 space-y-1 pt-2 border-t border-white/[0.04]">
+          <div className="flex justify-between"><span>Server Wallet (Admin)</span><span className="font-mono">{SERVER_WALLET_ADDR.slice(0, 6)}...{SERVER_WALLET_ADDR.slice(-4)}</span></div>
+          <div className="flex justify-between"><span>中继器 (Feeder)</span><span className="font-mono">{RELAYER_ADDR.slice(0, 6)}...{RELAYER_ADDR.slice(-4)}</span></div>
+          <div className="flex justify-between"><span>Oracle 合约</span><span className="font-mono">{PRICE_ORACLE_ADDRESS.slice(0, 6)}...{PRICE_ORACLE_ADDRESS.slice(-4)}</span></div>
+          <div className="flex justify-between"><span>自动同步</span><span>Cron 每 5 分钟</span></div>
+        </div>
       </div>
     </div>
   );
