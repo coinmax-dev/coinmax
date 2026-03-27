@@ -11,6 +11,8 @@ import { getProfile, getNodeOverview, getVaultPositions, activateVipTrial } from
 import type { NodeOverview } from "@shared/types";
 import { queryClient } from "@/lib/queryClient";
 import { usePayment, getPaymentStatusLabel } from "@/hooks/use-payment";
+import { useFetchWithPayment } from "thirdweb/react";
+import { useThirdwebClient } from "@/hooks/use-thirdweb";
 import { VIP_PLANS } from "@/lib/data";
 import type { Profile } from "@shared/types";
 
@@ -70,27 +72,28 @@ export default function ProfilePage() {
   const [showVipPlans, setShowVipPlans] = useState(false);
   const [selectedVipPlan, setSelectedVipPlan] = useState<"monthly" | "halfyear" | null>(null);
 
+  // x402 fetch — handles 402 → wallet payment → re-request automatically
+  const { client: twClient } = useThirdwebClient();
+  const { fetchWithPayment } = useFetchWithPayment(twClient!);
+
   const vipMutation = useMutation({
     mutationFn: async (planKey: "monthly" | "halfyear") => {
-      // x402 flow: payment + VIP activation handled by edge function in one call
-      const result = await payment.payVIPSubscribe(planKey);
-      payment.markSuccess();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const result = await fetchWithPayment(`${supabaseUrl}/functions/v1/vip-subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planKey, walletAddress: walletAddr }),
+      });
       return result;
     },
     onSuccess: () => {
       toast({ title: t("strategy.vipActivated"), description: t("strategy.vipActivatedDesc") });
       queryClient.invalidateQueries({ queryKey: ["profile", walletAddr] });
-      payment.reset();
       setShowVipPlans(false);
       setSelectedVipPlan(null);
     },
     onError: (err: Error) => {
-      const failedTxHash = payment.txHash;
-      const desc = failedTxHash
-        ? `${err.message}\n\nOn-chain tx: ${failedTxHash}\nPlease contact support.`
-        : err.message;
-      toast({ title: "Error", description: desc, variant: "destructive" });
-      payment.reset();
+      toast({ title: "VIP 激活失败", description: err.message, variant: "destructive" });
       setSelectedVipPlan(null);
     },
   });

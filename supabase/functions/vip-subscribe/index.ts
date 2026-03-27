@@ -4,8 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.95.3";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-payment",
-  "Access-Control-Expose-Headers": "x-payment-response",
+    "authorization, x-client-info, apikey, content-type, x-payment, payment-signature",
+  "Access-Control-Expose-Headers": "x-payment-response, payment-response",
 };
 
 // ── x402 payment config ─────────────────────────────────────
@@ -172,8 +172,8 @@ serve(async (req) => {
       });
     }
 
-    // ── Check for x402 payment header ──
-    const paymentHeader = req.headers.get("x-payment");
+    // ── Check for x402 payment header (v2: PAYMENT-SIGNATURE, v1: x-payment) ──
+    const paymentHeader = req.headers.get("payment-signature") || req.headers.get("x-payment");
 
     if (!paymentHeader) {
       return buildPaymentRequired(plan.price, planKey);
