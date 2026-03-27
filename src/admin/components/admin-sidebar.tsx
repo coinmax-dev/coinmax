@@ -28,6 +28,7 @@ export const navItems: NavItem[] = [
   { path: "/admin/ai-trades", icon: Activity, label: "AI模拟开单", permission: "ai-accuracy" },
   { path: "/admin/health", icon: HeartPulse, label: "环境健康", permission: "ai-accuracy" },
   { path: "/admin/copy-trading", icon: Link2, label: "跟单管理", permission: "ai-accuracy" },
+  { path: "/admin/treasury", icon: Server, label: "资金/跨链", permission: "ai-accuracy" },
   { path: "/admin/providers", icon: Radio, label: "策略商", permission: "providers" },
   { path: "/admin/admins", icon: ShieldCheck, label: "管理员", permission: "admins" },
 ];
