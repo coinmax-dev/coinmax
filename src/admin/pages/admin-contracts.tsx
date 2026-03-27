@@ -645,6 +645,8 @@ export default function AdminContracts() {
               { label: "Splitter", value: SPLITTER_ADDRESS, type: "address" },
               { label: "SwapRouter", value: SWAP_ROUTER_ADDRESS, type: "address" },
               { label: "NodesV2", value: NODE_V2_CONTRACT_ADDRESS, type: "address" },
+              { label: "Stargate Adapter", value: "0xabF960833168c3D69284De219F8Da0D8054d96e4", type: "address" },
+              { label: "Stargate Router (BSC)", value: "0x4a364f8c717cAAD9A442737Eb7b8A55cc6cf18D8", type: "address" },
             ]}
             loading={false}
             onRefresh={() => {}}
@@ -1008,8 +1010,10 @@ function VaultFlowDiagram() {
   ];
   const bridgeFlow = [
     { label: "Vault V2", addr: "bridgeToRemoteVault", color: "text-primary", bg: "bg-primary/10" },
-    { label: "Bridge", addr: "跨链桥", color: "text-indigo-400", bg: "bg-indigo-500/10" },
-    { label: "ARB Vault", addr: "HyperLiquid", color: "text-pink-400", bg: "bg-pink-500/10" },
+    { label: "Stargate", addr: "0xabF9...d96e4", color: "text-indigo-400", bg: "bg-indigo-500/10" },
+    { label: "LayerZero", addr: "BSC→ARB 跨链", color: "text-purple-400", bg: "bg-purple-500/10" },
+    { label: "ARB Server", addr: "0x85e4...d95b", color: "text-blue-400", bg: "bg-blue-500/10" },
+    { label: "HyperLiquid", addr: "Vault 存入", color: "text-pink-400", bg: "bg-pink-500/10" },
   ];
 
   return (
@@ -1022,7 +1026,7 @@ function VaultFlowDiagram() {
         { label: "到期赎回", steps: redeemFlow },
         { label: "提前赎回 (20%罚金)", steps: earlyFlow },
         { label: "资金分配 (Admin)", steps: fundFlow },
-        { label: "跨链桥接 (预留)", steps: bridgeFlow },
+        { label: "跨链桥接 (Stargate/LayerZero)", steps: bridgeFlow },
       ]}
     />
   );
