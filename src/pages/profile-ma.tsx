@@ -351,16 +351,22 @@ function MASwap() {
       </div>
 
       {/* Swap Card */}
-      <div className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-        {/* From */}
-        <div className="text-[10px] text-white/30 mb-1">{isSwapped ? "支付" : "卖出"}</div>
+      <div className="rounded-2xl p-3 sm:p-3.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        {/* Chain + From */}
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-[10px] text-white/30">{isSwapped ? "支付" : "卖出"}</div>
+          <div className="flex items-center gap-1 text-[8px] text-yellow-400/50">
+            <div className="w-2 h-2 rounded-full bg-yellow-500/30" />
+            BSC Chain
+          </div>
+        </div>
         <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2.5">
           <input
             type="number"
             value={maAmount}
             onChange={(e) => setMaAmount(e.target.value)}
             placeholder="0.00"
-            className="flex-1 bg-transparent text-[18px] font-mono font-semibold text-white outline-none placeholder:text-white/10 min-w-0"
+            className="flex-1 bg-transparent text-[16px] sm:text-[18px] font-mono font-semibold text-white outline-none placeholder:text-white/10 min-w-0"
           />
           <div className="flex items-center gap-1 bg-white/10 rounded-lg px-2 py-1 shrink-0">
             <div className={cn("w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold", isSwapped ? "bg-yellow-500/20 text-yellow-400" : "bg-primary/20 text-primary")}>
@@ -387,9 +393,9 @@ function MASwap() {
         {/* To */}
         <div className="text-[10px] text-white/30 mb-1">获得</div>
         <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2.5">
-          <div className="flex-1 text-[18px] font-mono font-semibold text-white/70 min-w-0">
+          <div className="flex-1 text-[16px] sm:text-[18px] font-mono font-semibold text-white/70 min-w-0">
             {inputAmount > 0 ? outputAmount.toFixed(isSwapped ? 2 : 4) : "0.00"}
-          </div>
+            </div>
           <div className="flex items-center gap-1 bg-white/10 rounded-lg px-2 py-1 shrink-0">
             <div className={cn("w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold", isSwapped ? "bg-primary/20 text-primary" : "bg-yellow-500/20 text-yellow-400")}>
               {isSwapped ? "M" : "$"}
@@ -494,7 +500,7 @@ export default function ProfileMAPage() {
   const { price } = useMaPrice();
 
   return (
-    <div className="min-h-screen pb-24 lg:pb-8 lg:pt-4" style={{ background: "#0a0a0a" }}>
+    <div className="min-h-screen pb-28 lg:pb-8 lg:pt-4" style={{ background: "#0a0a0a" }}>
       {/* Header */}
       <div className="px-4 pt-3 pb-2">
         <div className="flex items-center justify-center relative lg:justify-start">
@@ -507,18 +513,24 @@ export default function ProfileMAPage() {
 
       <div className="flex lg:gap-4">
         <ProfileNav />
-        <div className="flex-1 min-w-0 px-4 lg:px-0 lg:pr-4 space-y-3">
+        <div className="flex-1 min-w-0 px-4 lg:px-0 lg:pr-4 space-y-3 max-w-lg mx-auto lg:max-w-none lg:mx-0">
           {/* Price Header */}
-          <div className="flex items-end gap-2">
-            <div>
-              <div className="text-[10px] text-white/30 font-mono">MA / USD</div>
-              <div className="text-[26px] font-bold font-mono tracking-tight leading-none text-white">${price.toFixed(4)}</div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-end gap-2">
+              <div>
+                <div className="text-[10px] text-white/30 font-mono">MA / USD</div>
+                <div className="text-[24px] sm:text-[26px] font-bold font-mono tracking-tight leading-none text-white">${price.toFixed(4)}</div>
+              </div>
+              <div className="text-[11px] font-semibold font-mono mb-0.5 text-green-400">+{((price - 0.30) / 0.30 * 100).toFixed(1)}%</div>
             </div>
-            <div className="text-[12px] font-semibold font-mono mb-0.5 text-green-400">+{((price - 0.30) / 0.30 * 100).toFixed(1)}%</div>
+            <div className="flex items-center gap-1 bg-yellow-500/8 border border-yellow-500/15 rounded-lg px-2 py-1">
+              <div className="w-3 h-3 rounded-full bg-yellow-500/30 flex items-center justify-center text-[7px] font-bold text-yellow-400">B</div>
+              <span className="text-[9px] text-yellow-400/70 font-semibold">BSC</span>
+            </div>
           </div>
 
           {/* Chart */}
-          <div className="rounded-xl p-2.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="rounded-xl p-2 sm:p-2.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
             <MAPriceChart />
           </div>
 
