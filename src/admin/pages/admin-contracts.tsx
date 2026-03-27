@@ -623,6 +623,7 @@ export default function AdminContracts() {
           {isSuperAdmin && <SplitterPanel />}
           <VaultFlowDiagram />
           <NodeFlowDiagram />
+          <VIPFlowDiagram />
 
           {/* Deployed addresses */}
           <ContractSection
@@ -1024,6 +1025,39 @@ function NodeFlowDiagram() {
       flows={[
         { label: "资金流向 (USDT → USDC)", steps: nodeSteps },
         { label: "节点激活", steps: nodeResult },
+      ]}
+    />
+  );
+}
+
+function VIPFlowDiagram() {
+  const x402Steps = [
+    { label: "用户钱包", addr: "点击购买VIP", color: "text-blue-400", bg: "bg-blue-500/10" },
+    { label: "前端 x402", addr: "fetchWithPayment", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+    { label: "Edge Function", addr: "返回 HTTP 402", color: "text-amber-400", bg: "bg-amber-500/10" },
+    { label: "thirdweb SDK", addr: "弹出钱包授权", color: "text-purple-400", bg: "bg-purple-500/10" },
+  ];
+  const paymentSteps = [
+    { label: "用户签名", addr: "授权支付", color: "text-blue-400", bg: "bg-blue-500/10" },
+    { label: "Facilitator", addr: "x402.thirdweb.com", color: "text-pink-400", bg: "bg-pink-500/10" },
+    { label: "Arbitrum", addr: "USDC 转账", color: "text-indigo-400", bg: "bg-indigo-500/10" },
+    { label: "接收地址", addr: "VIP_RECEIVER", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+  ];
+  const activateSteps = [
+    { label: "Edge Function", addr: "验证支付", color: "text-amber-400", bg: "bg-amber-500/10" },
+    { label: "subscribe_vip", addr: "RPC 调用", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+    { label: "DB", addr: "is_vip = true", color: "text-green-400", bg: "bg-green-500/10" },
+    { label: "用户", addr: "VIP 激活", color: "text-yellow-400", bg: "bg-yellow-500/10" },
+  ];
+
+  return (
+    <FlowDiagram
+      title="VIP 购买链路 (x402)"
+      icon={<Shield className="h-4 w-4 text-amber-400/60" />}
+      flows={[
+        { label: "x402 协议流程", steps: x402Steps },
+        { label: "支付结算 (Arbitrum USDC)", steps: paymentSteps },
+        { label: "VIP 激活", steps: activateSteps },
       ]}
     />
   );
