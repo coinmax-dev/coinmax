@@ -173,24 +173,31 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
             {usdtAmount > 0 && (
               <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 space-y-2">
                 <div className="flex justify-between text-[12px]">
-                  <span className="text-foreground/40">铸造 MA</span>
+                  <span className="text-foreground/40">MA 实时价格</span>
+                  <span className="text-primary font-mono font-bold">${maPrice.toFixed(4)}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-foreground/40">按当前价铸造</span>
                   <span className="text-foreground/70 font-mono">{maToMint.toFixed(2)} MA</span>
                 </div>
                 <div className="flex justify-between text-[12px]">
-                  <span className="text-foreground/40">MA 价格</span>
-                  <span className="text-foreground/70 font-mono">${maPrice.toFixed(4)}</span>
+                  <span className="text-foreground/40">每日利息 (USDT)</span>
+                  <span className="text-foreground/70 font-mono">${dailyInterestUsd.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-[12px]">
-                  <span className="text-foreground/40">每日利息</span>
-                  <span className="text-green-400 font-mono">{dailyInterestMA.toFixed(2)} MA (${dailyInterestUsd.toFixed(2)})</span>
+                  <span className="text-foreground/40">按当前价折合</span>
+                  <span className="text-green-400 font-mono">≈ {dailyInterestMA.toFixed(2)} MA/天</span>
                 </div>
                 <div className="flex justify-between text-[12px] pt-1 border-t border-white/5">
-                  <span className="text-foreground/40">锁仓期 {plan.days} 天总收益</span>
+                  <span className="text-foreground/40">锁仓 {plan.days} 天预估总收益</span>
                   <span className="text-primary font-bold font-mono">
                     <Sparkles className="h-3 w-3 inline mr-0.5" />
-                    {totalYieldMA.toFixed(2)} MA
+                    ${(dailyInterestUsd * plan.days).toFixed(2)}
                   </span>
                 </div>
+                <p className="text-[9px] text-foreground/20 leading-relaxed">
+                  实际每日产出 MA 数量 = 当日利息(USDT) ÷ MA实时价格，随价格波动
+                </p>
               </div>
             )}
 
