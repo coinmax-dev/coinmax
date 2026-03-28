@@ -22,8 +22,11 @@ import { prepareContractCall, readContract, waitForReceipt, getContract } from "
 import { useQuery } from "@tanstack/react-query";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
 import { RELEASE_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
+import { useMaPrice } from "@/hooks/use-ma-price";
 import { queryClient } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { VAULT_PLANS } from "@/lib/data";
 
 interface MAReleaseDialogProps {
   open: boolean;
@@ -95,8 +98,34 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
     refetchInterval: 15000,
   });
 
-  const accumulated = Number(accumulatedRaw || BigInt(0)) / 1e18;
+  const onChainAccumulated = Number(accumulatedRaw || BigInt(0)) / 1e18;
   const totalClaimable = Number(totalClaimableRaw || BigInt(0)) / 1e18;
+
+  // Also read DB-based yield (vault interest calculated off-chain)
+  const { price: maPrice } = useMaPrice();
+  const { data: dbYield = 0 } = useQuery({
+    queryKey: ["vault-db-yield", account?.address],
+    queryFn: async () => {
+      if (!account?.address) return 0;
+      const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", account.address).single();
+      if (!profile) return 0;
+      const { data: positions } = await supabase.from("vault_positions").select("*").eq("user_id", profile.id).eq("status", "ACTIVE");
+      if (!positions) return 0;
+      let total = 0;
+      const now = new Date();
+      for (const pos of positions) {
+        const start = new Date(pos.start_date);
+        const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86400_000));
+        const dailyYieldUsd = Number(pos.principal) * Number(pos.daily_rate);
+        total += (dailyYieldUsd * days) / maPrice; // convert to MA
+      }
+      return total;
+    },
+    enabled: !!account?.address,
+  });
+
+  // Use whichever is higher: on-chain accumulated or DB yield
+  const accumulated = Math.max(onChainAccumulated, dbYield);
   const inputAmount = parseFloat(amount) || 0;
   const plan = PLANS.find(p => p.index === selectedPlan)!;
   const releaseMA = inputAmount * plan.release / 100;
