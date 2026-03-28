@@ -15,6 +15,7 @@ import { useFetchWithPayment } from "thirdweb/react";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
 import { VIP_PLANS } from "@/lib/data";
 import { MAReleaseDialog } from "@/components/vault/ma-release-dialog";
+import { supabase } from "@/lib/supabase";
 import type { Profile } from "@shared/types";
 
 import { useLocation } from "wouter";
@@ -119,6 +120,20 @@ export default function ProfilePage() {
   const nodeEarnings = Number(nodeOverview?.rewards?.totalEarnings || 0);
   const totalEarnings = nodeEarnings + vaultYield + referralEarnings;
   const net = deposited - withdrawn + referralEarnings;
+
+  // Query claimed yield to calculate available balance
+  const { data: claimedYield = 0 } = useQuery({
+    queryKey: ["claimed-yield", walletAddr],
+    queryFn: async () => {
+      if (!walletAddr) return 0;
+      const { data: prof } = await supabase.from("profiles").select("id").eq("wallet_address", walletAddr).single();
+      if (!prof) return 0;
+      const { data: txs } = await supabase.from("transactions").select("amount").eq("user_id", prof.id).eq("type", "YIELD_CLAIM");
+      return (txs || []).reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    },
+    enabled: !!walletAddr,
+  });
+  const availableEarnings = Math.max(0, totalEarnings - claimedYield);
 
   const refCode = profile?.refCode;
   // Self-referral link: both sponsor and placement = self
@@ -266,12 +281,12 @@ export default function ProfilePage() {
                       <TrendingUp className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <div className="text-[11px] text-white/45 font-medium">{t("profile.totalEarningsLabel")}</div>
+                      <div className="text-[11px] text-white/45 font-medium">{t("profile.availableEarnings", "可提收益")}</div>
                       {profileLoading ? (
                         <Skeleton className="h-5 w-20" />
                       ) : (
                         <div className="text-[18px] font-bold text-white" data-testid="text-total-earnings">
-                          {formatMA(totalEarnings)}
+                          {formatMA(availableEarnings)}
                         </div>
                       )}
                     </div>
@@ -280,7 +295,7 @@ export default function ProfilePage() {
                     size="sm"
                     className="rounded-xl text-[12px] h-8"
                     onClick={() => setReleaseOpen(true)}
-                    disabled={totalEarnings <= 0}
+                    disabled={availableEarnings <= 0}
                     data-testid="button-withdraw-earnings"
                   >
                     <ArrowUpFromLine className="mr-1 h-3 w-3" /> {t("common.withdraw")}
