@@ -25,6 +25,8 @@ interface CopyTradingFlowProps {
   compact?: boolean;
   readOnly?: boolean;
   initialStep?: CopyStep;
+  /** Pre-selected model from strategy card click (e.g. "GPT-4o") */
+  preSelectedModel?: string;
   onStepChange?: (step: CopyStep) => void;
 }
 
@@ -44,12 +46,22 @@ const FIXED_CONFIG = {
   revenueSharePlatform: 20,
 };
 
+const MODEL_INFO: Record<string, { icon: string; desc: string }> = {
+  "GPT-4o": { icon: "🟢", desc: "Trend follower, momentum-based" },
+  "Claude": { icon: "🟠", desc: "Risk-aware, contrarian analysis" },
+  "Gemini": { icon: "🔵", desc: "Volatility scalper" },
+  "DeepSeek": { icon: "🟣", desc: "Technical purist, RSI/MACD/BB" },
+  "Llama": { icon: "🦙", desc: "Momentum chaser, local AI" },
+  "CoinMax": { icon: "🧠", desc: "Multi-model consensus + deep learning" },
+};
+
 export function CopyTradingFlow({
   userId,
   showSteps = true,
   compact = false,
   readOnly = false,
   initialStep = "bind",
+  preSelectedModel,
   onStepChange,
 }: CopyTradingFlowProps) {
   const { t } = useTranslation();
@@ -102,7 +114,7 @@ export function CopyTradingFlow({
       const config = {
         wallet_address: userId,
         exchange: "binance",
-        models_follow: ["GPT-4o", "Claude", "Gemini", "DeepSeek", "Llama"],
+        models_follow: preSelectedModel ? [preSelectedModel] : ["GPT-4o", "Claude", "Gemini", "DeepSeek", "Llama", "CoinMax"],
         execution_mode: "full-auto",
         position_size_usd: showFineTune ? customSize : preset.positionSize,
         max_leverage: showFineTune ? customLeverage : preset.leverage,
@@ -186,14 +198,32 @@ export function CopyTradingFlow({
       {/* Step 2: AI suggestions + risk + activate */}
       {step === "ai" && (
         <div className="space-y-4">
-          {/* Models following */}
+          {/* Selected model */}
           <div className="rounded-xl bg-white/[0.02] p-4" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-            <h3 className="text-xs font-bold text-foreground/50 mb-2">{t("copy.followingModels", "跟随模型")}</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {["🟢 GPT-4o", "🟠 Claude", "🔵 Gemini", "🟣 DeepSeek", "🦙 Llama"].map(m => (
-                <span key={m} className="text-[10px] px-2 py-1 rounded-lg bg-primary/8 text-primary border border-primary/15 font-semibold">{m}</span>
-              ))}
-            </div>
+            {preSelectedModel && MODEL_INFO[preSelectedModel] ? (
+              <>
+                <h3 className="text-xs font-bold text-foreground/50 mb-2">{t("copy.followingModel", "跟随模型")}</h3>
+                <div className="flex items-center gap-3 bg-primary/5 rounded-xl px-4 py-3 border border-primary/15">
+                  <span className="text-2xl">{MODEL_INFO[preSelectedModel].icon}</span>
+                  <div>
+                    <p className="text-sm font-bold text-primary">{preSelectedModel}</p>
+                    <p className="text-[10px] text-foreground/30">{MODEL_INFO[preSelectedModel].desc}</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xs font-bold text-foreground/50 mb-2">{t("copy.followingModels", "跟随模型")}</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(MODEL_INFO).map(([name, info]) => (
+                    <span key={name} className="text-[10px] px-2 py-1 rounded-lg bg-primary/8 text-primary border border-primary/15 font-semibold">
+                      {info.icon} {name}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[9px] text-foreground/20 mt-1.5">{t("copy.multiModelConsensus", "多模型共识交易，≥2个模型一致时下单")}</p>
+              </>
+            )}
           </div>
 
           {/* AI Coin Picker */}
