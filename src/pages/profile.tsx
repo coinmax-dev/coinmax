@@ -430,17 +430,15 @@ export default function ProfilePage() {
               return (
                 <div className="flex items-center gap-2">
                   <span className={`text-[10px] font-mono ${isActive ? (daysLeft <= 3 ? "text-red-400" : "text-yellow-400/60") : "text-red-400"}`}>
-                    {isActive ? `剩余 ${daysLeft} 天` : "已过期"}
+                    {isActive ? `${t("profile.daysLeft", "剩余")} ${daysLeft} ${t("profile.days", "天")}` : t("profile.expired", "已过期")}
                   </span>
-                  {(daysLeft <= 3 || !isActive) && (
-                    <button
-                      className="px-2.5 py-1 rounded-full text-[9px] font-bold text-black"
-                      style={{ background: "linear-gradient(135deg, #facc15, #eab308)" }}
-                      onClick={() => setShowVipPlans(true)}
-                    >
-                      {isActive ? "续费" : "升级VIP"}
-                    </button>
-                  )}
+                  <button
+                    className="px-2.5 py-1 rounded-full text-[9px] font-bold text-black"
+                    style={{ background: "linear-gradient(135deg, #facc15, #eab308)" }}
+                    onClick={() => setShowVipPlans(true)}
+                  >
+                    {isActive ? t("profile.renewVip", "续费") : t("profile.upgradeVip", "升级VIP")}
+                  </button>
                 </div>
               );
             })()}

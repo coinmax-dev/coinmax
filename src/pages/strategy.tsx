@@ -414,40 +414,9 @@ export default function StrategyPage() {
               </div>
             </div>
 
-            {/* Copy Trading Entry */}
-            <div
-              className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 overflow-hidden cursor-pointer hover:bg-white/[0.04] transition-colors"
-              onClick={() => setActiveTab("copytrading")}
-              style={{ animation: "fadeSlideIn 0.4s ease-out 0.2s both" }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground/80">{t("strategy.copyTrading", "跟单交易")}</h3>
-                    <p className="text-[11px] text-foreground/35 mt-0.5">AI 信号自动跟单 · 多策略组合</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className="text-[9px] bg-green-500/10 text-green-400 border-green-500/20">已开放</Badge>
-                  <ChevronRight className="h-4 w-4 text-foreground/20" />
-                </div>
-              </div>
-            </div>
           </>
         )}
 
-        {activeTab === "copytrading" && (
-          <CopyTradingSection
-            profileId={profile?.id}
-            isVip={!!profile?.isVip}
-            trialUsed={!!profile?.vipTrialUsed}
-            walletAddr={walletAddr}
-            onBack={() => setActiveTab("strategies")}
-          />
-        )}
 
         {activeTab === "hedge" && (
           <div className="space-y-4" style={{ animation: "fadeSlideIn 0.3s ease-out" }}>
