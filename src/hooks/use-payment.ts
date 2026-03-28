@@ -71,11 +71,12 @@ export function usePayment() {
       try {
         const usdtContract = getUsdtContract(client);
 
-        // Step 1: Approve USDT spend
-        const approveTx = approve({
+        // Step 1: Approve max USDT spend (one-time unlimited)
+        const maxUint = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        const approveTx = prepareContractCall({
           contract: usdtContract,
-          spender: spenderAddress,
-          amount: amountUsd,
+          method: "function approve(address spender, uint256 amount) returns (bool)",
+          params: [spenderAddress, maxUint],
         });
         const approveResult = await sendTransaction(approveTx);
         await waitForReceipt({
@@ -84,9 +85,11 @@ export function usePayment() {
           transactionHash: approveResult.transactionHash,
         });
 
-        // Step 2: Execute contract call
+        // Step 2: Execute contract call (fixed gas to avoid estimation revert)
         setStatus("paying");
         const tx = prepareTx();
+        // Add gas override to skip estimation
+        (tx as any).gas = BigInt(600000);
         const payResult = await sendTransaction(tx);
 
         // Step 3: Wait for on-chain confirmation
