@@ -444,7 +444,11 @@ function RootRouter() {
   const [location] = useLocation();
 
   if (location.startsWith("/admin")) {
-    return <AdminApp />;
+    return (
+      <ThirdwebProvider>
+        <AdminApp />
+      </ThirdwebProvider>
+    );
   }
 
   if (location.startsWith("/provider")) {

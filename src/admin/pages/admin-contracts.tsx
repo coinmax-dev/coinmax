@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileCode2, Save, Lock, RefreshCw, ExternalLink, ChevronDown, ChevronRight, Shield, Zap, Wallet, ArrowRightLeft, Sparkles } from "lucide-react";
+import { FileCode2, Save, Lock, RefreshCw, ExternalLink, ChevronDown, ChevronRight, Shield, Zap, Wallet, ArrowRightLeft, Sparkles, Send, Plus, Fuel } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,9 @@ import { adminGetContractConfigs, adminUpdateContractConfig, adminAddLog } from 
 import { useAdminAuth } from "@/admin/admin-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
-import { readContract, getContract } from "thirdweb";
+import { readContract, getContract, prepareContractCall, prepareTransaction, waitForReceipt, toWei } from "thirdweb";
+import { useActiveAccount, useSendTransaction, ConnectButton } from "thirdweb/react";
+import { createWallet } from "thirdweb/wallets";
 import { bsc } from "thirdweb/chains";
 import {
   SWAP_ROUTER_ADDRESS,
@@ -608,6 +610,9 @@ export default function AdminContracts() {
             onRefresh={v3Oracle.refresh}
           />
 
+          {/* Admin Wallet Connect */}
+          <AdminWalletConnect />
+
           {/* FlashSwap Liquidity Monitor */}
           {FLASH_SWAP_ADDRESS && <FlashSwapPanel onRefresh={() => {}} />}
 
@@ -880,6 +885,44 @@ export default function AdminContracts() {
   );
 }
 
+// ── Admin Wallet Connect ──
+
+const adminWallets = [createWallet("io.metamask"), createWallet("io.rabby"), createWallet("com.coinbase.wallet")];
+
+function AdminWalletConnect() {
+  const { client } = useThirdwebClient();
+  const account = useActiveAccount();
+
+  if (!client) return null;
+
+  return (
+    <div className="rounded-xl border border-primary/15 overflow-hidden" style={{ background: "rgba(10,186,181,0.02)" }}>
+      <div className="px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-primary" />
+          <span className="text-[13px] font-bold text-foreground/80">管理钱包</span>
+          {account && (
+            <span className="text-[10px] font-mono text-primary/60">{account.address.slice(0, 6)}...{account.address.slice(-4)}</span>
+          )}
+        </div>
+        <ConnectButton
+          client={client}
+          chain={bsc}
+          wallets={adminWallets}
+          connectButton={{ label: "连接钱包", style: { height: "28px", fontSize: "11px", padding: "0 12px", borderRadius: "8px" } }}
+          detailsButton={{ style: { height: "28px", fontSize: "11px", padding: "0 12px", borderRadius: "8px" } }}
+          theme="dark"
+        />
+      </div>
+      {!account && (
+        <div className="px-4 pb-3">
+          <p className="text-[10px] text-foreground/25">连接钱包后可直接转账补充流动性、发送 Gas</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── FlashSwap Liquidity Monitor Panel ──
 
 const LIQUIDITY_ALERT_USDT = 500;  // USDT threshold for warning
@@ -888,7 +931,12 @@ const LIQUIDITY_ALERT_MA = 5000;   // MA threshold for warning
 function FlashSwapPanel({ onRefresh }: { onRefresh?: () => void }) {
   const { toast } = useToast();
   const { client } = useThirdwebClient();
+  const account = useActiveAccount();
+  const { mutateAsync: sendTx } = useSendTransaction();
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [depositToken, setDepositToken] = useState<"USDT" | "MA">("USDT");
+  const [depositAmount, setDepositAmount] = useState("");
   const [data, setData] = useState<{
     maLiq: string; usdtLiq: string; usdcLiq: string;
     feeBps: number; holdingRuleBps: number; minSwap: string;
@@ -941,6 +989,49 @@ function FlashSwapPanel({ onRefresh }: { onRefresh?: () => void }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Deposit liquidity: approve + transfer ERC20 to FlashSwap contract
+  const handleDeposit = async () => {
+    if (!client || !account || !depositAmount) return;
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    const tokenAddr = depositToken === "USDT" ? USDT_ADDRESS : MA_TOKEN_ADDRESS;
+    const tokenContract = getContract({ client, chain: bsc, address: tokenAddr });
+    const rawAmount = toWei(depositAmount);
+
+    try {
+      // Step 1: Approve
+      setBusy("approving");
+      const approveTx = prepareContractCall({
+        contract: tokenContract,
+        method: "function approve(address spender, uint256 amount) returns (bool)",
+        params: [FLASH_SWAP_ADDRESS, rawAmount],
+      });
+      const approveRes = await sendTx(approveTx);
+      await waitForReceipt({ client, chain: bsc, transactionHash: approveRes.transactionHash });
+
+      // Step 2: Transfer
+      setBusy("sending");
+      const transferTx = prepareContractCall({
+        contract: tokenContract,
+        method: "function transfer(address to, uint256 amount) returns (bool)",
+        params: [FLASH_SWAP_ADDRESS, rawAmount],
+      });
+      const txRes = await sendTx(transferTx);
+      const receipt = await waitForReceipt({ client, chain: bsc, transactionHash: txRes.transactionHash });
+
+      if (receipt.status === "reverted") throw new Error("Transaction reverted");
+
+      toast({ title: "补充成功", description: `${depositAmount} ${depositToken} -> FlashSwap` });
+      setDepositAmount("");
+      setTimeout(fetchData, 3000);
+    } catch (err: any) {
+      toast({ title: "补充失败", description: err?.shortMessage || err?.message, variant: "destructive" });
+    } finally {
+      setBusy("");
+    }
+  };
+
   const maNum = data ? parseFloat(data.maLiq.replace(/,/g, "")) : 0;
   const usdtNum = data ? parseFloat(data.usdtLiq.replace(/,/g, "")) : 0;
   const usdcNum = data ? parseFloat(data.usdcLiq.replace(/,/g, "")) : 0;
@@ -961,7 +1052,7 @@ function FlashSwapPanel({ onRefresh }: { onRefresh?: () => void }) {
             {formatAddress(FLASH_SWAP_ADDRESS)}<ExternalLink className="h-2.5 w-2.5" />
           </a>
           {data?.paused && <Badge className="text-[9px] bg-red-500/10 text-red-400 border-red-500/20">已暂停</Badge>}
-          {anyAlert && <Badge className="text-[9px] bg-red-500/10 text-red-400 border-red-500/20 animate-pulse">⚠ 流动性不足</Badge>}
+          {anyAlert && <Badge className="text-[9px] bg-red-500/10 text-red-400 border-red-500/20 animate-pulse">流动性不足</Badge>}
         </div>
         <button
           className="h-6 w-6 rounded flex items-center justify-center text-foreground/30 hover:text-foreground/60 hover:bg-white/[0.05] transition-colors"
@@ -984,20 +1075,63 @@ function FlashSwapPanel({ onRefresh }: { onRefresh?: () => void }) {
               <div className={`rounded-lg p-3 text-center border ${maLow ? "bg-red-500/5 border-red-500/20" : "bg-white/[0.02] border-white/[0.06]"}`}>
                 <div className={`text-lg font-bold font-mono ${maLow ? "text-red-400" : "text-foreground/80"}`}>{data.maLiq}</div>
                 <div className="text-[10px] text-foreground/30">MA Token</div>
-                {maLow && <div className="text-[9px] text-red-400 mt-1">⚠ 低于 {LIQUIDITY_ALERT_MA.toLocaleString()}</div>}
+                {maLow && <div className="text-[9px] text-red-400 mt-1">低于 {LIQUIDITY_ALERT_MA.toLocaleString()}</div>}
               </div>
               <div className={`rounded-lg p-3 text-center border ${usdtLow ? "bg-red-500/5 border-red-500/20" : "bg-white/[0.02] border-white/[0.06]"}`}>
                 <div className={`text-lg font-bold font-mono ${usdtLow ? "text-red-400" : "text-foreground/80"}`}>${data.usdtLiq}</div>
                 <div className="text-[10px] text-foreground/30">USDT</div>
-                {usdtLow && <div className="text-[9px] text-red-400 mt-1">⚠ 低于 ${LIQUIDITY_ALERT_USDT}</div>}
+                {usdtLow && <div className="text-[9px] text-red-400 mt-1">低于 ${LIQUIDITY_ALERT_USDT}</div>}
               </div>
               <div className={`rounded-lg p-3 text-center border ${usdcLow ? "bg-amber-500/5 border-amber-500/20" : "bg-white/[0.02] border-white/[0.06]"}`}>
                 <div className={`text-lg font-bold font-mono ${usdcLow ? "text-amber-400" : "text-foreground/80"}`}>${data.usdcLiq}</div>
                 <div className="text-[10px] text-foreground/30">USDC</div>
-                {usdcLow && <div className="text-[9px] text-amber-400 mt-1">⚠ 低于 ${LIQUIDITY_ALERT_USDT}</div>}
+                {usdcLow && <div className="text-[9px] text-amber-400 mt-1">低于 ${LIQUIDITY_ALERT_USDT}</div>}
               </div>
             </div>
           </div>
+
+          {/* Deposit Liquidity */}
+          {account && (
+            <div className="pt-3 border-t border-white/[0.04]">
+              <p className="text-[10px] text-foreground/30 mb-2 flex items-center gap-1">
+                <Plus className="h-3 w-3" /> 补充流动性
+              </p>
+              <div className="flex items-center gap-2">
+                <select
+                  value={depositToken}
+                  onChange={(e) => setDepositToken(e.target.value as "USDT" | "MA")}
+                  className="h-8 text-[11px] bg-background/50 border border-border/20 rounded px-2 text-foreground/70"
+                >
+                  <option value="USDT">USDT</option>
+                  <option value="MA">MA</option>
+                </select>
+                <Input
+                  type="number"
+                  step="100"
+                  min="1"
+                  placeholder="数量"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  className="flex-1 h-8 text-[11px] font-mono"
+                />
+                <Button
+                  size="sm"
+                  className="h-8 text-[11px]"
+                  disabled={!depositAmount || !!busy}
+                  onClick={handleDeposit}
+                >
+                  {busy === "approving" ? (
+                    <><RefreshCw className="h-3 w-3 mr-1 animate-spin" />授权中</>
+                  ) : busy === "sending" ? (
+                    <><RefreshCw className="h-3 w-3 mr-1 animate-spin" />转账中</>
+                  ) : (
+                    <><Send className="h-3 w-3 mr-1" />补充</>
+                  )}
+                </Button>
+              </div>
+              <p className="text-[9px] text-foreground/20 mt-1">从已连接钱包 approve + transfer {depositToken} 到 FlashSwap 合约</p>
+            </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -1036,8 +1170,13 @@ function FlashSwapPanel({ onRefresh }: { onRefresh?: () => void }) {
 
 function BatchGasPanel() {
   const { toast } = useToast();
+  const { client } = useThirdwebClient();
+  const account = useActiveAccount();
+  const { mutateAsync: sendTx } = useSendTransaction();
   const [balances, setBalances] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendProgress, setSendProgress] = useState("");
   const [sendAmount, setSendAmount] = useState("0.01");
   const [selectedWallets, setSelectedWallets] = useState<Set<string>>(new Set());
 
@@ -1105,27 +1244,38 @@ function BatchGasPanel() {
   const lowCount = SERVER_WALLETS.filter(w => parseFloat(balances[w.address] || "0") < GAS_ALERT_THRESHOLD).length;
   const totalCost = selectedWallets.size * parseFloat(sendAmount || "0");
 
-  const handleBatchSend = () => {
-    if (selectedWallets.size === 0) return;
-    // Generate the Hardhat script for the user to run
+  // Wallet-connected batch send
+  const handleBatchSend = async () => {
+    if (!client || !account || selectedWallets.size === 0) return;
     const targets = SERVER_WALLETS.filter(w => selectedWallets.has(w.address));
-    const script = targets.map(w =>
-      `await deployer.sendTransaction({ to: "${w.address}", value: ethers.parseEther("${sendAmount}") }); // ${w.label}`
-    ).join("\n");
+    setSending(true);
+    let sent = 0;
 
-    navigator.clipboard.writeText(
-      `// Batch send ${sendAmount} BNB to ${targets.length} wallets (total: ${totalCost.toFixed(4)} BNB)\n` +
-      `// Run: npx hardhat run scripts/batch-gas.js --network bsc\n` +
-      `const { ethers } = require("hardhat");\nasync function main() {\n  const [deployer] = await ethers.getSigners();\n  console.log("Sending from:", deployer.address);\n` +
-      targets.map(w =>
-        `  const tx${targets.indexOf(w)} = await deployer.sendTransaction({ to: "${w.address}", value: ethers.parseEther("${sendAmount}") });\n  await tx${targets.indexOf(w)}.wait();\n  console.log("[OK] ${w.label} ->", tx${targets.indexOf(w)}.hash);`
-      ).join("\n") +
-      `\n  console.log("Done! Sent ${sendAmount} BNB × ${targets.length} = ${totalCost.toFixed(4)} BNB");\n}\nmain().catch(console.error);`
-    );
-    toast({
-      title: "脚本已复制到剪贴板",
-      description: `${targets.length} 个钱包，每个 ${sendAmount} BNB，共 ${totalCost.toFixed(4)} BNB`,
-    });
+    try {
+      for (const w of targets) {
+        setSendProgress(`${sent + 1}/${targets.length}: ${w.label}`);
+        const tx = prepareTransaction({
+          client,
+          chain: bsc,
+          to: w.address as `0x${string}`,
+          value: toWei(sendAmount),
+        });
+        const result = await sendTx(tx);
+        await waitForReceipt({ client, chain: bsc, transactionHash: result.transactionHash });
+        sent++;
+      }
+      toast({ title: "批量发送完成", description: `${sent}/${targets.length} 个钱包，每个 ${sendAmount} BNB` });
+      setTimeout(fetchBalances, 3000);
+    } catch (err: any) {
+      toast({
+        title: `发送中断 (${sent}/${targets.length})`,
+        description: err?.shortMessage || err?.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+      setSendProgress("");
+    }
   };
 
   return (
@@ -1133,11 +1283,11 @@ function BatchGasPanel() {
       style={{ background: lowCount > 0 ? "rgba(245,158,11,0.02)" : "rgba(16,185,129,0.02)" }}>
       <div className="px-4 py-3 border-b border-amber-500/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-amber-400" />
+          <Fuel className="h-4 w-4 text-amber-400" />
           <span className="text-[13px] font-bold text-foreground/80">Server Wallet Gas 管理</span>
           {lowCount > 0 && (
             <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse">
-              ⚠ {lowCount} 个余额不足
+              {lowCount} 个余额不足
             </Badge>
           )}
         </div>
@@ -1218,16 +1368,25 @@ function BatchGasPanel() {
           <span className="text-[10px] text-foreground/25">BNB</span>
         </div>
 
-        <Button
-          size="sm"
-          disabled={selectedWallets.size === 0}
-          className="w-full bg-amber-600 text-white hover:bg-amber-500"
-          onClick={handleBatchSend}
-        >
-          复制批量打 Gas 脚本 ({selectedWallets.size} 个钱包，共 {totalCost.toFixed(4)} BNB)
-        </Button>
+        {account ? (
+          <Button
+            size="sm"
+            disabled={selectedWallets.size === 0 || sending}
+            className="w-full bg-amber-600 text-white hover:bg-amber-500"
+            onClick={handleBatchSend}
+          >
+            {sending ? (
+              <><RefreshCw className="h-3 w-3 mr-1 animate-spin" />{sendProgress}</>
+            ) : (
+              <><Send className="h-3 w-3 mr-1" />发送 Gas ({selectedWallets.size} 个钱包，共 {totalCost.toFixed(4)} BNB)</>
+            )}
+          </Button>
+        ) : (
+          <p className="text-[10px] text-foreground/25 text-center py-1">请先连接钱包</p>
+        )}
+
         <p className="text-[9px] text-foreground/20 text-center">
-          复制 Hardhat 脚本到剪贴板，用 deployer 钱包发送。阈值: {GAS_ALERT_THRESHOLD} BNB
+          通过已连接钱包逐笔发送 BNB。阈值: {GAS_ALERT_THRESHOLD} BNB
         </p>
       </div>
     </div>
