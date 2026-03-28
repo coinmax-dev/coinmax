@@ -20,6 +20,21 @@ const corsHeaders = {
 };
 
 const SWAP_FEE_PCT = 0.003; // 0.3%
+const MA_TOKEN = "0xE3d19D3299B0C2D6c5FDB74dBb79b102449Edc36";
+const BSC_RPC = "https://bsc-dataseed1.binance.org";
+
+async function getMABalance(wallet: string): Promise<number> {
+  try {
+    const data = "0x70a08231000000000000000000000000" + wallet.slice(2).toLowerCase();
+    const res = await fetch(BSC_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 1, params: [{ to: MA_TOKEN, data }, "latest"] }),
+    });
+    const r = await res.json();
+    return parseInt(r.result || "0x0", 16) / 1e18;
+  } catch { return 0; }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -52,12 +67,13 @@ serve(async (req) => {
       return jsonResponse({ error: "Invalid direction: must be 'sell' or 'buy'" }, 400);
     }
 
-    // Quota check for sell (MA→USD): max 50% of holdings
+    // Quota check for sell (MA→USD): verify on-chain balance, max 50%
     if (direction === "sell") {
-      const quota = (maBalance || 0) / 2;
+      const onChainBalance = await getMABalance(walletAddress);
+      const quota = onChainBalance / 2;
       if (maAmount > quota) {
         return jsonResponse({
-          error: `超出闪兑额度。最大可兑换 ${quota.toFixed(2)} MA（持仓的50%）`,
+          error: `超出闪兑额度。链上余额 ${onChainBalance.toFixed(2)} MA，最大可兑换 ${quota.toFixed(2)} MA（50%）`,
         }, 400);
       }
     }
@@ -92,7 +108,7 @@ serve(async (req) => {
       output_token: outputToken || "USDT",
       ma_price: maPrice,
       fee_usd: fee,
-      ma_balance_before: maBalance,
+      ma_balance_before: direction === "sell" ? await getMABalance(walletAddress) : (maBalance || 0),
       status: "completed",
     });
 
