@@ -1045,12 +1045,6 @@ export async function checkRankPromotion(walletAddress: string) {
   return data;
 }
 
-export async function getRankStatus(walletAddress: string) {
-  const { data, error } = await supabase.rpc("get_rank_status", { addr: walletAddress });
-  if (error) throw error;
-  return data;
-}
-
 // ─── Earnings Release / Burn ───
 export async function requestEarningsRelease(walletAddress: string, releaseDays: number, amount: number, sourceType: "VAULT" | "NODE" = "VAULT") {
   const { data, error } = await supabase.rpc("request_earnings_release", {
