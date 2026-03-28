@@ -134,22 +134,47 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
   const burnMA = inputAmount * plan.burn / 100;
 
   const handleCreateRelease = async () => {
-    if (!account || !client || !RELEASE_ADDRESS || inputAmount <= 0) return;
+    if (!account || inputAmount <= 0) return;
     setStep("creating");
     try {
-      const contract = getContract({ client, chain: BSC_CHAIN, address: RELEASE_ADDRESS });
-      const amountWei = BigInt(Math.floor(inputAmount * 1e18));
-      const tx = prepareContractCall({
-        contract,
-        method: "function createRelease(uint256 amount, uint256 planIndex)",
-        params: [amountWei, BigInt(selectedPlan)],
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+      // Step 1: Call edge function to mint MA + prepare release
+      const resp = await fetch(`${supabaseUrl}/functions/v1/claim-yield`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: account.address,
+          planIndex: selectedPlan,
+          amount: inputAmount,
+        }),
       });
-      const result = await sendTx(tx);
-      await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Claim failed");
+
+      // Step 2: For linear release plans, user needs to call createRelease on-chain
+      if (data.needsCreateRelease && client && RELEASE_ADDRESS) {
+        // Wait for Server Wallet txs to confirm
+        await new Promise(r => setTimeout(r, 10000));
+
+        const contract = getContract({ client, chain: BSC_CHAIN, address: RELEASE_ADDRESS });
+        const amountWei = BigInt(Math.floor(inputAmount * 1e18));
+        const tx = prepareContractCall({
+          contract,
+          method: "function createRelease(uint256 amount, uint256 planIndex)",
+          params: [amountWei, BigInt(selectedPlan)],
+        });
+        const result = await sendTx(tx);
+        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
+      }
+
+      // Instant release: MA already minted to wallet by edge function
       setStep("success");
       refetchAccumulated();
       refetchClaimable();
       queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["vault-db-yield-usd"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
       setAmount("");
     } catch (e: any) {
       console.error("createRelease failed:", e);
