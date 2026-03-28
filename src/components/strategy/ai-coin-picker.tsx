@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { useTranslation } from "react-i18next";
 
 interface CoinScore {
   asset: string;
@@ -25,14 +26,15 @@ interface CoinScore {
   recommendation: "strong_buy" | "buy" | "neutral" | "avoid";
 }
 
-const RECOMMENDATION_CONFIG = {
-  strong_buy: { label: "强烈推荐", color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
-  buy: { label: "推荐交易", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  neutral: { label: "中性观望", color: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/20" },
-  avoid: { label: "暂不推荐", color: "text-foreground/30", bg: "bg-white/[0.02]", border: "border-white/[0.06]" },
-};
+const RECOMMENDATION_STYLES = {
+  strong_buy: { key: "aiPicker.strongBuy", color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
+  buy: { key: "aiPicker.buy", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  neutral: { key: "aiPicker.neutral", color: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/20" },
+  avoid: { key: "aiPicker.avoid", color: "text-foreground/30", bg: "bg-white/[0.02]", border: "border-white/[0.06]" },
+} as const;
 
 export function AICoinPicker({ compact = false }: { compact?: boolean }) {
+  const { t } = useTranslation();
   const [coins, setCoins] = useState<CoinScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -157,8 +159,8 @@ export function AICoinPicker({ compact = false }: { compact?: boolean }) {
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-sm">🤖</span>
-          <span className="text-xs font-bold text-foreground/50">AI 优选币种</span>
-          <span className="text-[10px] text-foreground/20 animate-pulse">分析中...</span>
+          <span className="text-xs font-bold text-foreground/50">{t("aiPicker.title")}</span>
+          <span className="text-[10px] text-foreground/20 animate-pulse">{t("aiPicker.analyzing")}</span>
         </div>
         <div className="space-y-2">
           {[1, 2, 3].map(i => (
@@ -176,24 +178,24 @@ export function AICoinPicker({ compact = false }: { compact?: boolean }) {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <span className="text-xs">🤖</span>
-            <span className="text-[11px] font-bold text-foreground/50">AI 优选币种</span>
+            <span className="text-[11px] font-bold text-foreground/50">{t("aiPicker.title")}</span>
           </div>
           {lastUpdate && (
             <span className="text-[9px] text-foreground/20">
-              {lastUpdate.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+              {lastUpdate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {topCoins.slice(0, 6).map(coin => {
-            const cfg = RECOMMENDATION_CONFIG[coin.recommendation];
+            const cfg = RECOMMENDATION_STYLES[coin.recommendation];
             return (
               <div key={coin.asset} className={`shrink-0 px-2.5 py-1.5 rounded-lg border ${cfg.border} ${cfg.bg}`}>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-bold text-foreground/70">{coin.asset}</span>
                   <span className={`text-[10px] font-bold ${cfg.color}`}>{coin.score}</span>
                 </div>
-                <span className={`text-[9px] ${cfg.color}`}>{cfg.label}</span>
+                <span className={`text-[9px] ${cfg.color}`}>{t(cfg.key)}</span>
               </div>
             );
           })}
@@ -208,26 +210,26 @@ export function AICoinPicker({ compact = false }: { compact?: boolean }) {
       <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm">🤖</span>
-          <h2 className="text-sm font-bold text-foreground/70">AI 优选交易币种</h2>
+          <h2 className="text-sm font-bold text-foreground/70">{t("aiPicker.titleFull")}</h2>
         </div>
         <div className="flex items-center gap-2">
           {lastUpdate && (
             <span className="text-[10px] text-foreground/20">
-              更新于 {lastUpdate.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              {lastUpdate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
             </span>
           )}
           <button
             onClick={() => { setLoading(true); fetchCoinScores(); }}
             className="text-[10px] text-primary/60 hover:text-primary transition-colors"
           >
-            刷新
+            {t("aiPicker.refresh")}
           </button>
         </div>
       </div>
 
       <div className="divide-y divide-white/[0.04]">
         {coins.map(coin => {
-          const cfg = RECOMMENDATION_CONFIG[coin.recommendation];
+          const cfg = RECOMMENDATION_STYLES[coin.recommendation];
           return (
             <div key={coin.asset} className="px-4 py-3 hover:bg-white/[0.02] transition-colors">
               <div className="flex items-center justify-between mb-2">
@@ -235,7 +237,7 @@ export function AICoinPicker({ compact = false }: { compact?: boolean }) {
                   <span className="text-xs font-bold text-foreground/30 w-5">#{coin.rank}</span>
                   <span className="text-sm font-bold text-foreground/80">{coin.asset}</span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.color} ${cfg.bg} border ${cfg.border}`}>
-                    {cfg.label}
+                    {t(cfg.key)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -253,10 +255,10 @@ export function AICoinPicker({ compact = false }: { compact?: boolean }) {
 
               {/* Metrics row */}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-foreground/35 ml-7">
-                <span>信号数 <strong className="text-foreground/50">{coin.metrics.signalCount}</strong></span>
-                <span>趋势强度 <strong className="text-foreground/50">{coin.metrics.trendStrength}</strong></span>
-                <span>7日胜率 <strong className={coin.metrics.winRate7d > 50 ? "text-green-400/60" : "text-foreground/50"}>{coin.metrics.winRate7d}%</strong></span>
-                <span>7日均盈 <strong className={coin.metrics.avgPnl7d > 0 ? "text-green-400/60" : coin.metrics.avgPnl7d < 0 ? "text-red-400/60" : "text-foreground/50"}>
+                <span>{t("aiPicker.signalCount")} <strong className="text-foreground/50">{coin.metrics.signalCount}</strong></span>
+                <span>{t("aiPicker.trendStrength")} <strong className="text-foreground/50">{coin.metrics.trendStrength}</strong></span>
+                <span>{t("aiPicker.winRate7d")} <strong className={coin.metrics.winRate7d > 50 ? "text-green-400/60" : "text-foreground/50"}>{coin.metrics.winRate7d}%</strong></span>
+                <span>{t("aiPicker.avgPnl7d")} <strong className={coin.metrics.avgPnl7d > 0 ? "text-green-400/60" : coin.metrics.avgPnl7d < 0 ? "text-red-400/60" : "text-foreground/50"}>
                   {coin.metrics.avgPnl7d > 0 ? "+" : ""}{coin.metrics.avgPnl7d.toFixed(2)}%
                 </strong></span>
               </div>

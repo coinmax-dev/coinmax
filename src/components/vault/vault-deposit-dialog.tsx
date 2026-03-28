@@ -62,7 +62,7 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
       const usdt = getUsdtContract(client);
       const gateway = getGatewayContract(client);
       const amountWei = BigInt(Math.floor(usdtAmount * 1e18)); // BSC USDT = 18 decimals
-      const minUsdcOut = BigInt(Math.floor(usdtAmount * 0.999 * 1e18)); // 0.1% slippage
+      const minUsdcOut = BigInt(Math.floor(usdtAmount * 0.995 * 1e18)); // 0.5% slippage for stable pair
 
       // Step 1: Approve USDT
       setStep("approving");

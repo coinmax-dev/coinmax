@@ -1068,110 +1068,86 @@ function SplitterPanel() {
 // ── Vault Flow Diagram ──
 
 function VaultFlowDiagram() {
-  const depositFlow = [
-    { label: "用户钱包", addr: "USDT", color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: "Gateway", addr: "0x62ac...21eb", color: "text-cyan-400", bg: "bg-cyan-500/10" },
-    { label: "PancakeSwap", addr: "USDT→USDC", color: "text-purple-400", bg: "bg-purple-500/10" },
-    { label: "Splitter", addr: "0xcfF1...3845", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-    { label: "5个钱包", addr: "按比例分配", color: "text-green-400", bg: "bg-green-500/10" },
-  ];
-  const mintFlow = [
-    { label: "Gateway", addr: "铸造 cUSD", color: "text-cyan-400", bg: "bg-cyan-500/10" },
-    { label: "Vault V2", addr: "0xE0A8...e821", color: "text-primary", bg: "bg-primary/10" },
-    { label: "MA 铸造", addr: "按 Oracle 价格", color: "text-amber-400", bg: "bg-amber-500/10" },
-    { label: "锁仓", addr: "5/45/90/180/360天", color: "text-yellow-400", bg: "bg-yellow-500/10" },
-  ];
-  const redeemFlow = [
-    { label: "到期赎回", addr: "claimPrincipal", color: "text-green-400", bg: "bg-green-500/10" },
-    { label: "100% MA", addr: "→ 用户钱包", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  ];
-  const earlyFlow = [
-    { label: "提前赎回", addr: "earlyClaimPrincipal", color: "text-red-400", bg: "bg-red-500/10" },
-    { label: "80% MA", addr: "→ 用户钱包", color: "text-green-400", bg: "bg-green-500/10" },
-    { label: "20% MA", addr: "→ 销毁", color: "text-red-400", bg: "bg-red-500/10" },
-  ];
-  const fundFlow = [
-    { label: "Vault V2", addr: "distributeFunds", color: "text-primary", bg: "bg-primary/10" },
-    { label: "资金分配", addr: "→ FundDistributor", color: "text-purple-400", bg: "bg-purple-500/10" },
-  ];
-  const bridgeFlow = [
-    { label: "Vault V2", addr: "bridgeToRemoteVault", color: "text-primary", bg: "bg-primary/10" },
-    { label: "Stargate", addr: "0xabF9...d96e4", color: "text-indigo-400", bg: "bg-indigo-500/10" },
-    { label: "LayerZero", addr: "BSC→ARB 跨链", color: "text-purple-400", bg: "bg-purple-500/10" },
-    { label: "ARB Server", addr: "0x85e4...d95b", color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: "HyperLiquid", addr: "Vault 存入", color: "text-pink-400", bg: "bg-pink-500/10" },
-  ];
-
   return (
     <FlowDiagram
-      title="金库链路 (Vault V2)"
+      title="金库链路"
       icon={<Wallet className="h-4 w-4 text-primary/60" />}
       flows={[
-        { label: "存入: USDT → USDC → 分配", steps: depositFlow },
-        { label: "存入: cUSD → Vault → MA铸造锁仓", steps: mintFlow },
-        { label: "到期赎回", steps: redeemFlow },
-        { label: "提前赎回 (20%罚金)", steps: earlyFlow },
-        { label: "资金分配 (Admin)", steps: fundFlow },
-        { label: "跨链桥接 (Stargate/LayerZero)", steps: bridgeFlow },
+        { label: "存入: USDT → Gateway → Swap → 分配", steps: [
+          { label: "用户", addr: "USDT (BSC)", color: "text-blue-400", bg: "bg-blue-500/10" },
+          { label: "Gateway", addr: GATEWAY_ADDRESS?.slice(0,6)+"..."+GATEWAY_ADDRESS?.slice(-4), color: "text-cyan-400", bg: "bg-cyan-500/10" },
+          { label: "PancakeSwap", addr: "USDT→USDC", color: "text-purple-400", bg: "bg-purple-500/10" },
+          { label: "Splitter", addr: SPLITTER_ADDRESS?.slice(0,6)+"..."+SPLITTER_ADDRESS?.slice(-4), color: "text-emerald-400", bg: "bg-emerald-500/10" },
+          { label: "5钱包", addr: "按比例分配", color: "text-green-400", bg: "bg-green-500/10" },
+        ]},
+        { label: "铸造: cUSD → Vault → MA 锁仓", steps: [
+          { label: "Gateway", addr: "铸造 cUSD", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+          { label: "Vault", addr: VAULT_V3_ADDRESS?.slice(0,6)+"..."+VAULT_V3_ADDRESS?.slice(-4), color: "text-primary", bg: "bg-primary/10" },
+          { label: "Oracle", addr: PRICE_ORACLE_ADDRESS?.slice(0,6)+"..."+PRICE_ORACLE_ADDRESS?.slice(-4), color: "text-amber-400", bg: "bg-amber-500/10" },
+          { label: "MA 锁仓", addr: "5/45/90/180天", color: "text-yellow-400", bg: "bg-yellow-500/10" },
+        ]},
+        { label: "赎回: 到期100% / 提前80%+20%销毁", steps: [
+          { label: "Vault", addr: "claimPrincipal", color: "text-primary", bg: "bg-primary/10" },
+          { label: "到期", addr: "100% MA→钱包", color: "text-green-400", bg: "bg-green-500/10" },
+          { label: "提前", addr: "80% MA→钱包", color: "text-yellow-400", bg: "bg-yellow-500/10" },
+          { label: "销毁", addr: "20% MA→burn", color: "text-red-400", bg: "bg-red-500/10" },
+        ]},
+        { label: "收益: Engine → Release → 线性释放", steps: [
+          { label: "Engine", addr: ENGINE_ADDRESS?.slice(0,6)+"..."+ENGINE_ADDRESS?.slice(-4), color: "text-orange-400", bg: "bg-orange-500/10" },
+          { label: "Release", addr: RELEASE_ADDRESS?.slice(0,6)+"..."+RELEASE_ADDRESS?.slice(-4), color: "text-pink-400", bg: "bg-pink-500/10" },
+          { label: "5方案", addr: "80%即时~100%/60天", color: "text-purple-400", bg: "bg-purple-500/10" },
+          { label: "用户", addr: "claimAll()", color: "text-green-400", bg: "bg-green-500/10" },
+        ]},
+        { label: "跨链: Vault → Stargate → ARB → HyperLiquid", steps: [
+          { label: "Vault", addr: "bridgeToRemoteVault", color: "text-primary", bg: "bg-primary/10" },
+          { label: "Stargate", addr: "LayerZero", color: "text-indigo-400", bg: "bg-indigo-500/10" },
+          { label: "ARB", addr: "Server Wallet", color: "text-blue-400", bg: "bg-blue-500/10" },
+          { label: "HyperLiquid", addr: "Vault 存入", color: "text-pink-400", bg: "bg-pink-500/10" },
+        ]},
       ]}
     />
   );
 }
 
 function NodeFlowDiagram() {
-  const nodeSteps = [
-    { label: "用户钱包", addr: "USDT", color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: "SwapRouter", addr: "0x5650...7E3", color: "text-purple-400", bg: "bg-purple-500/10" },
-    { label: "PancakeSwap", addr: "USDT→USDC", color: "text-pink-400", bg: "bg-pink-500/10" },
-    { label: "NodesV2", addr: "0x17DD...cE2", color: "text-green-400", bg: "bg-green-500/10" },
-    { label: "FundManager", addr: "资金分配", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  ];
-  const nodeResult = [
-    { label: "NodesV2", addr: "记录购买", color: "text-green-400", bg: "bg-green-500/10" },
-    { label: "DB", addr: "node_memberships", color: "text-cyan-400", bg: "bg-cyan-500/10" },
-    { label: "用户", addr: "节点激活", color: "text-amber-400", bg: "bg-amber-500/10" },
-  ];
-
   return (
     <FlowDiagram
       title="节点购买链路"
       icon={<Zap className="h-4 w-4 text-green-400/60" />}
       flows={[
-        { label: "资金流向 (USDT → USDC)", steps: nodeSteps },
-        { label: "节点激活", steps: nodeResult },
+        { label: "购买: USDT → SwapRouter → NodesV2", steps: [
+          { label: "用户", addr: "USDT", color: "text-blue-400", bg: "bg-blue-500/10" },
+          { label: "SwapRouter", addr: SWAP_ROUTER_ADDRESS?.slice(0,6)+"..."+SWAP_ROUTER_ADDRESS?.slice(-4), color: "text-purple-400", bg: "bg-purple-500/10" },
+          { label: "PancakeSwap", addr: "USDT→USDC", color: "text-pink-400", bg: "bg-pink-500/10" },
+          { label: "NodesV2", addr: NODE_V2_CONTRACT_ADDRESS?.slice(0,6)+"..."+NODE_V2_CONTRACT_ADDRESS?.slice(-4), color: "text-green-400", bg: "bg-green-500/10" },
+        ]},
+        { label: "激活: 金库存入达标 → 等级升级", steps: [
+          { label: "金库存入", addr: "≥100U", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+          { label: "DB trigger", addr: "check_rank", color: "text-amber-400", bg: "bg-amber-500/10" },
+          { label: "V1→V7", addr: "实时升级", color: "text-green-400", bg: "bg-green-500/10" },
+        ]},
       ]}
     />
   );
 }
 
 function VIPFlowDiagram() {
-  const x402Steps = [
-    { label: "用户钱包", addr: "点击购买VIP", color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: "前端 x402", addr: "fetchWithPayment", color: "text-cyan-400", bg: "bg-cyan-500/10" },
-    { label: "Edge Function", addr: "返回 HTTP 402", color: "text-amber-400", bg: "bg-amber-500/10" },
-    { label: "thirdweb SDK", addr: "弹出钱包授权", color: "text-purple-400", bg: "bg-purple-500/10" },
-  ];
-  const paymentSteps = [
-    { label: "用户签名", addr: "授权支付", color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: "Facilitator", addr: "x402.thirdweb.com", color: "text-pink-400", bg: "bg-pink-500/10" },
-    { label: "Arbitrum", addr: "USDC 转账", color: "text-indigo-400", bg: "bg-indigo-500/10" },
-    { label: "接收地址", addr: "VIP_RECEIVER", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  ];
-  const activateSteps = [
-    { label: "Edge Function", addr: "验证支付", color: "text-amber-400", bg: "bg-amber-500/10" },
-    { label: "subscribe_vip", addr: "RPC 调用", color: "text-cyan-400", bg: "bg-cyan-500/10" },
-    { label: "DB", addr: "is_vip = true", color: "text-green-400", bg: "bg-green-500/10" },
-    { label: "用户", addr: "VIP 激活", color: "text-yellow-400", bg: "bg-yellow-500/10" },
-  ];
-
   return (
     <FlowDiagram
       title="VIP 购买链路 (x402)"
       icon={<Shield className="h-4 w-4 text-amber-400/60" />}
       flows={[
-        { label: "x402 协议流程", steps: x402Steps },
-        { label: "支付结算 (Arbitrum USDC)", steps: paymentSteps },
-        { label: "VIP 激活", steps: activateSteps },
+        { label: "x402: 前端 → 402响应 → 钱包授权 → 支付", steps: [
+          { label: "前端", addr: "fetchWithPayment", color: "text-blue-400", bg: "bg-blue-500/10" },
+          { label: "vip-subscribe", addr: "HTTP 402", color: "text-amber-400", bg: "bg-amber-500/10" },
+          { label: "thirdweb", addr: "钱包签名", color: "text-purple-400", bg: "bg-purple-500/10" },
+          { label: "ARB USDC", addr: "支付结算", color: "text-indigo-400", bg: "bg-indigo-500/10" },
+        ]},
+        { label: "激活: 验证 → subscribe_vip → VIP 生效", steps: [
+          { label: "验证", addr: "x402 settle", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+          { label: "DB RPC", addr: "subscribe_vip", color: "text-green-400", bg: "bg-green-500/10" },
+          { label: "用户", addr: "is_vip=true", color: "text-yellow-400", bg: "bg-yellow-500/10" },
+        ]},
       ]}
     />
   );
