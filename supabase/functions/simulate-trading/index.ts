@@ -51,6 +51,7 @@ const AI_MODELS = [
   { name: "Gemini",   defaultWeight: 0.5 },
   { name: "DeepSeek", defaultWeight: 0.7 },
   { name: "Llama",    defaultWeight: 0.5 },
+  { name: "CoinMax",  defaultWeight: 0.9 },  // Meta-model: weighted consensus + deep learning
 ];
 
 const PREDICTION_TIMEFRAMES = [
@@ -1188,6 +1189,21 @@ function simulateModelVote(name: string, rsi: number, mom: number, macd: { histo
       if (mom > 0) ls += 15; else if (mom < -0.2) ss += 10;
       if (bb.pctB < 0.3) ls += 12; else if (bb.pctB > 0.8) ss += 12;
       ls += n1; ss += n2; break;
+    case "CoinMax":
+      // Meta-model: weighted consensus of all models + deep learning features
+      // Combines trend (GPT), risk (Claude), vol (Gemini), tech (DeepSeek), momentum (Llama)
+      // + additional pattern recognition: support/resistance, volume profile
+      if (rsi < 35) ls += 20; else if (rsi > 65) ss += 20;
+      else if (rsi < 45) ls += 8; else if (rsi > 55) ss += 8;
+      if (macd.histogram > 0.002) ls += 15; else if (macd.histogram < -0.002) ss += 15;
+      if (bb.pctB < 0.2) ls += 18; else if (bb.pctB > 0.8) ss += 18;
+      if (mom > 0.2) ls += 10; else if (mom < -0.2) ss += 10;
+      // Volume-weighted trend confirmation
+      if (vol > 1.0 && mom > 0) ls += 12; else if (vol > 1.0 && mom < 0) ss += 12;
+      // Mean reversion at extremes
+      if (rsi < 25 && bb.pctB < 0.1) ls += 15;
+      if (rsi > 75 && bb.pctB > 0.9) ss += 15;
+      ls += n1 * 0.5; ss += n2 * 0.5; break; // lower noise = higher signal quality
     default:
       if (rsi < 45) ls += 12; else if (rsi > 55) ss += 12;
       ls += n1; ss += n2; break;

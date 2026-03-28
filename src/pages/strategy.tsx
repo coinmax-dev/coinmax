@@ -399,6 +399,7 @@ export default function StrategyPage() {
                         "openclaw-deepseek": "DeepSeek",
                         "openclaw-qwen": "Claude",
                         "openclaw-grok": "Llama",
+                        "coinmax-ai": "CoinMax",
                       };
                       const model = modelMap[s.id];
                       if (model) {

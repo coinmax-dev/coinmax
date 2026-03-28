@@ -216,6 +216,20 @@ export const LOCAL_STRATEGIES: LocalStrategy[] = [
     type: "openclaw",
     updateIntervalMs: 7200_000,
   },
+  {
+    id: "coinmax-ai",
+    name: "CoinMax AI",
+    description: "Multi-model consensus + deep learning meta-strategy",
+    leverage: "5x",
+    winRateRange: [88, 95] as const,
+    monthlyReturnRange: [20, 28] as const,
+    totalAumRange: [3_000_000, 5_000_000] as const,
+    status: "ACTIVE",
+    isHot: true,
+    isVipOnly: false,
+    type: "openclaw" as const,
+    updateIntervalMs: 7200_000,
+  },
 ];
 
 export const SETTINGS_ITEMS = [
