@@ -630,28 +630,50 @@ export default function AdminContracts() {
           <VIPFlowDiagram />
           <ReleaseFlowDiagram />
 
-          {/* 资金链路说明 */}
+          {/* ═══ 最新链路方案 ═══ */}
           <ContractSection
-            title="📋 资金链路 (隐藏分配)"
+            title="📋 完整资金链路"
             icon={<Shield className="h-4 w-4 text-primary" />}
             address=""
             items={[
-              { label: "─── 金库入金链路 (BSC) ───", value: "" },
-              { label: "1. 用户 USDT", value: "→ Gateway (swap)", type: "text" },
-              { label: "2. Gateway USDC", value: "→ BatchBridge (累积)", type: "text" },
-              { label: "3. 每4h 跨链", value: "→ Stargate → ARB", type: "text" },
-              { label: "4. ARB FundRouter", value: "→ 5钱包 (用户看不到)", type: "text" },
+              { label: "══ 金库入金 (BSC → ARB) ══", value: "" },
+              { label: "1. 用户 USDT", value: "→ Gateway (PancakeSwap V3 swap)" },
+              { label: "2. Gateway USDC", value: "→ Vault (mint cUSD记账 + mint MA锁仓)" },
+              { label: "3. Vault USDC", value: "→ BatchBridge (累积，不即时跨链)" },
+              { label: "4. 每4h cron", value: "→ Stargate 批量桥到 ARB" },
+              { label: "5. ARB FundRouter", value: "→ 5钱包按比例分配 (用户看不到)" },
+              { label: "   LP收益", value: "swap手续费 0.01% → 你的PancakeSwap LP仓位" },
               { label: "", value: "" },
-              { label: "─── 节点入金链路 (BSC) ───", value: "" },
-              { label: "1. 用户买节点", value: "→ NodesV2 (USDC)", type: "text" },
-              { label: "2. NodesV2", value: "→ NodePool 合约 (中转)", type: "text" },
-              { label: "3. 每30min flush", value: "→ 节点钱包 (0xeb8A)", type: "text" },
+              { label: "══ 节点购买 (BSC) ══", value: "" },
+              { label: "1. 用户 USDT", value: "→ SwapRouter (PancakeSwap V3 swap)" },
+              { label: "2. SwapRouter USDC", value: "→ NodesV2 (验证价格+记录)" },
+              { label: "3. NodesV2 USDC", value: "→ NodePool 合约 (中转缓冲)" },
+              { label: "4. 每30min cron", value: "→ flush → 节点钱包 0xeb8A" },
               { label: "", value: "" },
-              { label: "─── 用户可见 ───", value: "" },
-              { label: "✓ 存入: USDT → Gateway → Vault", value: "正常金库操作" },
-              { label: "✓ 节点: USDC → NodePool 合约", value: "像协议合约" },
-              { label: "✗ 看不到: 5钱包分配", value: "在 ARB 链上" },
-              { label: "✗ 看不到: 节点最终钱包", value: "NodePool 中转" },
+              { label: "══ 每日利息 (BSC) ══", value: "" },
+              { label: "1. Engine (cron)", value: "→ 读 Vault 仓位 × dailyRate × MA价格" },
+              { label: "2. Engine mint MA", value: "→ Release 合约 (待释放)" },
+              { label: "3. 用户 createRelease", value: "→ 选分成比例 → 线性释放 + 销毁" },
+              { label: "", value: "" },
+              { label: "══ MA 闪兑 (BSC) ══", value: "" },
+              { label: "1. 用户 MA", value: "→ FlashSwap (按Oracle价格换USDT)" },
+              { label: "2. 50%持仓规则", value: "→ 必须保留一半MA余额" },
+              { label: "   状态:", value: "FlashSwap 合约待部署" },
+              { label: "", value: "" },
+              { label: "══ VIP 订阅 (BSC) ══", value: "" },
+              { label: "1. 免费试用7天", value: "→ activate-vip-trial (edge fn)" },
+              { label: "2. 付费VIP", value: "→ USDT支付 → vip-subscribe (edge fn)" },
+              { label: "", value: "" },
+              { label: "══ 价格预言机 ══", value: "" },
+              { label: "1. ma-price-feed cron", value: "→ 每5min 计算价格曲线" },
+              { label: "2. Oracle.updatePrice", value: "→ 链上价格 (当前 $0.60)" },
+              { label: "3. 安全限制", value: "→ 单次最大涨跌10%, 24h心跳" },
+              { label: "", value: "" },
+              { label: "══ 用户可见性 ══", value: "" },
+              { label: "✓ 看到", value: "USDT → Gateway/SwapRouter → 合约地址" },
+              { label: "✗ 看不到", value: "5钱包分配 (在ARB链)" },
+              { label: "✗ 看不到", value: "节点最终钱包 (NodePool中转)" },
+              { label: "✗ 看不到", value: "LP收益去向 (PancakeSwap池)" },
             ]}
             loading={false}
             onRefresh={() => {}}
@@ -660,21 +682,24 @@ export default function AdminContracts() {
 
           {/* BSC 合约 */}
           <ContractSection
-            title="BSC 合约 (用户面)"
+            title="BSC 合约 (12个)"
             icon={<FileCode2 className="h-4 w-4 text-amber-400" />}
             address=""
             items={[
-              { label: "Gateway (入口 swap)", value: GATEWAY_ADDRESS, type: "address" },
-              { label: "Vault (ERC4626 金库) ✅可升级", value: VAULT_V3_ADDRESS, type: "address" },
-              { label: "Engine (利息引擎) ✅可升级", value: ENGINE_ADDRESS, type: "address" },
-              { label: "Release (释放合约) ✅可升级", value: RELEASE_ADDRESS, type: "address" },
-              { label: "Oracle (价格预言机) ✅可升级", value: PRICE_ORACLE_ADDRESS, type: "address" },
-              { label: "BatchBridge (跨链累积)", value: BATCH_BRIDGE_ADDRESS, type: "address" },
-              { label: "NodePool (节点中转)", value: "0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a", type: "address" },
-              { label: "MA Token", value: MA_TOKEN_ADDRESS, type: "address" },
-              { label: "cUSD (记账)", value: CUSD_ADDRESS, type: "address" },
-              { label: "Forwarder (EIP-2771)", value: FORWARDER_ADDRESS, type: "address" },
-              { label: "Timelock (24h)", value: TIMELOCK_ADDRESS, type: "address" },
+              { label: "🚪 Gateway (入口swap) ✅UUPS", value: GATEWAY_ADDRESS, type: "address" },
+              { label: "🏦 Vault (ERC4626金库) ✅UUPS", value: VAULT_V3_ADDRESS, type: "address" },
+              { label: "⚙️ Engine (利息引擎) ✅UUPS", value: ENGINE_ADDRESS, type: "address" },
+              { label: "🔓 Release (释放合约) ✅UUPS", value: RELEASE_ADDRESS, type: "address" },
+              { label: "📊 Oracle (价格预言机) ✅UUPS", value: PRICE_ORACLE_ADDRESS, type: "address" },
+              { label: "🌉 BatchBridge (跨链累积)", value: BATCH_BRIDGE_ADDRESS, type: "address" },
+              { label: "📦 NodePool (节点中转)", value: "0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a", type: "address" },
+              { label: "🪙 MA Token", value: MA_TOKEN_ADDRESS, type: "address" },
+              { label: "💵 cUSD (记账代币)", value: CUSD_ADDRESS, type: "address" },
+              { label: "🔀 SwapRouter (节点swap)", value: SWAP_ROUTER_ADDRESS, type: "address" },
+              { label: "🔄 NodesV2 (节点合约)", value: NODE_V2_CONTRACT_ADDRESS, type: "address" },
+              { label: "🔐 Forwarder (EIP-2771)", value: FORWARDER_ADDRESS, type: "address" },
+              { label: "⏳ Timelock (24h延迟)", value: TIMELOCK_ADDRESS, type: "address" },
+              { label: "🏊 PancakeSwap V3 Pool", value: "0x92b7807bF19b7DDdf89b706143896d05228f3121", type: "address" },
             ]}
             loading={false}
             onRefresh={() => {}}
@@ -687,12 +712,12 @@ export default function AdminContracts() {
             icon={<FileCode2 className="h-4 w-4 text-blue-400" />}
             address=""
             items={[
-              { label: "FundRouter (分配) ✅可升级", value: ARB_FUND_ROUTER_ADDRESS, type: "address" },
-              { label: "分配: Trading 30%", value: "0xd12097C9A12617c49220c032C84aCc99B6fFf57b", type: "address" },
-              { label: "分配: Ops 8%", value: "0xDf90770C89732a7eba5B727fCd6a12f827102EE6", type: "address" },
-              { label: "分配: Marketing 12%", value: "0x1C4D983620B3c8c2f7607c0943f2A5989e655599", type: "address" },
-              { label: "分配: Investor 20%", value: "0x85c3d07Ee3be12d6502353b4cA52B30cD85Ac5ff", type: "address" },
-              { label: "分配: Withdraw 30%", value: "0x7DEa369864583E792D230D360C0a4C56c2103FE4", type: "address" },
+              { label: "📤 FundRouter (分配) ✅UUPS", value: ARB_FUND_ROUTER_ADDRESS, type: "address" },
+              { label: "💰 Trading 30%", value: "0xd12097C9A12617c49220c032C84aCc99B6fFf57b", type: "address" },
+              { label: "🏢 Ops 8%", value: "0xDf90770C89732a7eba5B727fCd6a12f827102EE6", type: "address" },
+              { label: "📣 Marketing 12%", value: "0x1C4D983620B3c8c2f7607c0943f2A5989e655599", type: "address" },
+              { label: "🤝 Investor 20%", value: "0x85c3d07Ee3be12d6502353b4cA52B30cD85Ac5ff", type: "address" },
+              { label: "💳 Withdraw 30%", value: "0x7DEa369864583E792D230D360C0a4C56c2103FE4", type: "address" },
             ]}
             loading={false}
             onRefresh={() => {}}
@@ -705,34 +730,47 @@ export default function AdminContracts() {
             icon={<Zap className="h-4 w-4 text-purple-400" />}
             address=""
             items={[
-              { label: "simulate-trading", value: "每5分钟 — AI策略模拟" },
-              { label: "copy-trade-executor", value: "每1分钟 — 跟单执行" },
-              { label: "copy-trade-notify", value: "每2分钟 — Telegram通知" },
-              { label: "ma-price-feed", value: "每5分钟 — MA价格更新" },
-              { label: "batch-bridge", value: "每4小时 — BSC→ARB跨链" },
+              { label: "simulate-trading", value: "每5分钟 — AI策略模拟开单" },
+              { label: "copy-trade-executor", value: "每5分钟 — 跟单执行下单" },
+              { label: "copy-trade-notify", value: "每2分钟 — Telegram推送" },
+              { label: "ma-price-feed", value: "每5分钟 — MA价格喂价" },
+              { label: "batch-bridge", value: "每4小时 — BSC→ARB跨链桥" },
               { label: "flush-node-pool", value: "每30分钟 — 节点资金归集" },
               { label: "resolve-predictions", value: "每5分钟 — 预测结算" },
-              { label: "OpenClaw analyst", value: "每15分钟 — 5模型分析" },
+              { label: "OpenClaw analyst", value: "每15分钟 — 5模型×10币分析" },
               { label: "OpenClaw auditor", value: "每30分钟 — 合约安全审计" },
+              { label: "OpenClaw resolver", value: "每15分钟 — AI记忆学习" },
             ]}
             loading={false}
             onRefresh={() => {}}
             defaultOpen={false}
           />
 
-          {/* Server Wallet */}
+          {/* 钱包管理 */}
           <ContractSection
-            title="Server Wallet"
+            title="🔑 钱包管理"
             icon={<Wallet className="h-4 w-4 text-amber-400" />}
             address=""
             items={[
+              { label: "── Server Wallets (thirdweb) ──", value: "" },
               { label: "🏦 vault (金库ADMIN)", value: "0xeBAB6D22278c9839A46B86775b3AC9469710F84b", type: "address" },
               { label: "📈 trade (运营SERVER)", value: "0x0831e8875685C796D05F2302D3c5C2Dd77fAc3B6", type: "address" },
               { label: "💎 VIP (价格FEEDER)", value: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A", type: "address" },
               { label: "🪙 CoinMax (代币ADMIN)", value: "0x60D416dA873508c23C1315a2b750a31201959d78", type: "address" },
-              { label: "⛽ relayer (Gas)", value: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA", type: "address" },
-              { label: "🔑 deployer (备份)", value: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", type: "address" },
-              { label: "📦 节点钱包", value: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", type: "address" },
+              { label: "⛽ relayer (Gas支付)", value: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA", type: "address" },
+              { label: "", value: "" },
+              { label: "── 运营钱包 ──", value: "" },
+              { label: "🔑 deployer (当前admin)", value: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", type: "address" },
+              { label: "📦 节点接收钱包", value: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", type: "address" },
+              { label: "🏊 LP仓位钱包", value: "Pool: 0x92b7807bF19b7DDdf89b706143896d05228f3121", type: "address" },
+              { label: "", value: "" },
+              { label: "── 安全 ──", value: "" },
+              { label: "Vault/Engine/Release/Oracle", value: "✅ UUPS Proxy 可升级" },
+              { label: "Gateway", value: "✅ Proxy 可升级 (新: 0x38a6)" },
+              { label: "FundRouter (ARB)", value: "✅ UUPS Proxy 可升级" },
+              { label: "EIP-2771 Forwarder", value: "✅ 已部署" },
+              { label: "Timelock (24h)", value: "✅ 已部署" },
+              { label: "All admin", value: "deployer 0x1B6B (全部合约)" },
             ]}
             loading={false}
             onRefresh={() => {}}
