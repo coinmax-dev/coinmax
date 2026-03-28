@@ -78,15 +78,17 @@ export default function ProfileReferralPage() {
     enabled: isConnected,
   });
 
-  const { data: commission, isLoading: commissionLoading } = useQuery<CommissionSummary>({
+  const { data: commission, isLoading: commissionLoading } = useQuery({
     queryKey: ["commission", walletAddr],
-    queryFn: () => getCommissionRecords(walletAddr),
+    queryFn: () => getCommissionRecords(walletAddr) as Promise<CommissionSummary>,
     enabled: isConnected,
   });
 
   const totalCommission = Number(commission?.totalCommission || 0);
   const directTotal = Number(commission?.directReferralTotal || 0);
   const diffTotal = Number(commission?.differentialTotal || 0);
+  const sameRankTotal = Number(commission?.sameRankTotal || 0);
+  const overrideTotal = Number(commission?.overrideTotal || 0);
 
   // Rank status + team stats from RPC
   const { data: rankStatus } = useQuery({
@@ -266,27 +268,35 @@ export default function ProfileReferralPage() {
 
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #4ade80, #22c55e)" }} />
-            <span className="text-[13px] font-bold text-white">{t("profile.claimedAndPending")}</span>
+            <span className="text-[13px] font-bold text-white">{t("profile.rewardSummary", "奖励汇总")}</span>
           </div>
 
           <div className="rounded-2xl p-4" style={{ background: "#181818", border: "1px solid rgba(255,255,255,0.4)" }}>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[12px] text-white/50">{t("profile.totalRewards")}</span>
+              <span className="text-[12px] text-white/50">{t("profile.totalRewards", "总奖励")}</span>
               <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #facc15, #eab308)" }}>
                 <DollarSign className="h-3.5 w-3.5 text-black" />
               </div>
             </div>
             <div className="text-[24px] font-black text-white mb-3">
-              {formatCompact(totalCommission)}
+              {formatCompact(totalCommission)} <span className="text-[14px] text-primary">MA</span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-[11px] text-white/40 mb-0.5">{t("profile.claimed")}</div>
-                <div className="text-[16px] font-bold text-white">${totalCommission.toFixed(2)}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(236,72,153,0.06)", border: "1px solid rgba(236,72,153,0.15)" }}>
+                <div className="text-[10px] text-pink-400/60 mb-0.5">{t("profile.directReferralReward", "直推奖励")}</div>
+                <div className="text-[15px] font-bold text-pink-400">{formatCompact(directTotal)} MA</div>
               </div>
-              <div>
-                <div className="text-[11px] text-white/40 mb-0.5">{t("profile.pendingRewards")}</div>
-                <div className="text-[16px] font-bold text-white">{formatCompact(totalCommission)}</div>
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
+                <div className="text-[10px] text-indigo-400/60 mb-0.5">{t("profile.teamDiffReward", "团队级差")}</div>
+                <div className="text-[15px] font-bold text-indigo-400">{formatCompact(diffTotal)} MA</div>
+              </div>
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.15)" }}>
+                <div className="text-[10px] text-purple-400/60 mb-0.5">{t("profile.sameRankReward", "同级奖励")}</div>
+                <div className="text-[15px] font-bold text-purple-400">{formatCompact(sameRankTotal)} MA</div>
+              </div>
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.15)" }}>
+                <div className="text-[10px] text-yellow-400/60 mb-0.5">{t("profile.overrideReward", "越级奖励")}</div>
+                <div className="text-[15px] font-bold text-yellow-400">{formatCompact(overrideTotal)} MA</div>
               </div>
             </div>
           </div>
@@ -350,18 +360,6 @@ export default function ProfileReferralPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="rounded-xl p-3.5 text-center" style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.4)" }}>
-            <div className="text-[11px] text-white/50 font-medium mb-2">{t("profile.inviteRewards")}</div>
-            <UserPlus className="h-5 w-5 mx-auto text-white/50 mb-1.5" />
-            <div className="text-[18px] font-black text-white">{isConnected ? formatCompact(directTotal) : "--"}</div>
-          </div>
-          <div className="rounded-xl p-3.5 text-center" style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.4)" }}>
-            <div className="text-[11px] text-white/50 font-medium mb-2">{t("profile.teamRewards")}</div>
-            <Layers className="h-5 w-5 mx-auto text-white/50 mb-1.5" />
-            <div className="text-[18px] font-black text-white">{isConnected ? formatCompact(diffTotal) : "--"}</div>
-          </div>
-        </div>
 
         {/* Rank upgrade conditions */}
         {isConnected && rankStatus?.nextRankConditions && (

@@ -468,9 +468,13 @@ export async function getCommissionRecords(walletAddress: string) {
 
   let directTotal = 0;
   let diffTotal = 0;
+  let sameRankTotal = 0;
+  let overrideTotal = 0;
   for (const r of records) {
     const amt = Number(r.amount || 0);
     if (r.details?.type === "direct_referral") directTotal += amt;
+    else if (r.details?.type === "same_rank") sameRankTotal += amt;
+    else if (r.details?.type === "override") overrideTotal += amt;
     else diffTotal += amt;
   }
 
@@ -498,9 +502,11 @@ export async function getCommissionRecords(walletAddress: string) {
   }
 
   return {
-    totalCommission: (directTotal + diffTotal).toFixed(6),
+    totalCommission: (directTotal + diffTotal + sameRankTotal + overrideTotal).toFixed(6),
     directReferralTotal: directTotal.toFixed(6),
     differentialTotal: diffTotal.toFixed(6),
+    sameRankTotal: sameRankTotal.toFixed(6),
+    overrideTotal: overrideTotal.toFixed(6),
     records,
   };
 }

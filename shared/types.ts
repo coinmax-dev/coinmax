@@ -238,6 +238,8 @@ export interface CommissionSummary {
   totalCommission: string;
   directReferralTotal: string;
   differentialTotal: string;
+  sameRankTotal: string;
+  overrideTotal: string;
   records: CommissionRecord[];
 }
 
