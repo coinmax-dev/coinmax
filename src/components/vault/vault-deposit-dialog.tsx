@@ -61,25 +61,27 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
     try {
       const usdt = getUsdtContract(client);
       const gateway = getGatewayContract(client);
-      const amountWei = BigInt(Math.floor(usdtAmount * 1e18)); // BSC USDT = 18 decimals
-      const minUsdcOut = BigInt(Math.floor(usdtAmount * 0.995 * 1e18)); // 0.5% slippage for stable pair
+      const amountWei = BigInt(Math.floor(usdtAmount * 1e18));
+      const minUsdcOut = BigInt(Math.floor(usdtAmount * 0.995 * 1e18));
 
-      // Step 1: Approve USDT
+      // Step 1: Approve max USDT to Gateway (only if needed)
       setStep("approving");
-      const approveTx = approve({
+      const maxUint = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+      const approveTx = prepareContractCall({
         contract: usdt,
-        spender: GATEWAY_ADDRESS,
-        amount: usdtAmount,
+        method: "function approve(address spender, uint256 amount) returns (bool)",
+        params: [GATEWAY_ADDRESS, maxUint],
       });
       const approveResult = await sendTx(approveTx);
       await waitForReceipt({ client: client!, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
 
-      // Step 2: Call Gateway.depositVault
+      // Step 2: Call Gateway.depositVault (after approve confirmed)
       setStep("depositing");
       const depositTx = prepareContractCall({
         contract: gateway,
         method: "function depositVault(uint256 usdtAmount, uint256 planIndex, uint256 minUsdcOut, bytes bridgeOptions) payable",
         params: [amountWei, BigInt(plan.planIndex), minUsdcOut, "0x" as `0x${string}`],
+        gas: BigInt(500000), // skip estimation, use fixed gas
       });
       const depositResult = await sendTx(depositTx);
       const receipt = await waitForReceipt({ client: client!, chain: BSC_CHAIN, transactionHash: depositResult.transactionHash });
