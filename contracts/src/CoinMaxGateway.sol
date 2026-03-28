@@ -314,7 +314,7 @@ contract CoinMaxGateway is
     // ═══════════════════════════════════════════════════════════════════
 
     function _swapToUsdc(uint256 amountIn, uint256 amountOutMin) internal returns (uint256) {
-        usdt.safeIncreaseAllowance(address(dexRouter), amountIn);
+        usdt.forceApprove(address(dexRouter), amountIn);
         return dexRouter.exactInputSingle(
             IDEXRouter.ExactInputSingleParams({
                 tokenIn: address(usdt),
@@ -330,7 +330,7 @@ contract CoinMaxGateway is
 
     function _mintAndDeposit(address user, uint256 usdcAmount, uint256 planIndex) internal {
         cUsd.mintTo(address(this), usdcAmount);
-        IERC20(address(cUsd)).approve(address(vault), usdcAmount);
+        SafeERC20.forceApprove(IERC20(address(cUsd)), address(vault), usdcAmount);
         vault.depositFor(user, usdcAmount, planIndex);
     }
 
