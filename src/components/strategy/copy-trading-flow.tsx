@@ -57,6 +57,11 @@ export function CopyTradingFlow({
   const [isActive, setIsActive] = useState(false);
   const [activating, setActivating] = useState(false);
   const [riskLevel, setRiskLevel] = useState<"conservative" | "moderate" | "aggressive">("moderate");
+  const [showFineTune, setShowFineTune] = useState(false);
+  const [customSize, setCustomSize] = useState(300);
+  const [customLeverage, setCustomLeverage] = useState(5);
+  const [customPositions, setCustomPositions] = useState(3);
+  const [customDrawdown, setCustomDrawdown] = useState(15);
   const [configLoaded, setConfigLoaded] = useState(false);
 
   // Risk presets based on selection
@@ -99,9 +104,9 @@ export function CopyTradingFlow({
         exchange: "binance",
         models_follow: ["GPT-4o", "Claude", "Gemini", "DeepSeek", "Llama"],
         execution_mode: "full-auto",
-        position_size_usd: preset.positionSize,
-        max_leverage: preset.leverage,
-        max_positions: preset.concurrent,
+        position_size_usd: showFineTune ? customSize : preset.positionSize,
+        max_leverage: showFineTune ? customLeverage : preset.leverage,
+        max_positions: showFineTune ? customPositions : preset.concurrent,
         max_daily_loss_pct: FIXED_CONFIG.maxDailyLossPct,
         stop_loss_pct: 3,
         take_profit_pct: 6,
@@ -181,6 +186,16 @@ export function CopyTradingFlow({
       {/* Step 2: AI suggestions + risk + activate */}
       {step === "ai" && (
         <div className="space-y-4">
+          {/* Models following */}
+          <div className="rounded-xl bg-white/[0.02] p-4" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+            <h3 className="text-xs font-bold text-foreground/50 mb-2">{t("copy.followingModels", "跟随模型")}</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {["🟢 GPT-4o", "🟠 Claude", "🔵 Gemini", "🟣 DeepSeek", "🦙 Llama"].map(m => (
+                <span key={m} className="text-[10px] px-2 py-1 rounded-lg bg-primary/8 text-primary border border-primary/15 font-semibold">{m}</span>
+              ))}
+            </div>
+          </div>
+
           {/* AI Coin Picker */}
           <AICoinPicker compact />
 
@@ -212,9 +227,31 @@ export function CopyTradingFlow({
               <ParamCard label={t("copy.positionSize", "单笔仓位")} value={`$${preset.positionSize}`} />
               <ParamCard label={t("copy.maxLeverage", "最大杠杆")} value={`${preset.leverage}x`} />
               <ParamCard label={t("copy.maxPositions", "最大持仓")} value={`${preset.concurrent}`} />
-              <ParamCard label={t("copy.maxDrawdown", "最大回撤")} value={`${preset.drawdown}%`} />
+              <ParamCard label={t("copy.maxDrawdown", "最大回撤")} value={`${showFineTune ? customDrawdown : preset.drawdown}%`} />
             </div>
+            <button
+              onClick={() => {
+                if (!showFineTune) { setCustomSize(preset.positionSize); setCustomLeverage(preset.leverage); setCustomPositions(preset.concurrent); setCustomDrawdown(preset.drawdown); }
+                setShowFineTune(!showFineTune);
+              }}
+              className="text-[10px] text-primary/60 hover:text-primary transition-colors mt-1"
+            >
+              {showFineTune ? t("copy.useAiParams", "使用 AI 建议") : t("copy.fineTune", "手动微调参数 →")}
+            </button>
           </div>
+
+          {/* Fine-tune panel */}
+          {showFineTune && (
+            <div className="rounded-xl bg-white/[0.02] p-4 space-y-3" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+              <h3 className="text-xs font-bold text-foreground/50">{t("copy.fineTuneParams", "参数微调")}</h3>
+              <div className="space-y-2.5">
+                <RangeRow label={t("copy.positionSize", "单笔仓位")} value={customSize} min={100} max={1000} step={50} unit="$" onChange={setCustomSize} />
+                <RangeRow label={t("copy.maxLeverage", "最大杠杆")} value={customLeverage} min={1} max={10} step={1} unit="x" onChange={setCustomLeverage} />
+                <RangeRow label={t("copy.maxPositions", "最大持仓")} value={customPositions} min={1} max={5} step={1} unit="" onChange={setCustomPositions} />
+                <RangeRow label={t("copy.maxDrawdown", "最大回撤")} value={customDrawdown} min={5} max={20} step={1} unit="%" onChange={setCustomDrawdown} />
+              </div>
+            </div>
+          )}
 
           {/* Fixed rules */}
           <div className="rounded-xl bg-white/[0.02] p-4" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -286,6 +323,22 @@ function ParamCard({ label, value }: { label: string; value: string }) {
     <div className="px-3 py-2.5 rounded-lg bg-white/[0.02]" style={{ border: "1px solid rgba(255,255,255,0.04)" }}>
       <p className="text-[10px] text-foreground/25">{label}</p>
       <p className="text-sm font-bold mt-0.5 text-foreground/60">{value}</p>
+    </div>
+  );
+}
+
+function RangeRow({ label, value, min, max, step, unit, onChange }: {
+  label: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] text-foreground/40">{label}</span>
+        <span className="text-xs font-bold text-foreground/60">{unit === "$" ? `$${value}` : `${value}${unit}`}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full h-1 rounded-full appearance-none bg-foreground/10 accent-primary" />
     </div>
   );
 }
