@@ -29,6 +29,7 @@ const TX_TYPE_COLORS: Record<string, string> = {
   FIXED_YIELD: "bg-yellow-500/15 text-yellow-400",
   REWARD_RELEASE: "bg-teal-500/15 text-teal-400",
   COMPLETED: "bg-primary/15 text-primary",
+  BONUS_GRANT: "bg-amber-500/15 text-amber-400",
   CONFIRMED: "bg-primary/15 text-primary",
 };
 
@@ -47,6 +48,7 @@ const TX_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
   DIRECT_REFERRAL: { key: "tx.directReferral", fallback: "直推奖励" },
   FIXED_YIELD: { key: "tx.fixedYield", fallback: "节点收益" },
   REWARD_RELEASE: { key: "tx.rewardRelease", fallback: "释放到账" },
+  BONUS_GRANT: { key: "tx.bonusGrant", fallback: "体验金赠送" },
 };
 
 const FILTER_KEYS = [

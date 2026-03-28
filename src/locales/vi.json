@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "Phí Rút Sớm (20%)",
     "earlyRedeemWarning": "Rút sớm sẽ trừ 20% MA đã đúc, chỉ nhận lại 80%",
     "redeemReceive": "Nhận Khi Rút",
-    "approxValue": "≈ ${{value}} (tại giá ${{price}})"
+    "approxValue": "≈ ${{value}} (tại giá ${{price}})",
+    "bonusLabel": "Thưởng",
+    "bonusBadge": "Quà",
+    "bonusYieldLocked": "Lợi nhuận bị khóa · Nạp ≥100U để mở khóa",
+    "bonusGranted": "Đã tặng 500U"
   },
   "deposit": {
     "inputError": "Lỗi Nhập Liệu",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "Thưởng"
   }
 }

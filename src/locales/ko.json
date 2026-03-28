@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "조기 상환 벌금 (20%)",
     "earlyRedeemWarning": "만료 전 상환 시 주조 MA의 20%가 차감되며, 80%만 반환",
     "redeemReceive": "상환 수령",
-    "approxValue": "≈ ${{value}} (현재가 ${{price}})"
+    "approxValue": "≈ ${{value}} (현재가 ${{price}})",
+    "bonusLabel": "보너스",
+    "bonusBadge": "선물",
+    "bonusYieldLocked": "수익 잠김 · ≥100U 입금(45/90/180일)으로 해제",
+    "bonusGranted": "500U 보너스 지급"
   },
   "deposit": {
     "inputError": "입력 오류",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "보너스 지급"
   }
 }

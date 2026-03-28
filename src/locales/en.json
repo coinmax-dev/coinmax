@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "Early Redeem Penalty (20%)",
     "earlyRedeemWarning": "Early redemption deducts 20% of minted MA, only 80% returned",
     "redeemReceive": "Redeem Receive",
-    "approxValue": "≈ ${{value}} (at price ${{price}})"
+    "approxValue": "≈ ${{value}} (at price ${{price}})",
+    "bonusLabel": "Bonus",
+    "bonusBadge": "Gift",
+    "bonusYieldLocked": "Yield locked · Deposit ≥100U (45/90/180 days) to unlock",
+    "bonusGranted": "500U Bonus Granted"
   },
   "deposit": {
     "inputError": "Input Error",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "Bonus Grant"
   }
 }

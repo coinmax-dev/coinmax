@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "Vorzeitige Einlösungsstrafe (20%)",
     "earlyRedeemWarning": "Vorzeitige Einlösung zieht 20% des geprägten MA ab, nur 80% werden zurückgegeben",
     "redeemReceive": "Einlösung Erhalten",
-    "approxValue": "≈ ${{value}} (zum Preis ${{price}})"
+    "approxValue": "≈ ${{value}} (zum Preis ${{price}})",
+    "bonusLabel": "Bonus",
+    "bonusBadge": "Geschenk",
+    "bonusYieldLocked": "Ertrag gesperrt · ≥100U einzahlen zum Entsperren",
+    "bonusGranted": "500U Bonus Gewährt"
   },
   "deposit": {
     "inputError": "Eingabefehler",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "Bonus"
   }
 }

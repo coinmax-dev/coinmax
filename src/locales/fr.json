@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "Pénalité de Rachat Anticipé (20%)",
     "earlyRedeemWarning": "Le rachat anticipé déduit 20% du MA émis, seuls 80% sont restitués",
     "redeemReceive": "Rachat Reçu",
-    "approxValue": "≈ ${{value}} (au prix ${{price}})"
+    "approxValue": "≈ ${{value}} (au prix ${{price}})",
+    "bonusLabel": "Bonus",
+    "bonusBadge": "Cadeau",
+    "bonusYieldLocked": "Rendement verrouillé · Déposez ≥100U pour débloquer",
+    "bonusGranted": "500U Bonus Accordé"
   },
   "deposit": {
     "inputError": "Erreur de Saisie",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "Bonus"
   }
 }

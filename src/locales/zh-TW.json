@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "提前贖回罰金 (20%)",
     "earlyRedeemWarning": "未到期贖回將扣除鑄造 MA 的 20%，僅返還 80%",
     "redeemReceive": "贖回獲得",
-    "approxValue": "≈ ${{value}} (按當前價 ${{price}})"
+    "approxValue": "≈ ${{value}} (按當前價 ${{price}})",
+    "bonusLabel": "Bonus",
+    "bonusBadge": "Gift",
+    "bonusYieldLocked": "Yield locked · Deposit ≥100U (45/90/180 days) to unlock",
+    "bonusGranted": "500U Bonus Granted"
   },
   "deposit": {
     "inputError": "輸入錯誤",
@@ -960,6 +964,7 @@
     "filterDirect": "直推奖励",
     "filterTeam": "团队奖励",
     "filterNode": "节点收益",
-    "filterRedeem": "赎回/提取"
+    "filterRedeem": "赎回/提取",
+    "bonusGrant": "Bonus Grant"
   }
 }

@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "Penalidad por Canje Anticipado (20%)",
     "earlyRedeemWarning": "El canje anticipado deduce 20% del MA acuñado, solo se devuelve el 80%",
     "redeemReceive": "Canje Recibido",
-    "approxValue": "≈ ${{value}} (al precio ${{price}})"
+    "approxValue": "≈ ${{value}} (al precio ${{price}})",
+    "bonusLabel": "Bono",
+    "bonusBadge": "Regalo",
+    "bonusYieldLocked": "Rendimiento bloqueado · Deposite ≥100U para desbloquear",
+    "bonusGranted": "500U Bono Otorgado"
   },
   "deposit": {
     "inputError": "Error de Entrada",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "Bono"
   }
 }

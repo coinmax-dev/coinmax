@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Lock, ArrowDownToLine, ArrowUpFromLine, Sparkles, AlertCircle, Loader2, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { VaultChart } from "@/components/vault/vault-chart";
 import { VaultStats } from "@/components/vault/vault-stats";
 import { VaultDepositDialog } from "@/components/vault/vault-deposit-dialog";
@@ -303,11 +304,19 @@ export default function Vault() {
                           const now = new Date();
                           const daysLeft = end ? Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400_000)) : 0;
                           const isExpired = end ? now >= end : false;
+                          const isBonus = (pos as any).isBonus || pos.planType === "BONUS_5D";
+                          const yieldLocked = (pos as any).bonusYieldLocked;
                           return (
-                            <div key={pos.id} className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2.5 text-xs">
+                            <div key={pos.id} className={cn("flex items-center justify-between rounded-md px-3 py-2.5 text-xs", isBonus ? "bg-amber-500/5 border border-amber-500/10" : "bg-muted/30")}>
                               <div>
-                                <span className="font-semibold text-sm">${Number(pos.principal).toFixed(0)}</span>
-                                <span className="text-muted-foreground ml-2">{planConfig?.label || pos.planType}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-sm">${Number(pos.principal).toFixed(0)}</span>
+                                  <span className="text-muted-foreground">{isBonus ? t("vault.bonusLabel", "体验金") : (planConfig?.label || pos.planType)}</span>
+                                  {isBonus && <Badge className="text-[8px] bg-amber-500/10 text-amber-400 border-amber-500/20">{t("vault.bonusBadge", "赠送")}</Badge>}
+                                </div>
+                                {isBonus && yieldLocked && (
+                                  <p className="text-[9px] text-amber-400/60 mt-0.5">{t("vault.bonusYieldLocked", "收益锁仓中 · 存入≥100U(45/90/180天)激活")}</p>
+                                )}
                               </div>
                               <span className={isExpired ? "text-green-400" : "text-yellow-400"}>
                                 {isExpired ? t("vault.expired", "已到期") : t("vault.daysUntilExpiry", "{{days}}天后到期", { days: daysLeft })}

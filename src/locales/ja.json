@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "早期償還ペナルティ (20%)",
     "earlyRedeemWarning": "期限前の償還は鋳造MAの20%が差し引かれ、80%のみ返還",
     "redeemReceive": "償還受取",
-    "approxValue": "≈ ${{value}} (現在価格 ${{price}})"
+    "approxValue": "≈ ${{value}} (現在価格 ${{price}})",
+    "bonusLabel": "ボーナス",
+    "bonusBadge": "贈呈",
+    "bonusYieldLocked": "収益ロック中 · ≥100U入金(45/90/180日)で解除",
+    "bonusGranted": "500Uボーナス付与"
   },
   "deposit": {
     "inputError": "入力エラー",
@@ -960,6 +964,7 @@
     "filterDirect": "直接報酬",
     "filterTeam": "チーム報酬",
     "filterNode": "ノード収益",
-    "filterRedeem": "償還/引出"
+    "filterRedeem": "償還/引出",
+    "bonusGrant": "ボーナス付与"
   }
 }

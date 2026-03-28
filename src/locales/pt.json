@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "Penalidade de Resgate Antecipado (20%)",
     "earlyRedeemWarning": "O resgate antecipado deduz 20% do MA cunhado, apenas 80% retornado",
     "redeemReceive": "Resgate Recebido",
-    "approxValue": "≈ ${{value}} (ao preço ${{price}})"
+    "approxValue": "≈ ${{value}} (ao preço ${{price}})",
+    "bonusLabel": "Bônus",
+    "bonusBadge": "Presente",
+    "bonusYieldLocked": "Rendimento bloqueado · Deposite ≥100U para desbloquear",
+    "bonusGranted": "500U Bônus Concedido"
   },
   "deposit": {
     "inputError": "Erro de Entrada",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "Bônus"
   }
 }

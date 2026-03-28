@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "Штраф за Досрочный Выкуп (20%)",
     "earlyRedeemWarning": "Досрочный выкуп удерживает 20% от выпущенного MA, возвращается только 80%",
     "redeemReceive": "Получено при Выкупе",
-    "approxValue": "≈ ${{value}} (по цене ${{price}})"
+    "approxValue": "≈ ${{value}} (по цене ${{price}})",
+    "bonusLabel": "Бонус",
+    "bonusBadge": "Подарок",
+    "bonusYieldLocked": "Доход заблокирован · Внесите ≥100U для разблокировки",
+    "bonusGranted": "500U Бонус Выдан"
   },
   "deposit": {
     "inputError": "Ошибка Ввода",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "Бонус"
   }
 }

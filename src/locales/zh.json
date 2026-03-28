@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "提前赎回罚金 (20%)",
     "earlyRedeemWarning": "未到期赎回将扣除铸造 MA 的 20%，仅返还 80%",
     "redeemReceive": "赎回获得",
-    "approxValue": "≈ ${{value}} (按当前价 ${{price}})"
+    "approxValue": "≈ ${{value}} (按当前价 ${{price}})",
+    "bonusLabel": "体验金",
+    "bonusBadge": "赠送",
+    "bonusYieldLocked": "收益锁仓中 · 存入≥100U(45/90/180天)激活",
+    "bonusGranted": "500U 体验金已赠送"
   },
   "deposit": {
     "inputError": "输入错误",
@@ -976,6 +980,7 @@
     "filterDirect": "直推奖励",
     "filterTeam": "团队奖励",
     "filterNode": "节点收益",
-    "filterRedeem": "赎回/提取"
+    "filterRedeem": "赎回/提取",
+    "bonusGrant": "体验金赠送"
   }
 }

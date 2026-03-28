@@ -194,7 +194,11 @@
     "earlyRedeemPenalty": "غرامة الاسترداد المبكر (20%)",
     "earlyRedeemWarning": "الاسترداد المبكر يخصم 20% من MA المسكوك، يُعاد 80% فقط",
     "redeemReceive": "مبلغ الاسترداد",
-    "approxValue": "≈ ${{value}} (بسعر ${{price}})"
+    "approxValue": "≈ ${{value}} (بسعر ${{price}})",
+    "bonusLabel": "مكافأة",
+    "bonusBadge": "هدية",
+    "bonusYieldLocked": "العائد مقفل · أودع ≥100U للفتح",
+    "bonusGranted": "تم منح مكافأة 500U"
   },
   "deposit": {
     "inputError": "خطأ في الإدخال",
@@ -960,6 +964,7 @@
     "filterDirect": "Direct Rewards",
     "filterTeam": "Team Rewards",
     "filterNode": "Node Yield",
-    "filterRedeem": "Redeem/Withdraw"
+    "filterRedeem": "Redeem/Withdraw",
+    "bonusGrant": "مكافأة"
   }
 }
