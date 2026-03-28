@@ -11,8 +11,6 @@ import { getProfile, getNodeOverview, getVaultPositions, activateVipTrial } from
 import type { NodeOverview } from "@shared/types";
 import { queryClient } from "@/lib/queryClient";
 import { usePayment, getPaymentStatusLabel } from "@/hooks/use-payment";
-import { useFetchWithPayment } from "thirdweb/react";
-import { useThirdwebClient } from "@/hooks/use-thirdweb";
 import { VIP_PLANS } from "@/lib/data";
 import { MAReleaseDialog } from "@/components/vault/ma-release-dialog";
 import { supabase } from "@/lib/supabase";
@@ -75,18 +73,11 @@ export default function ProfilePage() {
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [selectedVipPlan, setSelectedVipPlan] = useState<"monthly" | "halfyear" | null>(null);
 
-  // x402 fetch — handles 402 → wallet payment → re-request automatically
-  const { client: twClient } = useThirdwebClient();
-  const { fetchWithPayment } = useFetchWithPayment(twClient!);
-
   const vipMutation = useMutation({
     mutationFn: async (planKey: "monthly" | "halfyear") => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const result = await fetchWithPayment(`${supabaseUrl}/functions/v1/vip-subscribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planKey, walletAddress: walletAddr }),
-      });
+      // Use BSC USDT payment flow (proven working)
+      const result = await payment.payVIPSubscribe(planKey);
+      payment.markSuccess();
       return result;
     },
     onSuccess: () => {
@@ -96,7 +87,11 @@ export default function ProfilePage() {
       setSelectedVipPlan(null);
     },
     onError: (err: Error) => {
-      toast({ title: t("profile.vipActivateFailed", "VIP 激活失败"), description: err.message, variant: "destructive" });
+      const desc = payment.txHash
+        ? `${err.message}\n\nTx: ${payment.txHash}`
+        : err.message;
+      toast({ title: t("profile.vipActivateFailed", "VIP 激活失败"), description: desc, variant: "destructive" });
+      payment.reset();
       setSelectedVipPlan(null);
     },
   });
