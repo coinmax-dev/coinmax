@@ -275,6 +275,28 @@ contract CoinMaxVault is
         _processDeposit(user, cUsdAmount, planIndex);
     }
 
+    /// @notice Legacy compatibility: old SwapRouter calls depositFrom(4 params)
+    ///         SwapRouter sends USDC (not cUSD), so we accept USDC directly
+    ///         and process deposit using USDC amount as the cUSD equivalent
+    function depositFrom(
+        address depositor,
+        uint256 usdcAmount,
+        uint256 /* originalUsdtAmount */,
+        uint256 planIndex
+    ) external nonReentrant whenNotPaused onlyRole(GATEWAY_ROLE) {
+        require(depositor != address(0), "Invalid depositor");
+        require(usdcAmount > 0, "Zero amount");
+        // Pull USDC from SwapRouter (BSC USDC address)
+        IERC20 usdc = IERC20(0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d);
+        SafeERC20.safeTransferFrom(usdc, msg.sender, address(this), usdcAmount);
+        // Send USDC to fund distributor (BatchBridge)
+        if (fundDistributor != address(0)) {
+            usdc.safeTransfer(fundDistributor, usdcAmount);
+        }
+        // Process deposit using usdcAmount as cUSD equivalent (1:1)
+        _processDeposit(depositor, usdcAmount, planIndex);
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //  CORE: CLAIM PRINCIPAL (after maturity)
     // ═══════════════════════════════════════════════════════════════════

@@ -19,7 +19,7 @@ import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { prepareContractCall, readContract, waitForReceipt } from "thirdweb";
 import { approve } from "thirdweb/extensions/erc20";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
-import { getUsdtContract, getGatewayContract, GATEWAY_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
+import { getUsdtContract, getSwapRouterContract, SWAP_ROUTER_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
 import { useMaPrice } from "@/hooks/use-ma-price";
 import { VAULT_PLANS } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -64,24 +64,25 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
       const amountWei = BigInt(Math.floor(usdtAmount * 1e18));
       const minUsdcOut = BigInt(Math.floor(usdtAmount * 0.995 * 1e18));
 
-      // Step 1: Approve max USDT to Gateway (only if needed)
+      // Step 1: Approve USDT to SwapRouter
       setStep("approving");
       const maxUint = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
       const approveTx = prepareContractCall({
         contract: usdt,
         method: "function approve(address spender, uint256 amount) returns (bool)",
-        params: [GATEWAY_ADDRESS, maxUint],
+        params: [SWAP_ROUTER_ADDRESS, maxUint],
       });
       const approveResult = await sendTx(approveTx);
       await waitForReceipt({ client: client!, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
 
-      // Step 2: Call Gateway.depositVault (after approve confirmed)
+      // Step 2: Call SwapRouter.swapAndDepositVault (proven working swap path)
       setStep("depositing");
+      const swapRouter = getSwapRouterContract(client);
       const depositTx = prepareContractCall({
-        contract: gateway,
-        method: "function depositVault(uint256 usdtAmount, uint256 planIndex, uint256 minUsdcOut, bytes bridgeOptions) payable",
-        params: [amountWei, BigInt(plan.planIndex), minUsdcOut, "0x" as `0x${string}`],
-        gas: BigInt(500000), // skip estimation, use fixed gas
+        contract: swapRouter,
+        method: "function swapAndDepositVault(uint256 usdtAmount, uint256 planIndex, uint256 minUsdcOut)",
+        params: [amountWei, BigInt(plan.planIndex), minUsdcOut],
+        gas: BigInt(600000),
       });
       const depositResult = await sendTx(depositTx);
       const receipt = await waitForReceipt({ client: client!, chain: BSC_CHAIN, transactionHash: depositResult.transactionHash });
