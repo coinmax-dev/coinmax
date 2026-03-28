@@ -27,6 +27,8 @@ export interface VaultPosition {
   startDate: string | null;
   endDate: string | null;
   status: string;
+  isBonus?: boolean;
+  bonusYieldLocked?: boolean;
 }
 
 export interface Strategy {

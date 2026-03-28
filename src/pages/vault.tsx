@@ -304,8 +304,8 @@ export default function Vault() {
                           const now = new Date();
                           const daysLeft = end ? Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400_000)) : 0;
                           const isExpired = end ? now >= end : false;
-                          const isBonus = (pos as any).isBonus || pos.planType === "BONUS_5D";
-                          const yieldLocked = (pos as any).bonusYieldLocked;
+                          const isBonus = pos.isBonus || pos.planType === "BONUS_5D";
+                          const yieldLocked = pos.bonusYieldLocked;
                           return (
                             <div key={pos.id} className={cn("flex items-center justify-between rounded-md px-3 py-2.5 text-xs", isBonus ? "bg-amber-500/5 border border-amber-500/10" : "bg-muted/30")}>
                               <div>
