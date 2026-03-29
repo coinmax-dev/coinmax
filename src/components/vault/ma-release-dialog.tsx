@@ -126,6 +126,8 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
       let total = 0;
       const now = new Date();
       for (const pos of positions) {
+        // Skip bonus positions with locked yield (same as profile page)
+        if (pos.bonus_yield_locked) continue;
         const start = new Date(pos.start_date);
         const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86400_000));
         total += Number(pos.principal) * Number(pos.daily_rate) * days;
