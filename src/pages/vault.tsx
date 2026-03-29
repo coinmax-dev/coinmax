@@ -301,8 +301,8 @@ export default function Vault() {
                           const planConfig = VAULT_PLANS[pos.planType as keyof typeof VAULT_PLANS];
                           const isBonus = pos.isBonus || pos.planType === "BONUS_5D";
                           const yieldLocked = pos.bonusYieldLocked;
-                          const dailyRatePct = planConfig ? (planConfig.dailyRate * 100).toFixed(1) : "0.0";
-                          const cycleDays = planConfig?.days || 0;
+                          const dailyRatePct = isBonus ? "0.5" : planConfig ? (planConfig.dailyRate * 100).toFixed(1) : "0.0";
+                          const cycleDays = isBonus ? 5 : (planConfig?.days || 0);
                           return (
                             <div key={pos.id} className={cn("flex items-center justify-between rounded-md px-3 py-2.5 text-xs", isBonus ? "bg-amber-500/5 border border-amber-500/10" : "bg-muted/30")}>
                               <div>
