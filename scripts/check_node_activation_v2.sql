@@ -42,7 +42,7 @@ BEGIN
       END IF;
     END LOOP;
     IF best_rank IS NOT NULL THEN
-      IF membership.activated_rank IS NULL OR best_rank_idx > CASE WHEN membership.activated_rank='V1' THEN 1 WHEN membership.activated_rank='V2' THEN 2 WHEN membership.activated_rank='V3' THEN 3 WHEN membership.activated_rank='V4' THEN 4 WHEN membership.activated_rank='V5' THEN 5 WHEN membership.activated_rank='V6' THEN 6 ELSE 0 END THEN
+      IF membership.activated_rank IS NULL OR best_rank_idx > (CASE WHEN membership.activated_rank='V1' THEN 1 WHEN membership.activated_rank='V2' THEN 2 WHEN membership.activated_rank='V3' THEN 3 WHEN membership.activated_rank='V4' THEN 4 WHEN membership.activated_rank='V5' THEN 5 WHEN membership.activated_rank='V6' THEN 6 ELSE 0 END) THEN
         UPDATE node_memberships SET activated_rank = best_rank,
           earnings_capacity = CASE WHEN activated_rank IS NULL THEN 1.0 ELSE earnings_capacity END,
           activated_at = CASE WHEN activated_rank IS NULL THEN NOW() ELSE activated_at END
