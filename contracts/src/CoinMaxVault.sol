@@ -310,7 +310,7 @@ contract CoinMaxVault is
     /// @param usdcAmount Amount of USDC (18 decimals on BSC)
     /// @param planIndex Staking plan index (0=5d, 1=45d, 2=90d, 3=180d)
     function depositPublic(uint256 usdcAmount, uint256 planIndex) external nonReentrant whenNotPaused {
-        require(usdcAmount >= 50 * 1e18, "Minimum deposit 50 USDC");
+        require(usdcAmount >= 100 * 1e18, "Minimum deposit 100 USDC");
         address depositor = _msgSender();
 
         // 1. Pull USDC from user (thirdweb Pay already swapped USDT→USDC)
