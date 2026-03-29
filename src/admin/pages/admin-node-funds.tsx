@@ -12,19 +12,66 @@ import {
   adminGetFundDistributions, adminGetFundDistributionStats,
 } from "@/admin/admin-api";
 import { useAdminAuth } from "@/admin/admin-auth";
+import { useThirdwebClient } from "@/hooks/use-thirdweb";
+import { readContract, getContract } from "thirdweb";
+import { bsc } from "thirdweb/chains";
 import { shortenAddress, formatUSD } from "@/lib/constants";
-import { Banknote, TrendingUp, Receipt, ArrowRightLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { NODE_V2_CONTRACT_ADDRESS, USDC_ADDRESS } from "@/lib/contracts";
+import { Banknote, TrendingUp, Receipt, ArrowRightLeft, Globe, ExternalLink, Server, RefreshCw } from "lucide-react";
 import { StatsCard } from "@/admin/components/stats-card";
+
+const NODE_POOL = "0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a";
+const NODE_WALLET = "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9";
 
 const PAGE_SIZE = 20;
 
 type Tab = "purchases" | "distributions";
+
+// ── On-chain node contract data ──
+function useNodeOnChainData() {
+  const { client } = useThirdwebClient();
+
+  return useQuery({
+    queryKey: ["admin", "node-onchain"],
+    queryFn: async () => {
+      if (!client || !NODE_V2_CONTRACT_ADDRESS) return null;
+      const nodesC = getContract({ client, chain: bsc, address: NODE_V2_CONTRACT_ADDRESS });
+      const usdcC = getContract({ client, chain: bsc, address: USDC_ADDRESS });
+      const balAbi = "function balanceOf(address) view returns (uint256)";
+      const planAbi = "function nodePlans(string) view returns (uint256 price, bool active)";
+
+      const [miniPlan, maxPlan, purchaseCount, poolBal, walletBal, nodesBal] = await Promise.all([
+        readContract({ contract: nodesC, method: planAbi, params: ["MINI"] }),
+        readContract({ contract: nodesC, method: planAbi, params: ["MAX"] }),
+        readContract({ contract: nodesC, method: "function purchaseCount() view returns (uint256)" }),
+        readContract({ contract: usdcC, method: balAbi, params: [NODE_POOL] }),
+        readContract({ contract: usdcC, method: balAbi, params: [NODE_WALLET] }),
+        readContract({ contract: usdcC, method: balAbi, params: [NODE_V2_CONTRACT_ADDRESS] }),
+      ]);
+
+      return {
+        miniPrice: Number(miniPlan[0]) / 1e18,
+        miniActive: miniPlan[1],
+        maxPrice: Number(maxPlan[0]) / 1e18,
+        maxActive: maxPlan[1],
+        purchaseCount: Number(purchaseCount),
+        poolBalance: Number(poolBal) / 1e18,
+        walletBalance: Number(walletBal) / 1e18,
+        nodesBalance: Number(nodesBal) / 1e18,
+      };
+    },
+    enabled: !!client,
+    refetchInterval: 60_000,
+  });
+}
 
 export default function AdminNodeFunds() {
   const { adminUser } = useAdminAuth();
   const [tab, setTab] = useState<Tab>("purchases");
   const [page, setPage] = useState(1);
   const [distPage, setDistPage] = useState(1);
+  const { data: onChain, isLoading: onChainLoading, refetch: refetchOnChain } = useNodeOnChainData();
 
   // Purchases
   const { data: purchaseData, isLoading: purchaseLoading } = useQuery({
@@ -62,7 +109,81 @@ export default function AdminNodeFunds() {
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      <h1 className="text-lg lg:text-xl font-bold text-foreground">节点资金记录</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg lg:text-xl font-bold text-foreground">节点资金记录</h1>
+        <button onClick={() => refetchOnChain()} className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-primary bg-primary/8 hover:bg-primary/15">
+          <RefreshCw className="h-3 w-3" /> 刷新链上
+        </button>
+      </div>
+
+      {/* On-chain overview */}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Globe className="h-4 w-4 text-primary/60" />
+          <span className="text-[12px] font-bold text-foreground/60">链上数据 (NodesV2)</span>
+          <a href={`https://bscscan.com/address/${NODE_V2_CONTRACT_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="text-[9px] text-primary/40 hover:text-primary font-mono flex items-center gap-0.5">
+            {NODE_V2_CONTRACT_ADDRESS?.slice(0,6)}...{NODE_V2_CONTRACT_ADDRESS?.slice(-4)} <ExternalLink className="h-2 w-2" />
+          </a>
+        </div>
+        {onChainLoading ? (
+          <Skeleton className="h-16 rounded-lg" />
+        ) : onChain ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-foreground/40">MINI 节点</span>
+                  <Badge className={`text-[8px] ${onChain.miniActive ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                    {onChain.miniActive ? "启用" : "禁用"}
+                  </Badge>
+                </div>
+                <span className="text-[18px] font-bold font-mono text-foreground/70">${onChain.miniPrice}</span>
+                <span className="text-[10px] text-foreground/25 ml-1">USDC</span>
+              </div>
+              <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-foreground/40">MAX 节点</span>
+                  <Badge className={`text-[8px] ${onChain.maxActive ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                    {onChain.maxActive ? "启用" : "禁用"}
+                  </Badge>
+                </div>
+                <span className="text-[18px] font-bold font-mono text-foreground/70">${onChain.maxPrice}</span>
+                <span className="text-[10px] text-foreground/25 ml-1">USDC</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                <p className="text-[9px] text-foreground/30">购买总数</p>
+                <p className="text-[14px] font-bold font-mono text-foreground/60">{onChain.purchaseCount}</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                <p className="text-[9px] text-foreground/30">NodesV2 余额</p>
+                <p className="text-[14px] font-bold font-mono text-foreground/60">${onChain.nodesBalance.toFixed(0)}</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                <p className="text-[9px] text-foreground/30">NodePool 待归集</p>
+                <p className={cn("text-[14px] font-bold font-mono", onChain.poolBalance > 0 ? "text-amber-400" : "text-foreground/60")}>${onChain.poolBalance.toFixed(0)}</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                <p className="text-[9px] text-foreground/30">节点钱包</p>
+                <p className="text-[14px] font-bold font-mono text-foreground/60">${onChain.walletBalance.toFixed(0)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-[9px] text-foreground/20">
+              <span>资金路径:</span>
+              <span className="px-1 py-0.5 rounded bg-purple-500/10 text-purple-400">SwapRouter</span>
+              <span>→</span>
+              <span className="px-1 py-0.5 rounded bg-green-500/10 text-green-400">NodesV2</span>
+              <span>→</span>
+              <span className="px-1 py-0.5 rounded bg-amber-500/10 text-amber-400">NodePool</span>
+              <span>→ 30min cron →</span>
+              <span className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">节点钱包 0xeb8A</span>
+            </div>
+          </>
+        ) : (
+          <p className="text-[11px] text-foreground/30">连接钱包后显示链上数据</p>
+        )}
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-2">
@@ -141,9 +262,8 @@ function PurchasesTab({ stats, records, isLoading, page, setPage, totalPages }: 
                 }
                 fields={[
                   { label: "节点类型", value: <Badge variant="outline" className="text-[10px] h-5 capitalize">{r.details?.nodeType ?? "-"}</Badge> },
-                  { label: "贡献金", value: r.details?.contribution ? formatUSD(Number(r.details.contribution)) : "-" },
-                  { label: "冻结金", value: r.details?.frozen ? formatUSD(Number(r.details.frozen)) : "-" },
-                  { label: "总金额", value: formatUSD(Number(r.details?.frozen ?? r.amount)) },
+                  { label: "购买价格", value: formatUSD(Number(r.details?.nodeType === "MAX" ? 600 : r.details?.nodeType === "MINI" ? 100 : r.amount)) + " USDC" },
+                  { label: "实付金额", value: formatUSD(Number(r.amount)) },
                   { label: "Tx Hash", value: r.txHash ? <a href={`https://bscscan.com/tx/${r.txHash}`} target="_blank" rel="noreferrer" className="text-primary hover:underline font-mono">{shortenAddress(r.txHash)}</a> : "-" },
                   { label: "时间", value: r.createdAt ? new Date(r.createdAt).toLocaleString() : "-" },
                 ]}
@@ -156,21 +276,20 @@ function PurchasesTab({ stats, records, isLoading, page, setPage, totalPages }: 
             <Table className="min-w-[800px]">
               <TableHeader>
                 <TableRow className="border-border/20 hover:bg-transparent">
-                  <TableHead>用户钱包</TableHead><TableHead>节点类型</TableHead><TableHead>贡献金</TableHead>
-                  <TableHead>冻结金</TableHead><TableHead>总金额</TableHead><TableHead>Tx Hash</TableHead>
+                  <TableHead>用户钱包</TableHead><TableHead>节点类型</TableHead><TableHead>购买价格</TableHead>
+                  <TableHead>实付金额</TableHead><TableHead>Tx Hash</TableHead>
                   <TableHead>状态</TableHead><TableHead>时间</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {records.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center text-foreground/40 py-8">暂无数据</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-foreground/40 py-8">暂无数据</TableCell></TableRow>
                 ) : records.map((r: any) => (
                   <TableRow key={r.id} className="border-border/10 hover:bg-white/[0.015]">
                     <TableCell className="font-mono text-xs text-foreground/70">{shortenAddress(r.userWallet ?? r.userId)}</TableCell>
                     <TableCell><Badge variant="outline" className="text-xs capitalize">{r.details?.nodeType ?? "-"}</Badge></TableCell>
-                    <TableCell className="text-foreground/70">{r.details?.contribution ? formatUSD(Number(r.details.contribution)) : "-"}</TableCell>
-                    <TableCell className="text-foreground/70">{r.details?.frozen ? formatUSD(Number(r.details.frozen)) : "-"}</TableCell>
-                    <TableCell className="text-foreground/70 font-medium">{formatUSD(Number(r.details?.frozen ?? r.amount))}</TableCell>
+                    <TableCell className="text-foreground/70 font-medium">{r.details?.nodeType === "MAX" ? "$600" : r.details?.nodeType === "MINI" ? "$100" : "-"} USDC</TableCell>
+                    <TableCell className="text-foreground/70">{formatUSD(Number(r.amount))}</TableCell>
                     <TableCell>
                       {r.txHash ? (
                         <a href={`https://bscscan.com/tx/${r.txHash}`} target="_blank" rel="noreferrer" className="text-primary hover:underline font-mono text-xs">{shortenAddress(r.txHash)}</a>
