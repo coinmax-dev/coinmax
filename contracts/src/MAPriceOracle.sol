@@ -4,6 +4,7 @@ pragma solidity ^0.8.27;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /// @notice PancakeSwap V3 Pool interface for on-chain TWAP
 interface IPancakeV3Pool {
@@ -44,7 +45,8 @@ interface IPancakeV3Pool {
 contract MAPriceOracle is
     Initializable,
     AccessControlUpgradeable,
-    PausableUpgradeable
+    PausableUpgradeable,
+    UUPSUpgradeable
 {
     // ═══════════════════════════════════════════════════════════════════
     //  ROLES
@@ -439,4 +441,7 @@ contract MAPriceOracle is
         // Convert from 18 decimals to 6 decimals
         return price18 / 1e12;
     }
+
+    // ─── UUPS Upgrade Authorization ─────────────────────────────────
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

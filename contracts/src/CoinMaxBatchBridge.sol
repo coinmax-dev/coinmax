@@ -94,7 +94,9 @@ contract CoinMaxBatchBridge is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice Bridge accumulated USDC to ARB via Stargate
     /// @dev Called by cron every 4 hours. Sends ALL accumulated USDC.
-    function bridgeToARB() external payable onlyOwner nonReentrant whenNotPaused {
+    ///      Uses contract's BNB balance for Stargate fee (no msg.value needed).
+    ///      Pre-fund with BNB via receive() or direct transfer.
+    function bridgeToARB() external onlyOwner nonReentrant whenNotPaused {
         require(block.timestamp >= lastBridgeTime + bridgeInterval, "Too soon");
 
         uint256 balance = usdc.balanceOf(address(this));
@@ -119,10 +121,10 @@ contract CoinMaxBatchBridge is Ownable, ReentrancyGuard, Pausable {
 
         // Quote fee
         IStargateRouter.MessagingFee memory fee = stargateRouter.quoteSend(params, false);
-        require(msg.value >= fee.nativeFee, "Insufficient native fee");
+        require(address(this).balance >= fee.nativeFee, "Insufficient BNB for fee");
 
-        // Send
-        stargateRouter.send{value: fee.nativeFee}(params, fee, msg.sender);
+        // Send using contract's BNB balance (not msg.value)
+        stargateRouter.send{value: fee.nativeFee}(params, fee, address(this));
 
         lastBridgeTime = block.timestamp;
         totalBridged += balance;
