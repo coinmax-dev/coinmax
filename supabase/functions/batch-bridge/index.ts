@@ -16,7 +16,7 @@ const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_ac
 
 // Will be updated after deployment
 const BATCH_BRIDGE_ADDRESS = Deno.env.get("BATCH_BRIDGE_ADDRESS") || "0x670dbfAA27C9a32023484B4BF7688171E70962f6";
-const RELAYER_ADDRESS = "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA";
+const DEPLOYER_ADDRESS = "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1";
 
 serve(async () => {
   try {
@@ -51,8 +51,8 @@ serve(async () => {
     // For now, send a fixed gas amount (0.003 BNB should cover Stargate + LZ fee)
     const gasFee = "0x" + (BigInt(3000000000000000)).toString(16); // 0.003 BNB
 
-    // 3. Call bridgeToARB() via thirdweb contracts/write
-    const res = await fetch("https://api.thirdweb.com/v1/contracts/write", {
+    // 3. Call bridgeToARB() via thirdweb (raw tx — payable needs value)
+    const res = await fetch("https://api.thirdweb.com/v1/transactions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -61,11 +61,10 @@ serve(async () => {
       },
       body: JSON.stringify({
         chainId: 56,
-        from: RELAYER_ADDRESS,
-        calls: [{
-          contractAddress: BATCH_BRIDGE_ADDRESS,
-          method: "function bridgeToARB() payable",
-          params: [],
+        from: DEPLOYER_ADDRESS,
+        transactions: [{
+          to: BATCH_BRIDGE_ADDRESS,
+          data: "0x8e3c0aab", // bridgeToARB()
           value: gasFee,
         }],
       }),

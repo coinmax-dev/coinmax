@@ -105,11 +105,12 @@ const FLASH_SWAP_READ_ABI = {
 
 // ── Server Wallets for gas monitoring ──
 const SERVER_WALLETS = [
-  { label: "Executor (主中继器·MINTER/FEEDER/ENGINE)", address: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA" },
-  { label: "Server Wallet (备用·4337)", address: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b" },
-  { label: "deployer (合约admin)", address: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1" },
+  { label: "Server Wallet (ERC-4337·MINTER/FEEDER/ENGINE)", address: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b" },
+  { label: "Deployer (EOA·合约admin·跨链)", address: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1" },
+  { label: "Relayer (EIP-7702·BSC不可用)", address: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA" },
   { label: "VIP接收钱包", address: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A" },
   { label: "节点接收钱包", address: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9" },
+  { label: "HL Treasury (ARB)", address: "0x60D416dA873508c23C1315a2b750a31201959d78" },
 ] as const;
 
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
@@ -664,14 +665,14 @@ export default function AdminContracts() {
             icon={<Wallet className="h-4 w-4 text-amber-400" />}
             address=""
             items={[
-              { label: "── Executor (thirdweb Engine) ──", value: "" },
-              { label: "Executor 中继器 (MINTER/FEEDER/ENGINE/NodePool Owner)", value: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA", type: "address" },
-              { label: "Server Wallet 备用 (4337 Account)", value: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b", type: "address" },
-              { label: "── 管理钱包 ──", value: "" },
-              { label: "deployer (合约admin·紧急恢复)", value: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", type: "address" },
+              { label: "── 执行钱包 ──", value: "" },
+              { label: "Server Wallet (ERC-4337·主执行)", value: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b", type: "address" },
+              { label: "Deployer (EOA·跨链+紧急恢复)", value: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", type: "address" },
+              { label: "Relayer (EIP-7702·BSC不可用)", value: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA", type: "address" },
               { label: "── 接收钱包 ──", value: "" },
               { label: "VIP接收 (USDT)", value: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A", type: "address" },
               { label: "节点接收 (USDC)", value: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", type: "address" },
+              { label: "HL Treasury (ARB)", value: "0x60D416dA873508c23C1315a2b750a31201959d78", type: "address" },
             ]}
             loading={false}
             onRefresh={() => {}}
@@ -1278,7 +1279,7 @@ function BatchGasPanel() {
 
 const THIRDWEB_SECRET = import.meta.env.VITE_THIRDWEB_SECRET_KEY || "";
 const THIRDWEB_VAULT_TOKEN = import.meta.env.VITE_THIRDWEB_VAULT_TOKEN || "";
-const EXECUTOR_ADDR = "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA";
+const EXECUTOR_ADDR = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
 const FEEDER_ROLE_HASH = "0x80a586cc4ecf40a390b370be075aa38ab3cc512c5c1a7bc1007974dbdf2663c7";
 
 async function callExecutor(calls: { contractAddress: string; method: string; params: string[] }[]) {
