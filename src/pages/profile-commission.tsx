@@ -160,13 +160,11 @@ export default function ProfileCommissionPage() {
                   <CardContent className="p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className={`h-8 w-8 rounded-md flex items-center justify-center shrink-0 ${
-                          isDirectRef ? "bg-primary/15" : "bg-amber-500/15"
-                        }`}>
+                        <div className="h-8 w-8 rounded-md flex items-center justify-center shrink-0 bg-foreground/[0.06]">
                           {isDirectRef ? (
-                            <UserPlus className="h-4 w-4 text-primary" />
+                            <UserPlus className="h-4 w-4 text-foreground/40" />
                           ) : (
-                            <Layers className="h-4 w-4 text-amber-500" />
+                            <Layers className="h-4 w-4 text-foreground/40" />
                           )}
                         </div>
                         <div className="min-w-0">

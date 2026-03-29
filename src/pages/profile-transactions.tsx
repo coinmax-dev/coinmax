@@ -15,22 +15,22 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 const TX_TYPE_COLORS: Record<string, string> = {
-  DEPOSIT: "bg-primary/15 text-primary",
-  VAULT_DEPOSIT: "bg-cyan-500/15 text-cyan-400",
-  WITHDRAW: "bg-red-500/15 text-red-400",
-  VAULT_REDEEM: "bg-orange-500/15 text-orange-400",
-  YIELD: "bg-blue-500/15 text-blue-400",
-  YIELD_CLAIM: "bg-emerald-500/15 text-emerald-400",
-  VIP_PURCHASE: "bg-purple-500/15 text-purple-400",
-  NODE_PURCHASE: "bg-amber-500/15 text-amber-400",
-  REWARD: "bg-green-500/15 text-green-400",
-  TEAM_COMMISSION: "bg-indigo-500/15 text-indigo-400",
-  DIRECT_REFERRAL: "bg-pink-500/15 text-pink-400",
-  FIXED_YIELD: "bg-yellow-500/15 text-yellow-400",
-  REWARD_RELEASE: "bg-teal-500/15 text-teal-400",
-  COMPLETED: "bg-primary/15 text-primary",
-  BONUS_GRANT: "bg-amber-500/15 text-amber-400",
-  CONFIRMED: "bg-primary/15 text-primary",
+  DEPOSIT: "bg-foreground/8 text-foreground/60",
+  VAULT_DEPOSIT: "bg-foreground/8 text-foreground/60",
+  WITHDRAW: "bg-foreground/8 text-foreground/60",
+  VAULT_REDEEM: "bg-foreground/8 text-foreground/60",
+  YIELD: "bg-foreground/8 text-foreground/60",
+  YIELD_CLAIM: "bg-foreground/8 text-foreground/60",
+  VIP_PURCHASE: "bg-foreground/8 text-foreground/60",
+  NODE_PURCHASE: "bg-foreground/8 text-foreground/60",
+  REWARD: "bg-foreground/8 text-foreground/60",
+  TEAM_COMMISSION: "bg-foreground/8 text-foreground/60",
+  DIRECT_REFERRAL: "bg-foreground/8 text-foreground/60",
+  FIXED_YIELD: "bg-foreground/8 text-foreground/60",
+  REWARD_RELEASE: "bg-foreground/8 text-foreground/60",
+  COMPLETED: "bg-foreground/8 text-foreground/60",
+  BONUS_GRANT: "bg-foreground/8 text-foreground/60",
+  CONFIRMED: "bg-foreground/8 text-foreground/60",
 };
 
 // Labels resolved at render time via t()
@@ -154,8 +154,8 @@ export default function ProfileTransactionsPage() {
                         </span>
                         <Badge className={`text-[9px] shrink-0 no-default-hover-elevate no-default-active-elevate ${
                           tx.status === "CONFIRMED" || tx.status === "COMPLETED"
-                            ? "bg-primary/15 text-primary"
-                            : "bg-yellow-500/15 text-yellow-400"
+                            ? "bg-foreground/8 text-foreground/50"
+                            : "bg-foreground/5 text-foreground/30"
                         }`}>
                           {tx.status}
                         </Badge>
@@ -165,7 +165,7 @@ export default function ProfileTransactionsPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className="text-[9px] border-yellow-500/30 text-yellow-400 no-default-hover-elevate no-default-active-elevate">
+                      <Badge variant="outline" className="text-[9px] border-foreground/10 text-foreground/40 no-default-hover-elevate no-default-active-elevate">
                         <Link className="h-2 w-2 mr-0.5" />BSC
                       </Badge>
                       {explorerUrl ? (
