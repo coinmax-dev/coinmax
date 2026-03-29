@@ -133,12 +133,53 @@ export default function AdminTreasury() {
     }
   };
 
+  // Call edge function directly
+  const callEdgeFunction = async (name: string, body: Record<string, unknown> = {}) => {
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  };
+
   // Trigger splitter flush
   const flushSplitter = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/splitter-flush`, { method: "POST", headers: { "Content-Type": "application/json" } });
-      const data = await res.json();
+      const data = await callEdgeFunction("splitter-flush");
       toast({ title: "Splitter Flush", description: `${data.status}: ${data.balance || ""}` });
+    } catch (e: any) {
+      toast({ title: "失败", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // Trigger NodePool flush
+  const flushNodePool = async () => {
+    try {
+      const data = await callEdgeFunction("flush-node-pool");
+      toast({ title: "NodePool Flush", description: `${data.status}: ${data.balance || ""}` });
+    } catch (e: any) {
+      toast({ title: "失败", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // Trigger batch bridge (BSC → ARB)
+  const triggerBridge = async () => {
+    try {
+      const data = await callEdgeFunction("batch-bridge");
+      toast({ title: "跨链桥", description: `${data.status}: ${data.balance || ""} ${data.txId ? "TX:" + data.txId.slice(0, 8) : ""}` });
+      refetchCycles();
+    } catch (e: any) {
+      toast({ title: "失败", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // Trigger HL deposit/withdraw
+  const triggerHL = async (action: string, amount?: number) => {
+    try {
+      const data = await callEdgeFunction("hl-treasury", { action, amount });
+      toast({ title: `HL ${action}`, description: JSON.stringify(data).slice(0, 100) });
+      refetchCycles();
     } catch (e: any) {
       toast({ title: "失败", description: e.message, variant: "destructive" });
     }
@@ -230,12 +271,12 @@ export default function AdminTreasury() {
           <h2 className="text-sm font-bold text-foreground/60">手动操作</h2>
         </div>
         <div className="p-4 lg:p-5 grid grid-cols-2 lg:grid-cols-3 gap-2">
-          <ActionButton label="Splitter 分配" desc="立即分配 USDC" icon={<ArrowRightLeft className="h-3.5 w-3.5" />} color="emerald" onClick={flushSplitter} />
-          <ActionButton label="BSC → ARB" desc="跨链到 Arbitrum" icon={<Globe className="h-3.5 w-3.5" />} color="blue" onClick={() => createCycle("BSC_TO_ARB")} disabled={switches.find(s => s.key === "bridge_enabled")?.value !== "true"} />
-          <ActionButton label="存入 HL" desc="USDC → HyperLiquid" icon={<ArrowDownToLine className="h-3.5 w-3.5" />} color="cyan" onClick={() => createCycle("DEPOSIT_HL")} disabled={switches.find(s => s.key === "hl_deposit_enabled")?.value !== "true"} />
-          <ActionButton label="提取 HL" desc="HyperLiquid → USDC" icon={<ArrowUpFromLine className="h-3.5 w-3.5" />} color="orange" onClick={() => createCycle("WITHDRAW_HL")} disabled={switches.find(s => s.key === "hl_withdraw_enabled")?.value !== "true"} />
-          <ActionButton label="ARB → BSC" desc="跨链回 BSC" icon={<Globe className="h-3.5 w-3.5" />} color="purple" onClick={() => createCycle("ARB_TO_BSC")} disabled={switches.find(s => s.key === "bridge_enabled")?.value !== "true"} />
-          <ActionButton label="完整周期" desc="BSC→ARB→HL→ARB→BSC" icon={<Zap className="h-3.5 w-3.5" />} color="amber" onClick={() => createCycle("FULL_ROUND")} disabled={switches.find(s => s.key === "bridge_enabled")?.value !== "true"} />
+          <ActionButton label="Splitter 分配" desc="金库 USDC 分配" icon={<ArrowRightLeft className="h-3.5 w-3.5" />} color="emerald" onClick={flushSplitter} />
+          <ActionButton label="NodePool 分配" desc="节点 USDC → 接收钱包" icon={<ArrowRightLeft className="h-3.5 w-3.5" />} color="emerald" onClick={flushNodePool} />
+          <ActionButton label="BSC → ARB 跨链" desc="BatchBridge → Stargate" icon={<Globe className="h-3.5 w-3.5" />} color="blue" onClick={triggerBridge} />
+          <ActionButton label="存入 HL Vault" desc="ARB USDC → HL" icon={<ArrowDownToLine className="h-3.5 w-3.5" />} color="cyan" onClick={() => triggerHL("deposit")} />
+          <ActionButton label="提取 HL Vault" desc="HL → ARB USDC (24h)" icon={<ArrowUpFromLine className="h-3.5 w-3.5" />} color="orange" onClick={() => triggerHL("withdraw")} />
+          <ActionButton label="HL 余额查询" desc="查看 HL 持仓" icon={<RefreshCw className="h-3.5 w-3.5" />} color="foreground" onClick={() => triggerHL("status")} />
         </div>
       </div>
 
