@@ -201,7 +201,8 @@
     "bonusGranted": "تم منح مكافأة 500U",
     "progress": "Progress",
     "perDay": "day",
-    "totalEarned": "Total Earned"
+    "totalEarned": "Total Earned",
+    "yieldLocked": "Yield (Locked)"
   },
   "deposit": {
     "inputError": "خطأ في الإدخال",

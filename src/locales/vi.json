@@ -201,7 +201,8 @@
     "bonusGranted": "Đã tặng 500U",
     "progress": "Progress",
     "perDay": "day",
-    "totalEarned": "Total Earned"
+    "totalEarned": "Total Earned",
+    "yieldLocked": "Yield (Locked)"
   },
   "deposit": {
     "inputError": "Lỗi Nhập Liệu",

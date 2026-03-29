@@ -201,7 +201,8 @@
     "bonusGranted": "500U Bono Otorgado",
     "progress": "Progress",
     "perDay": "day",
-    "totalEarned": "Total Earned"
+    "totalEarned": "Total Earned",
+    "yieldLocked": "Yield (Locked)"
   },
   "deposit": {
     "inputError": "Error de Entrada",

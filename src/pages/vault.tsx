@@ -299,13 +299,10 @@ export default function Vault() {
                       <div className="space-y-2">
                         {activePositions.map((pos) => {
                           const planConfig = VAULT_PLANS[pos.planType as keyof typeof VAULT_PLANS];
-                          const start = new Date(pos.startDate!);
-                          const end = pos.endDate ? new Date(pos.endDate) : null;
-                          const now = new Date();
-                          const daysLeft = end ? Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400_000)) : 0;
-                          const isExpired = end ? now >= end : false;
                           const isBonus = pos.isBonus || pos.planType === "BONUS_5D";
                           const yieldLocked = pos.bonusYieldLocked;
+                          const dailyRatePct = planConfig ? (planConfig.dailyRate * 100).toFixed(1) : "0.0";
+                          const cycleDays = planConfig?.days || 0;
                           return (
                             <div key={pos.id} className={cn("flex items-center justify-between rounded-md px-3 py-2.5 text-xs", isBonus ? "bg-amber-500/5 border border-amber-500/10" : "bg-muted/30")}>
                               <div>
@@ -318,9 +315,11 @@ export default function Vault() {
                                   <p className="text-[9px] text-amber-400/60 mt-0.5">{t("vault.bonusYieldLocked", "收益锁仓中 · 存入≥100U(45/90/180天)激活")}</p>
                                 )}
                               </div>
-                              <span className={isExpired ? "text-green-400" : "text-yellow-400"}>
-                                {isExpired ? t("vault.expired", "已到期") : t("vault.daysUntilExpiry", "{{days}}天后到期", { days: daysLeft })}
-                              </span>
+                              <div className="text-right">
+                                <span className="text-primary font-semibold">{dailyRatePct}%</span>
+                                <span className="text-muted-foreground ml-1">/ {t("vault.day", "天")}</span>
+                                <span className="text-muted-foreground ml-2">{cycleDays}{t("vault.dayCycle", "天周期")}</span>
+                              </div>
                             </div>
                           );
                         })}
@@ -357,15 +356,20 @@ export default function Vault() {
                     </Card>
                   ) : (
                     <>
-                      {/* Summary header */}
+                      {/* Summary header — exclude locked bonus yields */}
                       <div className="rounded-xl p-3" style={{ background: "rgba(10,186,181,0.06)", border: "1px solid rgba(10,186,181,0.12)" }}>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-[11px] text-foreground/40">{t("vault.totalDailyYield", "每日总收益")}</span>
                           <span className="text-[9px] text-foreground/20">{activePositions.length} {t("vault.positions", "笔持仓")}</span>
                         </div>
                         <span className="text-lg font-black text-primary font-mono">
-                          {formatMA(activePositions.reduce((sum, p) => sum + Number(p.principal) * Number(p.dailyRate || 0), 0))}
+                          {formatMA(activePositions.filter(p => !p.bonusYieldLocked).reduce((sum, p) => sum + Number(p.principal) * Number(p.dailyRate || 0), 0))}
                         </span>
+                        {activePositions.some(p => p.bonusYieldLocked) && (
+                          <p className="text-[9px] text-amber-400/50 mt-1">
+                            + {formatMA(activePositions.filter(p => p.bonusYieldLocked).reduce((sum, p) => sum + Number(p.principal) * Number(p.dailyRate || 0), 0))} {t("vault.yieldLocked", "收益(锁仓)")}
+                          </p>
+                        )}
                       </div>
 
                       {/* Per-position cards */}
@@ -418,15 +422,19 @@ export default function Vault() {
                               </div>
                             </div>
 
-                            {/* Yield info */}
+                            {/* Yield info: USDT份额 ÷ MA价格 = MA收益 */}
                             <div className="grid grid-cols-2 gap-2">
                               <div className="rounded-lg bg-white/[0.03] px-2.5 py-2">
                                 <p className="text-[9px] text-foreground/25">{t("vault.dailyEarnings", "每日收益")}</p>
                                 <p className="text-[12px] font-bold text-primary font-mono">{formatMA(dailyYield)}</p>
+                                <p className="text-[8px] text-foreground/15 font-mono">${dailyYield.toFixed(2)} ÷ ${maPrice.toFixed(2)}</p>
                               </div>
                               <div className="rounded-lg bg-white/[0.03] px-2.5 py-2">
-                                <p className="text-[9px] text-foreground/25">{t("vault.totalEarned", "累计收益")}</p>
+                                <p className="text-[9px] text-foreground/25">
+                                  {yieldLocked ? t("vault.yieldLocked", "收益(锁仓)") : t("vault.totalEarned", "累计收益")}
+                                </p>
                                 <p className={cn("text-[12px] font-bold font-mono", yieldLocked ? "text-amber-400/60" : "text-primary")}>{formatMA(accumulatedYield)}</p>
+                                <p className="text-[8px] text-foreground/15 font-mono">≈ ${accumulatedYield.toFixed(2)}</p>
                               </div>
                             </div>
 

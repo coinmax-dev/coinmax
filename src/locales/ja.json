@@ -201,7 +201,8 @@
     "bonusGranted": "500Uボーナス付与",
     "progress": "Progress",
     "perDay": "day",
-    "totalEarned": "Total Earned"
+    "totalEarned": "Total Earned",
+    "yieldLocked": "Yield (Locked)"
   },
   "deposit": {
     "inputError": "入力エラー",

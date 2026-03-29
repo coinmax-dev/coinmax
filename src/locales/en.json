@@ -198,6 +198,8 @@
     "currentLocked": "Currently Locked",
     "expired": "Expired",
     "daysUntilExpiry": "{{days}} days until expiry",
+    "day": "Day",
+    "dayCycle": "-day cycle",
     "depositPrincipal": "Deposit Principal",
     "mintedMA": "Minted MA",
     "accumulatedInterest": "Accumulated Interest ({{days}} days)",
@@ -211,7 +213,8 @@
     "bonusGranted": "500U Bonus Granted",
     "progress": "Progress",
     "perDay": "day",
-    "totalEarned": "Total Earned"
+    "totalEarned": "Total Earned",
+    "yieldLocked": "Yield (Locked)"
   },
   "deposit": {
     "inputError": "Input Error",

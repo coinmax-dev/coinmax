@@ -60,6 +60,8 @@ export default function ProfilePage() {
     let yieldSum = 0;
     for (const p of vaultPositions) {
       if (p.status !== "ACTIVE") continue;
+      // Skip bonus positions with locked yield — they don't count as available earnings
+      if (p.bonusYieldLocked) continue;
       const amt = Number(p.principal || 0);
       const start = new Date(p.startDate!);
       const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));

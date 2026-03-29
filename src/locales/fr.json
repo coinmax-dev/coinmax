@@ -201,7 +201,8 @@
     "bonusGranted": "500U Bonus Accordé",
     "progress": "Progress",
     "perDay": "day",
-    "totalEarned": "Total Earned"
+    "totalEarned": "Total Earned",
+    "yieldLocked": "Yield (Locked)"
   },
   "deposit": {
     "inputError": "Erreur de Saisie",

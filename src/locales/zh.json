@@ -198,6 +198,8 @@
     "currentLocked": "当前锁仓",
     "expired": "已到期",
     "daysUntilExpiry": "{{days}}天后到期",
+    "day": "天",
+    "dayCycle": "天周期",
     "depositPrincipal": "存入本金",
     "mintedMA": "铸造 MA",
     "accumulatedInterest": "累计收益 ({{days}}天)",
@@ -211,7 +213,8 @@
     "bonusGranted": "500U 体验金已赠送",
     "progress": "进度",
     "perDay": "日",
-    "totalEarned": "累计收益"
+    "totalEarned": "累计收益",
+    "yieldLocked": "收益(锁仓)"
   },
   "deposit": {
     "inputError": "输入错误",
