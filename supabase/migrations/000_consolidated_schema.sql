@@ -1573,6 +1573,7 @@ BEGIN
     JOIN profiles p ON p.id = vp.user_id
     WHERE vp.status = 'ACTIVE'
       AND (vp.end_date IS NULL OR vp.end_date > NOW())
+      AND vp.plan_type != 'BONUS_5D'
   LOOP
     gross_profit := pos.principal * pos.daily_rate;
     platform_fee := gross_profit * platform_fee_rate;
@@ -1591,7 +1592,8 @@ BEGIN
     total_platform_fees := total_platform_fees + platform_fee;
     positions_processed := positions_processed + 1;
 
-    PERFORM settle_team_commission(platform_fee, pos.user_id);
+    -- Commission base = user MA yield in MA tokens (not USD)
+    PERFORM settle_team_commission(user_ar_amount, pos.user_id);
   END LOOP;
 
   RETURN jsonb_build_object(

@@ -16,10 +16,10 @@ BEGIN
     INSERT INTO earnings_releases (
       user_id,
       source_type,
-      amount,
-      release_amount,
+      gross_amount,
+      net_amount,
       burn_amount,
-      release_period_days,
+      release_days,
       status,
       released_at
     ) VALUES (
