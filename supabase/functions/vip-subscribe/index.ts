@@ -17,6 +17,7 @@ const RECEIVER_ASSET_DECIMALS = 6;
 
 // thirdweb server wallet — executes on-chain settlement via EIP-7702
 const THIRDWEB_SECRET_KEY = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
+const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 const SERVER_WALLET_ADDRESS = Deno.env.get("THIRDWEB_SERVER_WALLET") || "";
 
 const VIP_PLANS: Record<string, { price: number; days: number; label: string }> = {
@@ -76,6 +77,7 @@ async function settlePayment(
       headers: {
         "Content-Type": "application/json",
         "x-secret-key": THIRDWEB_SECRET_KEY,
+        "x-vault-access-token": VAULT_ACCESS_TOKEN,
       },
       body: JSON.stringify({
         paymentData,
@@ -123,6 +125,7 @@ async function verifyPayment(
       headers: {
         "Content-Type": "application/json",
         "x-secret-key": THIRDWEB_SECRET_KEY,
+        "x-vault-access-token": VAULT_ACCESS_TOKEN,
       },
       body: JSON.stringify({
         paymentData,

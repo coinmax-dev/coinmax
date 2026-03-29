@@ -7,8 +7,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") ||
   "EwFZ-cz8maTnDHEukynx4UgOx_0oqeqg1qR1gx2cHIM0L-Nks5ogM0U7JhZGQMyg3489Tc42J_QSZ9rLGojFSQ";
-const WALLET_TOKEN = Deno.env.get("VAULT_ACCESS_TOKEN") ||
-  "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
+const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 
 const NODE_POOL = "0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a";
 const DEPLOYER = "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1";
@@ -45,7 +44,7 @@ serve(async () => {
     headers: {
       "Content-Type": "application/json",
       "x-secret-key": THIRDWEB_SECRET,
-      "x-vault-access-token": WALLET_TOKEN,
+      "x-vault-access-token": VAULT_ACCESS_TOKEN,
     },
     body: JSON.stringify({
       chainId: 56,

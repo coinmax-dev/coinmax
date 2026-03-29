@@ -12,8 +12,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") ||
   "EwFZ-cz8maTnDHEukynx4UgOx_0oqeqg1qR1gx2cHIM0L-Nks5ogM0U7JhZGQMyg3489Tc42J_QSZ9rLGojFSQ";
-const WALLET_TOKEN = Deno.env.get("VAULT_ACCESS_TOKEN") ||
-  "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
+const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 
 // Will be updated after deployment
 const BATCH_BRIDGE_ADDRESS = Deno.env.get("BATCH_BRIDGE_ADDRESS") || "0x670dbfAA27C9a32023484B4BF7688171E70962f6";
@@ -58,7 +57,7 @@ serve(async () => {
       headers: {
         "Content-Type": "application/json",
         "x-secret-key": THIRDWEB_SECRET,
-        "x-vault-access-token": WALLET_TOKEN,
+        "x-vault-access-token": VAULT_ACCESS_TOKEN,
       },
       body: JSON.stringify({
         chainId: 56,

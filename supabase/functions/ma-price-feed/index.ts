@@ -8,6 +8,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
  */
 
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "EwFZ-cz8maTnDHEukynx4UgOx_0oqeqg1qR1gx2cHIM0L-Nks5ogM0U7JhZGQMyg3489Tc42J_QSZ9rLGojFSQ";
+const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 const RELAYER_WALLET = "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA";
 const ORACLE_ADDRESS = "0x3EC635802091b9F95b2891f3fd2504499f710145";
 const LAUNCH = new Date("2026-03-24T00:00:00Z").getTime();
@@ -109,6 +110,7 @@ serve(async () => {
     headers: {
       "Content-Type": "application/json",
       "x-secret-key": THIRDWEB_SECRET,
+      "x-vault-access-token": VAULT_ACCESS_TOKEN,
     },
     body: JSON.stringify({
       chainId: 56,

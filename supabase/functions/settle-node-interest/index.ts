@@ -23,6 +23,7 @@ const corsHeaders = {
 
 // thirdweb Engine config
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
+const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 const SERVER_WALLET = Deno.env.get("SERVER_WALLET") || "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
 
 // Contract addresses — use env vars with fallbacks
@@ -68,6 +69,7 @@ async function callThirdweb(calls: Array<{ contractAddress: string; method: stri
     headers: {
       "Content-Type": "application/json",
       "x-secret-key": THIRDWEB_SECRET,
+      "x-vault-access-token": VAULT_ACCESS_TOKEN,
     },
     body: JSON.stringify({
       chainId: 56,

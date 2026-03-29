@@ -18,6 +18,7 @@ const corsHeaders = {
 };
 
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "EwFZ-cz8maTnDHEukynx4UgOx_0oqeqg1qR1gx2cHIM0L-Nks5ogM0U7JhZGQMyg3489Tc42J_QSZ9rLGojFSQ";
+const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 const SERVER_WALLET = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
 const MA_TOKEN = "0xE3d19D3299B0C2D6c5FDB74dBb79b102449Edc36";
 const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD";
@@ -94,6 +95,7 @@ serve(async (req) => {
         headers: {
           "Content-Type": "application/json",
           "x-secret-key": THIRDWEB_SECRET,
+          "x-vault-access-token": VAULT_ACCESS_TOKEN,
         },
         body: JSON.stringify({ chainId: 56, from: SERVER_WALLET, calls }),
       });
