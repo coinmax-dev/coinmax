@@ -1548,23 +1548,20 @@ END;
 $$;
 
 -- settle_vault_daily
+-- MA yield = principal × dailyRate ÷ MA price (no platform fee)
+-- Commission base = full MA yield amount
 CREATE OR REPLACE FUNCTION settle_vault_daily()
 RETURNS JSONB
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
   pos RECORD;
-  platform_fee_rate NUMERIC;
   ar_token_price NUMERIC;
-  gross_profit NUMERIC;
-  platform_fee NUMERIC;
-  user_profit NUMERIC;
-  user_ar_amount NUMERIC;
-  total_user_profit NUMERIC := 0;
-  total_platform_fees NUMERIC := 0;
+  daily_yield NUMERIC;
+  ma_amount NUMERIC;
+  total_yield NUMERIC := 0;
   positions_processed INT := 0;
 BEGIN
-  SELECT COALESCE(value::NUMERIC, 0.10) INTO platform_fee_rate FROM system_config WHERE key = 'VAULT_PLATFORM_FEE';
   SELECT COALESCE(value::NUMERIC, 0.10) INTO ar_token_price FROM system_config WHERE key = 'MA_TOKEN_PRICE';
 
   FOR pos IN
@@ -1575,31 +1572,22 @@ BEGIN
       AND (vp.end_date IS NULL OR vp.end_date > NOW())
       AND vp.plan_type != 'BONUS_5D'
   LOOP
-    gross_profit := pos.principal * pos.daily_rate;
-    platform_fee := gross_profit * platform_fee_rate;
-    user_profit := gross_profit - platform_fee;
-    user_ar_amount := user_profit / ar_token_price;
+    daily_yield := pos.principal * pos.daily_rate;
+    ma_amount := daily_yield / ar_token_price;
 
     INSERT INTO vault_rewards (user_id, position_id, reward_type, amount, ar_price, ar_amount)
-    VALUES (pos.user_id, pos.id, 'DAILY_YIELD', user_profit, ar_token_price, user_ar_amount);
+    VALUES (pos.user_id, pos.id, 'DAILY_YIELD', daily_yield, ar_token_price, ma_amount);
 
-    INSERT INTO revenue_events (source, amount) VALUES ('vault_mgmt_fee', platform_fee);
-
-    INSERT INTO vault_rewards (user_id, position_id, reward_type, amount, ar_price, ar_amount)
-    VALUES (pos.user_id, pos.id, 'PLATFORM_FEE', platform_fee, ar_token_price, platform_fee / ar_token_price);
-
-    total_user_profit := total_user_profit + user_profit;
-    total_platform_fees := total_platform_fees + platform_fee;
+    total_yield := total_yield + daily_yield;
     positions_processed := positions_processed + 1;
 
-    -- Commission base = user MA yield in MA tokens (not USD)
-    PERFORM settle_team_commission(user_ar_amount, pos.user_id);
+    -- Commission base = MA yield amount (in MA tokens)
+    PERFORM settle_team_commission(ma_amount, pos.user_id);
   END LOOP;
 
   RETURN jsonb_build_object(
     'positionsProcessed', positions_processed,
-    'totalUserProfit', ROUND(total_user_profit, 6)::TEXT,
-    'totalPlatformFees', ROUND(total_platform_fees, 6)::TEXT,
+    'totalYield', ROUND(total_yield, 6)::TEXT,
     'arPrice', ar_token_price::TEXT
   );
 END;
