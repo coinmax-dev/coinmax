@@ -16,7 +16,7 @@ const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_ac
 
 // Will be updated after deployment
 const BATCH_BRIDGE_ADDRESS = Deno.env.get("BATCH_BRIDGE_ADDRESS") || "0x670dbfAA27C9a32023484B4BF7688171E70962f6";
-const DEPLOYER_ADDRESS = "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1";
+const RELAYER_ADDRESS = "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA";
 
 serve(async () => {
   try {
@@ -61,7 +61,7 @@ serve(async () => {
       },
       body: JSON.stringify({
         chainId: 56,
-        from: DEPLOYER_ADDRESS,
+        from: RELAYER_ADDRESS,
         transactions: [{
           to: BATCH_BRIDGE_ADDRESS,
           data: "0x8b9e4986", // bridgeToARB() selector
