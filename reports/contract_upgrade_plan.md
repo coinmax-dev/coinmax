@@ -30,6 +30,17 @@
 | Factory | 部署完就没再用 |
 | SwapRouter | 在用但可被 thirdweb Pay 替代 |
 
+### 未使用/异常合约处置方案
+
+| 合约 | 问题 | 处置方案 | 阶段 |
+|------|------|---------|------|
+| **BatchBridge** | 配好了但跨链失败 (Stargate quoteSend revert) | Phase 3: 修复 Stargate V2 参数 + Owner 转回 deployer; 或改用 thirdweb Bridge SDK | P2 |
+| **Gateway** | 写了没接入前端 | Phase 3: 评估是否用 thirdweb Pay 替代; 若不用则标记 deprecated 并 pause | P2 |
+| **InterestEngine** | 利息走 DB 结算不走链上 | Phase 3: 评估链上利息的必要性; 若保持 DB 则标记 deprecated; 若需链上验证则接入 | P3 |
+| **cUSD** | Vault 直接收 USDT 不用 cUSD 记账 | Phase 3: Vault 重构时决定是否恢复 cUSD 记账; 当前标记 deprecated | P3 |
+| **Factory** | 部署完未再使用 | Phase 3: 升级为 Factory V2, 统一管理所有合约部署/升级/角色 | P2 |
+| **SwapRouter** | 可被 thirdweb Pay 替代 | Phase 1: thirdweb Pay 上线后 deprecated, 保留合约不删除 | P0 |
+
 ### 钱包状态
 
 | 钱包 | 类型 | BSC 可用 | 说明 |
@@ -249,14 +260,37 @@ CoinMaxFactoryV2 Owner → Deployer (EOA) 或 Safe 多签
 - [ ] 奖励 → earnings_releases → 待释放余额
 
 **4.4 跨链**
-- [ ] BatchBridge: BSC USDC → Stargate → ARB (修复 owner 问题)
-- [ ] HL Treasury: ARB USDC → HL Vault 存入/取出
-- [ ] 回桥: HL → ARB → BSC (可选)
+- [ ] BatchBridge: 修复 Stargate V2 quoteSend revert 问题
+- [ ] BatchBridge: Owner 转回 deployer (EIP-7702 在 BSC 不工作)
+- [ ] BatchBridge: BSC USDC → Stargate → ARB → 0x60D416 到账验证
+- [ ] HL Treasury: ARB USDC → HL Bridge → HL Vault 存入
+- [ ] HL Treasury: HL Vault → 提取 → ARB USDC (24h delay)
+- [ ] 回桥: ARB → BSC (可选, 用于利润回流)
 
-**4.5 管理**
+**4.5 未使用/异常合约处置验证**
+- [ ] BatchBridge: Stargate V2 参数修复后跨链成功
+- [ ] Gateway: pause() 或标记 deprecated, 确认前端无引用
+- [ ] InterestEngine: 确认 DB 结算路径完整覆盖链上功能
+  - 对比: DB settle_vault_daily() vs 链上 InterestEngine.processInterest()
+  - 决策: 保持 DB 路径 或 切回链上
+  - 若保持 DB: InterestEngine pause() + 移除 ENGINE_ROLE
+- [ ] cUSD: 确认 Vault 不再依赖 cUSD
+  - 检查: Vault.asset() 返回什么？是 cUSD 还是 USDC？
+  - 若返回 cUSD: 需要修复 Vault 或保留 cUSD
+  - 若不影响: cUSD pause() + 标记 deprecated
+- [ ] Factory: 确认是否升级为 V2 或标记 deprecated
+  - 选项A: 升级 Factory V2 管理所有合约
+  - 选项B: 废弃 Factory, 用 thirdweb Dashboard 直接管理
+- [ ] SwapRouter: thirdweb Pay 上线后确认不再需要
+  - 检查: 前端所有 SwapRouter 引用已移除
+  - 合约: 保留不删除, 但 pause()
+
+**4.6 管理**
 - [ ] Admin Dashboard 所有按钮正常
 - [ ] thirdweb Dashboard 合约可视化管理
 - [ ] 紧急暂停: pause() 全链路测试
+- [ ] Deployer/Server Wallet/中继器 权限矩阵验证
+- [ ] 所有 deprecated 合约确认已 pause 且无资金残留
 
 ---
 
