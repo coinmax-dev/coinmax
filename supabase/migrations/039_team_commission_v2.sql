@@ -28,6 +28,8 @@ DECLARE
   commission NUMERIC;
   total_commission NUMERIC := 0;
   commissions_paid INT := 0;
+  same_rank_paid BOOLEAN := FALSE;
+  override_paid BOOLEAN := FALSE;
 BEGIN
   SELECT value::JSONB INTO ranks_json FROM system_config WHERE key = 'RANKS';
   SELECT COALESCE(value::INT, 15) INTO max_depth FROM system_config WHERE key = 'TEAM_MAX_DEPTH';
@@ -79,9 +81,11 @@ BEGIN
       commissions_paid := commissions_paid + 1;
     END IF;
 
-    -- ── 3. Same-rank bonus (同级奖励) ──
-    -- If upline rank == prev_rank (same level as the child who already earned differential)
-    IF upline_rank IS NOT NULL AND prev_rank IS NOT NULL AND upline_rank = prev_rank AND same_rank_rate > 0 THEN
+    -- ── 3. Same-rank bonus (同级奖励) — ONLY ONCE ──
+    IF NOT same_rank_paid
+       AND upline_rank IS NOT NULL AND prev_rank IS NOT NULL
+       AND upline_rank = prev_rank AND same_rank_rate > 0
+    THEN
       commission := base_amount * upline_commission * same_rank_rate;
       IF commission > 0 THEN
         INSERT INTO node_rewards (user_id, reward_type, amount, details)
@@ -90,12 +94,15 @@ BEGIN
             'depth', current_depth, 'rate', same_rank_rate, 'matched_rank', upline_rank));
         total_commission := total_commission + commission;
         commissions_paid := commissions_paid + 1;
+        same_rank_paid := TRUE;
       END IF;
     END IF;
 
-    -- ── 4. Override bonus (越级奖励) ──
-    -- If upline rank < prev_rank (lower rank than child below), gets 5% of child's yield
-    IF upline_commission > 0 AND upline_commission < prev_rate AND override_rate > 0 THEN
+    -- ── 4. Override bonus (越级奖励) — ONLY ONCE ──
+    IF NOT override_paid
+       AND upline_commission > 0 AND upline_commission < prev_rate
+       AND override_rate > 0
+    THEN
       commission := base_amount * override_rate;
       IF commission > 0 THEN
         INSERT INTO node_rewards (user_id, reward_type, amount, details)
@@ -104,6 +111,7 @@ BEGIN
             'depth', current_depth, 'rate', override_rate));
         total_commission := total_commission + commission;
         commissions_paid := commissions_paid + 1;
+        override_paid := TRUE;
       END IF;
     END IF;
 
