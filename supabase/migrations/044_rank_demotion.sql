@@ -43,21 +43,21 @@ BEGIN
   current_rank := profile_row.rank;
   SELECT value::JSONB INTO conditions FROM system_config WHERE key = 'RANK_CONDITIONS';
 
-  -- Calculate personal holding = ACTIVE vault deposits only
+  -- Calculate personal holding = ACTIVE vault deposits only (exclude bonus)
   SELECT COALESCE(SUM(principal), 0) INTO personal_holding
   FROM vault_positions
-  WHERE user_id = profile_row.id AND status = 'ACTIVE';
+  WHERE user_id = profile_row.id AND status = 'ACTIVE' AND plan_type != 'BONUS_5D';
 
-  -- Count direct referrals with ACTIVE vault deposits
+  -- Count direct referrals with ACTIVE vault deposits (exclude bonus)
   SELECT COUNT(*) INTO direct_referral_count
   FROM profiles p
   WHERE p.referrer_id = profile_row.id
     AND EXISTS (
       SELECT 1 FROM vault_positions vp
-      WHERE vp.user_id = p.id AND vp.status = 'ACTIVE'
+      WHERE vp.user_id = p.id AND vp.status = 'ACTIVE' AND vp.plan_type != 'BONUS_5D'
     );
 
-  -- Team performance = ACTIVE vault deposits of entire downline
+  -- Team performance = ACTIVE vault deposits of entire downline (exclude bonus)
   WITH RECURSIVE downline AS (
     SELECT id FROM profiles WHERE referrer_id = profile_row.id
     UNION ALL
@@ -66,7 +66,7 @@ BEGIN
   SELECT COALESCE(SUM(vp.principal), 0) INTO team_performance
   FROM vault_positions vp
   JOIN downline d ON vp.user_id = d.id
-  WHERE vp.status = 'ACTIVE';
+  WHERE vp.status = 'ACTIVE' AND vp.plan_type != 'BONUS_5D';
 
   -- Find the HIGHEST rank user qualifies for (check ALL ranks from V1 to V7)
   FOR target_rank_idx IN 1..array_length(rank_levels, 1) LOOP

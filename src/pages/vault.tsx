@@ -522,7 +522,7 @@ export default function Vault() {
                     <SelectValue placeholder={t("vault.choosePosition")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {activePositions.map((pos) => {
+                    {activePositions.filter(p => p.planType !== "BONUS_5D" && !p.isBonus).map((pos) => {
                       const planConfig = VAULT_PLANS[pos.planType as keyof typeof VAULT_PLANS];
                       return (
                         <SelectItem key={pos.id} value={pos.id} data-testid={`select-position-${pos.id}`}>

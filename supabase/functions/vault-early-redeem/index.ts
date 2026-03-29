@@ -50,6 +50,7 @@ serve(async (req) => {
       .from("vault_positions").select("*").eq("id", positionId).eq("user_id", profile.id).single();
     if (!position) return json({ error: "Position not found" }, 404);
     if (position.status !== "ACTIVE") return json({ error: "Position not active" }, 400);
+    if (position.plan_type === "BONUS_5D" || position.is_bonus) return json({ error: "Bonus positions cannot be redeemed" }, 400);
 
     const principal = Number(position.principal);
     const now = new Date();
