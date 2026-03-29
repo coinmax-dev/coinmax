@@ -1,6 +1,7 @@
 # CoinMax 合约升级计划
 
 > 生成时间: 2026-03-30
+> 最后更新: 2026-03-30
 > 目标: 统一使用 thirdweb 基础设施 + Factory 部署 + 模块化升级
 
 ---
@@ -12,7 +13,8 @@
 | 合约 | 地址 | 部署方式 | 可升级 | 问题 |
 |------|------|---------|--------|------|
 | Vault | `0xE0A80b82F42d009cdE772d5c34b1682C2D79e821` | Factory → ERC1967Proxy | ✅ UUPS | asset=cUSD 而非 USDC |
-| MA Token | `0xE3d19D3299B0C2D6c5FDB74dBb79b102449Edc36` | 直接部署 | ❌ 固定 | 无 permit, 无模块化 |
+| MA Token V2 | `0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b` | ✅ thirdweb ERC20 Core + MintableERC20 模块 | ✅ 模块化 | **已完成迁移** |
+| ~~MA Token V1~~ | ~~`0xE3d19D3299B0C2D6c5FDB74dBb79b102449Edc36`~~ | ~~直接部署~~ | ~~❌ 固定~~ | ~~已废弃~~ |
 | Oracle | `0x3EC635802091b9F95b2891f3fd2504499f710145` | 直接部署 | ⚠️ Initializable 但无 UUPS | 不可升级 |
 | Release | `0xC80724a4133c90824A64914323fE856019D52B67` | Factory → ERC1967Proxy | ✅ UUPS | 正常 |
 | FlashSwap | `0xabF960833168c3D69284De219F8Da0D8054d96e4` | 直接部署 | ✅ UUPS | 正常 |
@@ -53,7 +55,7 @@
 
 ## 二、升级计划（5 个阶段）
 
-### Phase 1: 支付优化 — thirdweb Pay + Paymaster
+### Phase 1: 支付优化 — thirdweb Pay + Paymaster ✅ 已完成
 
 **目标**: 用户 0 gas、任意代币/法币完成所有购买
 
@@ -267,38 +269,48 @@ Day 90:    同时考核 V4
 
 ---
 
-### Phase 2: MA Token 升级 — thirdweb 模块化
+### Phase 2: MA Token 升级 — thirdweb 模块化 ✅ 已完成
 
-**目标**: MA Token 迁移到 thirdweb TokenERC20 + 自定义模块
+**目标**: MA Token 迁移到 thirdweb 模块化合约
 
-**2.1 部署新 MA Token**
-- [ ] 使用 thirdweb CLI 部署 TokenERC20 Core
-- [ ] 安装 MintableERC20 模块（MINTER_ROLE 控制）
-- [ ] 编写+安装自定义模块:
-  ```solidity
-  // CoinMaxMAExtension.sol (~80行)
-  - blacklist mapping + transfer hook
-  - supplyCap check on mint
-  - mintLimit per-call check
-  ```
-- [ ] publish 到 thirdweb Dashboard
+**2.1 部署新 MA Token** ✅
+- [x] thirdweb Dashboard 部署 ERC20 Core (BSC)
+- [x] 安装 MintableERC20 模块
+- [x] grantRoles: Smart Account `0x85e44A` → role=2 (minter)
+- [x] 新地址: `0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b`
+- [x] Dashboard mint 测试成功
 
-**2.2 迁移**
-- [ ] 新合约部署到 BSC（CREATE2 确定性地址）
-- [ ] 旧 MA Token 暂停 mint
-- [ ] Vault/Release/FlashSwap 更新 MA Token 地址指向新合约
-- [ ] 用户余额快照 → 新合约批量 airdrop
-- [ ] 旧合约永久 pause
+**2.2 切换引用** ✅
+- [x] Edge functions: claim-yield, vault-early-redeem, ma-swap → 新地址
+- [x] 前端: .env VITE_MA_TOKEN_ADDRESS → 新地址
+- [x] Admin: contracts.ts 自动读取 env
 
-**2.3 获得的能力**
-- ✅ ERC2612 permit() — 无 gas 授权
-- ✅ Dashboard 直接管理 mint/burn/pause/blacklist
-- ✅ 模块可装卸 — 后续加功能不需重部署
-- ✅ CREATE2 — 可部署到 ARB 同地址
+**2.3 旧合约处置**
+- [ ] 旧 MA Token `0xE3d19D3` → pause (待 deployer 操作)
+- [ ] 测试阶段余额不迁移
+
+**2.4 获得的能力**
+- ✅ thirdweb Dashboard 直接管理 mint/burn/pause
+- ✅ 模块可装卸 — 后续加 blacklist/supplyCap 不需重部署
+- ✅ 可安装 AggLayer CrossChain 模块跨链到 ARB
+
+**2.5 待安装模块（后续）**
+- [ ] TransferableERC20 模块 — blacklist/transferable 控制
+- [ ] 自定义 supplyCap 模块 — 最大供应量限制
+- [ ] AggLayer CrossChain — 跨链到 ARB 同地址
+
+**关键发现：thirdweb Server Wallet 双地址**
+```
+每个 Server Wallet = EOA 签名者 + ERC-4337 Smart Account
+  EOA (0xeBAB)   → from: 走 EIP-7702 → BSC 失败 ❌
+  Smart (0x85e4)  → from: 走 ERC-4337  → BSC 成功 ✅
+
+所有 edge function 必须使用 Smart Account 地址!
+```
 
 ---
 
-### Phase 3: 合约重构 — Factory + thirdweb 部署
+### Phase 3: 合约重构 — Factory + thirdweb 部署 🔄 进行中
 
 **目标**: 所有合约统一通过 Factory 管理，thirdweb Dashboard 可视化
 
@@ -516,7 +528,7 @@ Factory V2:    待部署 (CREATE2 确定性地址)
 Vault:         0xE0A80b82... (保持, UUPS 可升级)
 Release:       0xC80724a4... (保持, UUPS 可升级)
 FlashSwap:     0xabF96083... (保持, UUPS 可升级)
-MA Token V2:   待部署 (thirdweb TokenERC20, CREATE2)
+MA Token V2:   0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b ✅ (thirdweb ERC20 Core + MintableERC20)
 Oracle V2:     待部署 (UUPS 代理, CREATE2)
 Splitter:      0xcfF14557... (保持, 隐私设计)
 BatchBridge:   0x670dbfAA... (Owner 转回 deployer)
