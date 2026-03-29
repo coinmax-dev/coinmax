@@ -105,12 +105,11 @@ const FLASH_SWAP_READ_ABI = {
 
 // ── Server Wallets for gas monitoring ──
 const SERVER_WALLETS = [
-  { label: "vault (金库ADMIN)", address: "0xeBAB6D22278c9839A46B86775b3AC9469710F84b" },
-  { label: "trade (运营SERVER)", address: "0x0831e8875685C796D05F2302D3c5C2Dd77fAc3B6" },
-  { label: "VIP (价格FEEDER)", address: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A" },
-  { label: "CoinMax (代币ADMIN)", address: "0x60D416dA873508c23C1315a2b750a31201959d78" },
-  { label: "relayer (Gas支付)", address: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA" },
-  { label: "deployer (当前admin)", address: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1" },
+  { label: "Executor (主中继器·MINTER/FEEDER/ENGINE)", address: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA" },
+  { label: "Server Wallet (备用·4337)", address: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b" },
+  { label: "deployer (合约admin)", address: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1" },
+  { label: "VIP接收钱包", address: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A" },
+  { label: "节点接收钱包", address: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9" },
 ] as const;
 
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
@@ -665,15 +664,14 @@ export default function AdminContracts() {
             icon={<Wallet className="h-4 w-4 text-amber-400" />}
             address=""
             items={[
-              { label: "── Server Wallets ──", value: "" },
-              { label: "vault (金库ADMIN)", value: "0xeBAB6D22278c9839A46B86775b3AC9469710F84b", type: "address" },
-              { label: "trade (运营SERVER)", value: "0x0831e8875685C796D05F2302D3c5C2Dd77fAc3B6", type: "address" },
-              { label: "VIP (价格FEEDER)", value: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A", type: "address" },
-              { label: "CoinMax (代币ADMIN)", value: "0x60D416dA873508c23C1315a2b750a31201959d78", type: "address" },
-              { label: "relayer (Gas支付)", value: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA", type: "address" },
-              { label: "── 运营钱包 ──", value: "" },
-              { label: "deployer (全部admin)", value: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", type: "address" },
-              { label: "节点接收钱包", value: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", type: "address" },
+              { label: "── Executor (thirdweb Engine) ──", value: "" },
+              { label: "Executor 中继器 (MINTER/FEEDER/ENGINE/NodePool Owner)", value: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA", type: "address" },
+              { label: "Server Wallet 备用 (4337 Account)", value: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b", type: "address" },
+              { label: "── 管理钱包 ──", value: "" },
+              { label: "deployer (合约admin·紧急恢复)", value: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", type: "address" },
+              { label: "── 接收钱包 ──", value: "" },
+              { label: "VIP接收 (USDT)", value: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A", type: "address" },
+              { label: "节点接收 (USDC)", value: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", type: "address" },
             ]}
             loading={false}
             onRefresh={() => {}}
@@ -1167,7 +1165,7 @@ function BatchGasPanel() {
       <div className="px-4 py-3 border-b border-amber-500/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Fuel className="h-4 w-4 text-amber-400" />
-          <span className="text-[13px] font-bold text-foreground/80">Server Wallet Gas 管理</span>
+          <span className="text-[13px] font-bold text-foreground/80">Executor Gas 管理</span>
           {lowCount > 0 && (
             <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse">
               {lowCount} 个余额不足
@@ -1276,18 +1274,18 @@ function BatchGasPanel() {
   );
 }
 
-// ── Oracle Admin Panel — write operations via thirdweb Server Wallet ──
+// ── Oracle Admin Panel — write operations via thirdweb Executor Wallet ──
 
 const THIRDWEB_SECRET = import.meta.env.VITE_THIRDWEB_SECRET_KEY || "";
-const SERVER_WALLET_ADDR = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
-const RELAYER_ADDR = "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA";
+const THIRDWEB_VAULT_TOKEN = import.meta.env.VITE_THIRDWEB_VAULT_TOKEN || "";
+const EXECUTOR_ADDR = "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA";
 const FEEDER_ROLE_HASH = "0x80a586cc4ecf40a390b370be075aa38ab3cc512c5c1a7bc1007974dbdf2663c7";
 
-async function callServerWallet(calls: { contractAddress: string; method: string; params: string[] }[]) {
+async function callExecutor(calls: { contractAddress: string; method: string; params: string[] }[]) {
   const res = await fetch("https://api.thirdweb.com/v1/contracts/write", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-secret-key": THIRDWEB_SECRET },
-    body: JSON.stringify({ chainId: 56, from: SERVER_WALLET_ADDR, calls }),
+    headers: { "Content-Type": "application/json", "x-secret-key": THIRDWEB_SECRET, "x-vault-access-token": THIRDWEB_VAULT_TOKEN },
+    body: JSON.stringify({ chainId: 56, from: EXECUTOR_ADDR, calls }),
   });
   return res.json();
 }
@@ -1296,13 +1294,13 @@ function OracleAdminPanel({ onPriceUpdated }: { onPriceUpdated: () => void }) {
   const { toast } = useToast();
   const [newPrice, setNewPrice] = useState("");
   const [maxChangeRate, setMaxChangeRate] = useState("");
-  const [grantAddress, setGrantAddress] = useState(RELAYER_ADDR);
+  const [grantAddress, setGrantAddress] = useState(EXECUTOR_ADDR);
   const [busy, setBusy] = useState("");
 
   const exec = async (label: string, calls: { contractAddress: string; method: string; params: string[] }[]) => {
     setBusy(label);
     try {
-      const data = await callServerWallet(calls);
+      const data = await callExecutor(calls);
       const txId = data?.result?.transactionIds?.[0];
       if (txId) {
         toast({ title: `${label} 已提交`, description: `TX: ${txId}` });
@@ -1322,7 +1320,7 @@ function OracleAdminPanel({ onPriceUpdated }: { onPriceUpdated: () => void }) {
       <div className="px-4 py-3 border-b border-amber-500/10 flex items-center gap-2">
         <Zap className="h-4 w-4 text-amber-400" />
         <span className="text-[13px] font-bold text-foreground/80">Oracle 管理操作</span>
-        <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20">Server Wallet</Badge>
+        <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20">Executor</Badge>
       </div>
       <div className="p-4 space-y-4">
         {/* Emergency Set Price */}
@@ -1442,14 +1440,14 @@ function OracleAdminPanel({ onPriceUpdated }: { onPriceUpdated: () => void }) {
             {busy === "同步" ? "同步中..." : "立即同步 K 线价格 → Oracle"}
           </Button>
           <p className="text-[9px] text-foreground/20 mt-1 text-center">
-            触发 ma-price-feed，通过中继器 {RELAYER_ADDR.slice(0, 6)}...{RELAYER_ADDR.slice(-4)} 调用 updatePrice
+            触发 ma-price-feed，通过中继器 {EXECUTOR_ADDR.slice(0, 6)}...{EXECUTOR_ADDR.slice(-4)} 调用 updatePrice
           </p>
         </div>
 
         {/* Info */}
         <div className="text-[10px] text-foreground/20 space-y-1 pt-2 border-t border-white/[0.04]">
-          <div className="flex justify-between"><span>Server Wallet (Admin)</span><span className="font-mono">{SERVER_WALLET_ADDR.slice(0, 6)}...{SERVER_WALLET_ADDR.slice(-4)}</span></div>
-          <div className="flex justify-between"><span>中继器 (Feeder)</span><span className="font-mono">{RELAYER_ADDR.slice(0, 6)}...{RELAYER_ADDR.slice(-4)}</span></div>
+          <div className="flex justify-between"><span>Executor 中继器</span><span className="font-mono">{EXECUTOR_ADDR.slice(0, 6)}...{EXECUTOR_ADDR.slice(-4)}</span></div>
+          <div className="flex justify-between"><span>中继器 (Feeder)</span><span className="font-mono">{EXECUTOR_ADDR.slice(0, 6)}...{EXECUTOR_ADDR.slice(-4)}</span></div>
           <div className="flex justify-between"><span>Oracle 合约</span><span className="font-mono">{PRICE_ORACLE_ADDRESS.slice(0, 6)}...{PRICE_ORACLE_ADDRESS.slice(-4)}</span></div>
           <div className="flex justify-between"><span>自动同步</span><span>Cron 每 5 分钟</span></div>
         </div>
