@@ -66,12 +66,12 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
     try {
       const amountWei = BigInt(Math.floor(usdtAmount * 1e18));
 
-      // ═══ Vault.depositPublic — thirdweb Pay auto-swaps USDT→USDC ═══
+      // ═══ Vault.depositPublic — direct USDT deposit ═══
       setStep("depositing");
       const vault = getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
       const depositTx = prepareContractCall({
         contract: vault,
-        method: "function depositPublic(uint256 usdcAmount, uint256 planIndex)",
+        method: "function depositPublic(uint256 usdtAmount, uint256 planIndex)",
         params: [amountWei, BigInt(plan.planIndex)],
       });
       const depositResult = await sendTx(depositTx);

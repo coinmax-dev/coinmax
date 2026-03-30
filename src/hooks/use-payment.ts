@@ -181,7 +181,7 @@ export function usePayment() {
         const vault = getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
         const tx = prepareContractCall({
           contract: vault,
-          method: "function purchaseNodePublic(string nodeType, uint256 usdcAmount)",
+          method: "function purchaseNodePublic(string nodeType, uint256 usdtAmount)",
           params: [nodeType, usdcAmount],
         });
         const payResult = await sendTransaction(tx);
