@@ -65,8 +65,7 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
 
     try {
       const amountWei = BigInt(Math.floor(usdtAmount * 1e18));
-      // Use a large but safe approval amount (avoid MaxUint256 BigInt conversion issues in thirdweb)
-      const approveAmount = BigInt("1000000000000000000000000000"); // 1 billion USDT
+      const approveAmount = amountWei;
       const usdt = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
       const vault = getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
 
