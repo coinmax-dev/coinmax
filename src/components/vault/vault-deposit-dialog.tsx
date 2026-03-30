@@ -17,8 +17,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { prepareContractCall, waitForReceipt, getContract } from "thirdweb";
+import { approve } from "thirdweb/extensions/erc20";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
-import { VAULT_V3_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
+import { VAULT_V3_ADDRESS, USDT_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
 import { useMaPrice } from "@/hooks/use-ma-price";
 import { VAULT_PLANS } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -65,9 +66,16 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
 
     try {
       const amountWei = BigInt(Math.floor(usdtAmount * 1e18));
+      const maxUint = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
-      // ═══ Vault.depositPublic — direct USDT deposit ═══
+      // ═══ Step 1: Approve USDT to Vault ═══
       setStep("depositing");
+      const usdt = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
+      const approveTx = approve({ contract: usdt, spender: VAULT_V3_ADDRESS, amountWei: maxUint });
+      const approveResult = await sendTx(approveTx);
+      await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+
+      // ═══ Step 2: Vault.depositPublic — pull USDT ═══
       const vault = getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
       const depositTx = prepareContractCall({
         contract: vault,
