@@ -17,10 +17,11 @@ export function useMaPrice() {
       try {
         const raw = await readContract({
           contract: getPriceOracleContract(client),
-          method: "function getPriceUnsafe() view returns (uint256)",
+          method: "function price() view returns (uint256)",
           params: [],
         });
-        return Number(raw) / 1e6;
+        const p = Number(raw) / 1e6;
+        return p > 0 ? p : null; // fallback to DB if oracle returns 0
       } catch {
         return null;
       }
