@@ -1,549 +1,231 @@
 # CoinMax 合约升级计划
 
 > 生成时间: 2026-03-30
-> 最后更新: 2026-03-30
-> 目标: 统一使用 thirdweb 基础设施 + Factory 部署 + 模块化升级
+> 最后更新: 2026-03-30 (v2 — 反映已完成部署)
+> 目标: 统一使用 thirdweb 基础设施 + 模块化升级
 
 ---
 
-## 一、当前状态审计
+## 一、当前状态（已部署）
 
-### 在用合约清单
+### BSC 在用合约
 
-| 合约 | 地址 | 部署方式 | 可升级 | 问题 |
+| 合约 | 地址 | 部署方式 | 可升级 | 状态 |
 |------|------|---------|--------|------|
-| Vault | `0xE0A80b82F42d009cdE772d5c34b1682C2D79e821` | Factory → ERC1967Proxy | ✅ UUPS | asset=cUSD 而非 USDC |
-| MA Token V2 | `0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b` | ✅ thirdweb ERC20 Core + MintableERC20 模块 | ✅ 模块化 | **已完成迁移** |
-| ~~MA Token V1~~ | ~~`0xE3d19D3299B0C2D6c5FDB74dBb79b102449Edc36`~~ | ~~直接部署~~ | ~~❌ 固定~~ | ~~已废弃~~ |
-| Oracle | `0x3EC635802091b9F95b2891f3fd2504499f710145` | 直接部署 | ⚠️ Initializable 但无 UUPS | 不可升级 |
-| Release | `0xC80724a4133c90824A64914323fE856019D52B67` | Factory → ERC1967Proxy | ✅ UUPS | 正常 |
-| FlashSwap | `0xabF960833168c3D69284De219F8Da0D8054d96e4` | 直接部署 | ✅ UUPS | 正常 |
-| Splitter | `0xcfF14557337368E4A9E09586B0833C5Bbf323845` | 直接部署 | ❌ 固定 | 钱包列表私有=OK |
-| BatchBridge | `0x670dbfAA27C9a32023484B4BF7688171E70962f6` | 直接部署 | ❌ 固定 | Owner=中继器(EIP7702不work) |
-| NodePool | `0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a` | 直接部署 | ❌ 固定 | Owner=中继器 |
-
-### 未使用合约
-
-| 合约 | 说明 |
-|------|------|
-| Gateway | 写了没接入前端 |
-| InterestEngine | 利息走 DB 结算 |
-| cUSD | Vault 直接收 USDT |
-| Factory | 部署完就没再用 |
-| SwapRouter | 在用但可被 thirdweb Pay 替代 |
-
-### 未使用/异常合约处置方案
-
-| 合约 | 问题 | 处置方案 | 阶段 |
-|------|------|---------|------|
-| **BatchBridge** | 跨链失败: bridgeToARB()是payable需带BNB, thirdweb所有钱包(4337/7702)都无法发payable交易. Owner卡在中继器(0xcb41)上 | Phase 3: 方案A)改合约去掉payable,fee从合约BNB余额扣; 方案B)用deployer私钥直接发(不走thirdweb); 方案C)改用thirdweb Universal Bridge SDK在后端跨链 | P2 |
-| **Gateway** | 写了没接入前端 | Phase 3: 评估是否用 thirdweb Pay 替代; 若不用则标记 deprecated 并 pause | P2 |
-| **InterestEngine** | 利息走 DB 结算不走链上 | Phase 3: 评估链上利息的必要性; 若保持 DB 则标记 deprecated; 若需链上验证则接入 | P3 |
-| **cUSD** | Vault 直接收 USDT 不用 cUSD 记账 | Phase 3: Vault 重构时决定是否恢复 cUSD 记账; 当前标记 deprecated | P3 |
-| **Factory** | 部署完未再使用 | Phase 3: 升级为 Factory V2, 统一管理所有合约部署/升级/角色 | P2 |
-| **SwapRouter** | 可被 thirdweb Pay 替代 | Phase 1: thirdweb Pay 上线后 deprecated, 保留合约不删除 | P0 |
-
-### 钱包状态
-
-| 钱包 | 类型 | BSC 可用 | 说明 |
-|------|------|---------|------|
-| Server Wallet `0x85e44A` | ERC-4337 | ✅ 非payable | mint/grantRole OK |
-| 中继器 `0xcb41` | EIP-7702 | ❌ 全部失败 | BSC 不支持 EIP-7702 |
-| Deployer `0x1B6B` | EOA | ✅ 全部OK | 但私钥暴露风险 |
-
----
-
-## 二、升级计划（5 个阶段）
-
-### Phase 1: 支付优化 — thirdweb Pay + Paymaster ✅ 已完成
-
-**目标**: 用户 0 gas、任意代币/法币完成所有购买
-
-#### 1.1 当前三种购买链路审计
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ 金库入金 (vault-deposit-dialog.tsx)                                  │
-│ 用户 USDT → approve SwapRouter → swapAndDepositVault()              │
-│          → PancakeSwap USDT→USDC → Vault.depositFrom()             │
-│ 合约: SwapRouter + PancakeSwap + Vault                              │
-│ 问题: 需要 BNB + 2笔签名 (approve + swap+deposit)                    │
-├─────────────────────────────────────────────────────────────────────┤
-│ 节点购买 (node-purchase-section.tsx)                                 │
-│ V1: USDT → approve Node合约 → Node.purchase(type, USDT)             │
-│ V2: USDT → approve SwapRouter → swapAndPurchaseNode()               │
-│          → PancakeSwap USDT→USDC → NodesV2.purchase()              │
-│ 合约: SwapRouter + PancakeSwap + NodesV2                            │
-│ 问题: 需要 BNB + 2笔签名                                            │
-├─────────────────────────────────────────────────────────────────────┤
-│ VIP购买 (use-payment.ts → payVIPSubscribe)                          │
-│ 用户 USDT → 直接 transfer → Server钱包(0x927e)                      │
-│          → edge function vip-subscribe → DB激活                     │
-│ 合约: 无 (纯 ERC20 transfer)                                        │
-│ 问题: 需要 BNB + 1笔签名, 无合约验证                                  │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-#### 1.2 优化方案: thirdweb Pay 统一入口
-
-```
-优化后（三种购买统一）:
-
-  用户 任意代币/法币/信用卡
-    ↓ thirdweb Pay (前端 SDK 自动 swap)
-    ↓
-  ┌─ 金库入金 → USDC 直接 → Vault.depositFrom() (无需 SwapRouter)
-  ├─ 节点购买 → USDC 直接 → NodesV2.purchase() (无需 SwapRouter)
-  └─ VIP购买  → USDT 直接 → Server钱包 (保持现有)
-
-  = 用户 0 gas, 1次确认, 任意代币
-```
-
-**金库入金改动:**
-- [x] 前端: `vault-deposit-dialog.tsx` 加 payModal (buyWithCrypto + buyWithFiat)
-- [x] 去掉手动 approve 步骤 (thirdweb SDK 自动处理)
-- [ ] Vault 合约: 确认 `depositFrom()` 可被 Server Wallet 调用 (Phase 3)
-- [ ] 废弃 SwapRouter (Phase 3, 需要合约改动)
-- [ ] 测试: USDT/USDC/BNB/信用卡 入金
-
-**节点购买改动:**
-- [x] 前端: `use-payment.ts` 加 payModal (覆盖节点购买)
-- [ ] NodesV2 合约: 确认可直接收 USDC (Phase 3)
-- [ ] 废弃 SwapRouter (Phase 3)
-- [ ] 测试: 各代币购买 MINI/MAX 节点
-
-**VIP购买改动 (两种方案可选):**
-
-方案A: thirdweb Pay (与金库/节点统一)
-- [ ] 前端: `payVIPSubscribe` 改用 thirdweb Pay
-- [ ] 支持任意代币/法币/信用卡
-- [ ] 资金 → Server钱包 → edge function 激活
-
-方案B: x402 协议 (更优雅)
-- [ ] edge function 返回 HTTP 402 + 支付要求
-- [ ] 前端 `fetchWithPayment` 自动处理支付流程
-- [ ] 支付完成后自动激活 VIP
-- [ ] 优势: 标准协议, 支持 ARB USDC, 链上验证
-- [ ] `vip-subscribe` edge function 已有 x402 框架代码
-
-推荐: **x402 (方案B)** — VIP 是订阅性质,适合 402 支付协议
-- [ ] 测试: x402 支付流 + 自动激活
-
-**SwapRouter 废弃评估:**
-- [ ] 确认金库入金不再需要 SwapRouter
-- [ ] 确认节点购买不再需要 SwapRouter
-- [ ] SwapRouter 合约标记为 deprecated, 不删除
-- [ ] admin-contracts 页面移除 SwapRouter
-
-#### 1.3 Paymaster 代付 gas
-- [ ] 在 thirdweb Dashboard 开启 BSC Paymaster
-- [ ] 设置 gas 赞助规则（仅限 Vault/NodesV2/MA 合约交互）
-- [ ] 前端: 所有合约调用自动走 paymaster
-- [ ] 限额: 每用户每日 gas 赞助上限
-
-#### 1.4 Session Key（可选）
-- [ ] 用户首次 approve 后设置 session key
-- [ ] 后续存入/购买无需重复 approve
-
-#### 1.5 节点系统重构
-
-> 节点购买后不产生团队奖励。必须存入金库激活节点后才开启收益。
-
-**核心规则：购买节点 ≠ 激活。激活 = 金库存入达标。**
-
-##### 大节点 (MAX) — 价格 600U, 冻结 6000U
-
-**激活条件：**
-
-| 激活等级 | 金库存入要求 | 额外条件 |
-|---------|-----------|---------|
-| V1 | ≥100U | 推荐 3 个小节点 |
-| V2 | ≥300U | 无 |
-| V3 | ≥500U | 无 |
-| V4 | ≥600U | 无 |
-| V5 | ≥800U | 无 |
-| V6 | ≥1000U | 无 |
-
-**收益规则：**
-- 激活后**第二天**开始产生收益
-- 每日收益 = 6000U × 0.9% = **54U 铸造 MA**
-- 未激活 = 不启动收益
-
-**达标考核时间线：**
-
-```
-Day 1-15:  激活后每日 54U → MA
-           ├── 已激活: ✅ 正常领取
-           └── 未激活: ❌ 无收益
-
-Day 15:    考核 V1
-           ├── V1 达标: Day 16-30 继续领取 54U/天
-           └── V1 不达标: Day 16-30 收益暂停
-
-Day 30:    考核 V2
-           ├── V2 达标: Day 31-60 继续领取 54U/天
-           └── V2 不达标: Day 31-60 收益暂停, 等级降为实际等级
-
-Day 60:    考核 V4
-           ├── V4 达标: Day 61-120 继续领取 54U/天
-           └── V4 不达标: Day 61-120 收益暂停, 等级降为实际等级
-
-Day 120:   考核 V6
-           ├── V6 达标: 解锁 6000U 铸造 MA ✨
-           └── V6 不达标: 不解锁, 等级降为实际等级
-```
-
-##### 小节点 (MINI) — 价格 100U, 冻结 1000U
-
-**激活条件：**
-
-| 激活等级 | 金库存入要求 |
-|---------|-----------|
-| V1 | ≥100U |
-| V2 | ≥300U |
-| V3 | ≥500U |
-| V4 | ≥600U |
-
-**收益规则：**
-- 激活后**第二天**开始产生收益
-- 每日收益 = 1000U × 0.9% = **9U 铸造 MA**
-- 所有收益**锁仓**，达标后解锁
-
-**达标考核时间线：**
-
-```
-Day 1-90:  激活后每日 9U → MA (锁仓)
-           └── 每日铸造但锁仓，不可领取
-
-Day 30:    考核 V2 (哪日达标次日解锁)
-           ├── V2 达标: 解锁 Day 1-60 锁仓收益, 继续领取至 Day 90
-           └── V2 不达标: 收益不可解锁, 等级降为实际等级
-
-Day 90:    考核 V2
-           ├── V2 达标: 解锁 Day 1-90 全部锁仓收益
-           └── V2 不达标: 全部收益销毁 ☠️
-
-Day 90:    同时考核 V4
-           ├── V4 达标: 解锁 1000U 铸造 MA ✨
-           └── V4 不达标: 不解锁
-```
-
-##### 节点改动清单
-
-**DB 函数修改：**
-- [x] `check_node_activation()`: 激活条件已更新
-- [x] `settle_node_fixed_yield()`: MAX=released, MINI=locked
-- [x] `check_node_milestones()`: pass/fail + rank demotion
-
-**system_config 更新：**
-- [x] `MAX_ACTIVATION_TIERS`: V1-V6
-- [x] `MINI_ACTIVATION_TIERS`: V1-V4
-- [x] `MAX_MILESTONES`: Day 15/30/60/120
-- [x] `MINI_MILESTONES`: Day 30/90
-
-**前端修改：**
-- [x] 节点详情页: 激活状态 + 考核时间线 (已有)
-- [x] 收益页: MAX 可领取 / MINI 锁仓 (已有)
-- [x] 里程碑进度条 (已有)
-
-**Edge function 修改：**
-- [x] `settle-node-interest`: MA V2 + MAX直接mint / MINI锁仓
-- [x] `check-node-activation`: 金库存入触发 (vault-record调用)
-- [x] `check-node-qualification`: 达标考核 cron
-
-**重要规则：倒计时从金库存入激活节点那天开始计算，不是购买节点那天。**
-**日收益也从激活次日开始，未激活不产生收益。**
-
-**测试结果：**
-- [x] MAX Day 1: 收益直接释放 54U ✅
-- [x] MAX V1 达标: 继续领取 ✅
-- [x] MAX V1 不达标: 收益暂停 (earnings_paused=true) ✅
-- [x] MINI Day 1: 收益锁仓 9U ✅
-- [x] MINI Day 30 V2 达标: 解锁锁仓 ✅
-- [x] MINI Day 90 V2 不达标: 收益销毁 (destroyed_earnings=810) ✅
-- [ ] V6/V4 达标 → 冻结金额解锁验证 (待测试)
-- [ ] 等级降级 → 实际等级验证 (待测试)
-
----
-
-### Phase 2: MA Token 升级 — thirdweb 模块化 ✅ 已完成
-
-**目标**: MA Token 迁移到 thirdweb 模块化合约
-
-**2.1 部署新 MA Token** ✅
-- [x] thirdweb Dashboard 部署 ERC20 Core (BSC)
-- [x] 安装 MintableERC20 模块
-- [x] grantRoles: Smart Account `0x85e44A` → role=2 (minter)
-- [x] 新地址: `0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b`
-- [x] Dashboard mint 测试成功
-
-**2.2 切换引用** ✅
-- [x] Edge functions: claim-yield, vault-early-redeem, ma-swap → 新地址
-- [x] 前端: .env VITE_MA_TOKEN_ADDRESS → 新地址
-- [x] Admin: contracts.ts 自动读取 env
-
-**2.3 旧合约处置**
-- [ ] 旧 MA Token `0xE3d19D3` → pause (待 deployer 操作)
-- [ ] 测试阶段余额不迁移
-
-**2.4 获得的能力**
-- ✅ thirdweb Dashboard 直接管理 mint/burn/pause
-- ✅ 模块可装卸 — 后续加 blacklist/supplyCap 不需重部署
-- ✅ 可安装 AggLayer CrossChain 模块跨链到 ARB
-
-**2.5 待安装模块（后续）**
-- [ ] TransferableERC20 模块 — blacklist/transferable 控制
-- [ ] 自定义 supplyCap 模块 — 最大供应量限制
-- [ ] AggLayer CrossChain — 跨链到 ARB 同地址
-
-**关键发现：thirdweb Server Wallet 双地址**
-```
-每个 Server Wallet = EOA 签名者 + ERC-4337 Smart Account
-  EOA (0xeBAB)   → from: 走 EIP-7702 → BSC 失败 ❌
-  Smart (0x85e4)  → from: 走 ERC-4337  → BSC 成功 ✅
-
-所有 edge function 必须使用 Smart Account 地址!
-```
-
----
-
-### Phase 3: 合约重构 — Factory + thirdweb 部署 🔄 进行中
-
-**目标**: 所有合约统一通过 Factory 管理，thirdweb Dashboard 可视化
-
-**3.1 CoinMaxFactory V2**
-
-升级 Factory 合约，覆盖所有在用合约：
-
-```solidity
-contract CoinMaxFactoryV2 is Ownable {
-    // 已有: Vault + Engine + Release (ERC1967Proxy)
-    // 新增:
-    address public oracleProxy;    // Oracle → UUPS 代理
-    address public flashSwapProxy; // FlashSwap → 已经是 UUPS
-    address public splitterClone;  // Splitter → Clone
-    address public batchBridgeClone; // BatchBridge → Clone
-    address public nodePoolClone;  // NodePool → Clone
-
-    function deployOracle(...) external onlyOwner { ... }
-    function deploySplitter(...) external onlyOwner { ... }
-    function deployBatchBridge(...) external onlyOwner { ... }
-    function deployNodePool(...) external onlyOwner { ... }
-
-    // 统一 role 管理
-    function grantRoleOn(address target, bytes32 role, address account) external onlyOwner { ... }
-    function revokeRoleOn(address target, bytes32 role, address account) external onlyOwner { ... }
-
-    // 统一升级
-    function upgradeContract(address proxy, address newImpl) external onlyOwner { ... }
-}
-```
-
-**3.2 重部署策略**
-
-| 合约 | 当前 | 升级方案 | 需要迁移数据？ |
-|------|------|---------|-------------|
-| Oracle | 直接部署, 不可升级 | **重部署**: Factory → ERC1967Proxy | ✅ 需迁移当前价格 |
-| Splitter | 直接部署, Ownable | **保持**: 隐私设计不需要代理 | ❌ |
-| BatchBridge | 直接部署, Ownable | **重部署**: 加 UUPS 升级能力 | ✅ Owner 转移 |
-| NodePool | 直接部署, Ownable | **保持**: 简单 flush 逻辑 | ❌ |
-| FlashSwap | 直接部署, UUPS | **纳入 Factory**: 注册到 Factory | ❌ 已是代理 |
-| Vault | Factory 部署 | **保持**: 已正确部署 | ❌ |
-| Release | Factory 部署 | **保持**: 已正确部署 | ❌ |
-
-**3.3 publish 到 thirdweb**
-- [ ] `npx thirdweb publish` — 发布 CoinMaxFactoryV2
-- [ ] `npx thirdweb publish` — 发布所有 implementation 合约
-- [ ] Dashboard 可视化部署 + 管理
-
-**3.4 Owner 策略**
-
-```
-所有合约 Owner/ADMIN → CoinMaxFactoryV2
-CoinMaxFactoryV2 Owner → Deployer (EOA) 或 Safe 多签
-
-操作链路:
-  Admin Dashboard → Factory.grantRoleOn() → 目标合约
-  Admin Dashboard → Factory.upgradeContract() → UUPS 升级
-```
-
----
-
-### Phase 4: 功能连接验证
-
-**目标**: 确保升级后所有功能正常
-
-**4.1 入金流程**
-- [ ] thirdweb Pay 入金 → Vault 记录 → DB 同步
-- [ ] 多代币测试: USDT/USDC/BNB/信用卡
-- [ ] Paymaster 代付 gas 验证
-- [ ] vault-record edge function 正常记录
-
-**4.2 收益流程**
-- [ ] 日利息结算: settle_vault_daily() → MA mint (新 MA Token)
-- [ ] 收益提取: claim-yield edge function → 新 MA Token mintTo
-- [ ] 释放: Release.createRelease() → 线性领取
-- [ ] 闪兑: FlashSwap 用新 MA Token 地址
-
-**4.3 节点+推荐**
-- [ ] 节点购买 → NodePool → flush → 接收钱包
-- [ ] 等级升级: check_rank_promotion() 触发
-- [ ] 团队奖励: settle_team_commission() → 4种奖励
-- [ ] 奖励 → earnings_releases → 待释放余额
-
-**4.4 跨链**
-- [ ] BatchBridge: 修复 Stargate V2 quoteSend revert 问题
-- [ ] BatchBridge: Owner 转回 deployer (EIP-7702 在 BSC 不工作)
-- [ ] BatchBridge: BSC USDC → Stargate → ARB → 0x60D416 到账验证
-- [ ] HL Treasury: ARB USDC → HL Bridge → HL Vault 存入
-- [ ] HL Treasury: HL Vault → 提取 → ARB USDC (24h delay)
-- [ ] 回桥: ARB → BSC (可选, 用于利润回流)
-
-**4.5 未使用/异常合约处置验证**
-- [ ] BatchBridge: Stargate V2 参数修复后跨链成功
-- [ ] Gateway: pause() 或标记 deprecated, 确认前端无引用
-- [ ] InterestEngine: 确认 DB 结算路径完整覆盖链上功能
-  - 对比: DB settle_vault_daily() vs 链上 InterestEngine.processInterest()
-  - 决策: 保持 DB 路径 或 切回链上
-  - 若保持 DB: InterestEngine pause() + 移除 ENGINE_ROLE
-- [ ] cUSD: 确认 Vault 不再依赖 cUSD
-  - 检查: Vault.asset() 返回什么？是 cUSD 还是 USDC？
-  - 若返回 cUSD: 需要修复 Vault 或保留 cUSD
-  - 若不影响: cUSD pause() + 标记 deprecated
-- [ ] Factory: 确认是否升级为 V2 或标记 deprecated
-  - 选项A: 升级 Factory V2 管理所有合约
-  - 选项B: 废弃 Factory, 用 thirdweb Dashboard 直接管理
-- [ ] SwapRouter: thirdweb Pay 上线后确认不再需要
-  - 检查: 前端所有 SwapRouter 引用已移除
-  - 合约: 保留不删除, 但 pause()
-
-**4.6 管理**
-- [ ] Admin Dashboard 所有按钮正常
-- [ ] thirdweb Dashboard 合约可视化管理
-- [ ] 紧急暂停: pause() 全链路测试
-- [ ] Deployer/Server Wallet/中继器 权限矩阵验证
-- [ ] 所有 deprecated 合约确认已 pause 且无资金残留
-
----
-
-### Phase 5: 链上链下混合隐私
-
-**目标**: 投资者可验证资金安全，但无法追踪个人交易
-
-**5.1 链上（透明层）— 投资者可验证**
-
-```
-BSC 链上公开:
-  ├── Vault 合约: totalAssets() — 总存入金额
-  ├── MA Token: totalSupply() — MA 总发行量
-  ├── BatchBridge: totalBridged() — 已跨链总额
-  └── 审计报告: 合约源码已验证
-
-ARB 链上公开:
-  ├── Treasury 钱包: USDC 余额
-  └── HL Vault: CoinMax 份额
-
-投资者验证:
-  Vault 总存入 ≈ Splitter 分配总额 ≈ BatchBridge 跨链额 + 运营分配
-```
-
-**5.2 链下（隐私层）— 保护个人数据**
-
-```
-DB (Supabase) 存储:
-  ├── 个人仓位: vault_positions (user_id, principal, plan)
-  ├── 个人收益: vault_rewards (daily yield per position)
-  ├── 推荐关系: profiles.referrer_id
-  ├── 团队业绩: 递归计算，不上链
-  └── 奖励分配: node_rewards (4种奖励明细)
-
-链上不暴露:
-  ✗ 个人存入金额
-  ✗ 推荐关系
-  ✗ 等级信息
-  ✗ 奖励明细
-```
-
-**5.3 BatchBridge 隐私增强**
-
-```
-现有设计 (保持):
-  ├── 4h 批量跨链 — 混合多笔存入
-  ├── Splitter 私有钱包列表 — 外部不可见
-  └── 固定间隔 — 金额随机
-
-可增强:
-  ├── 随机延迟 (3-5h 而非固定 4h) — 更难预测
-  ├── 最小/最大批量金额 — 避免特征识别
-  └── 多路径跨链 — 不同 bridge 轮换
-```
-
-**5.4 Zero-Knowledge 证明（远期）**
-
-```
-远期方案:
-  ├── zk-proof 验证用户存入金额（不暴露具体数字）
-  ├── 链上只存 commitment hash
-  ├── 提取时验证 proof
-  └── 投资者验证 Merkle root 匹配总额
-```
-
----
-
-## 三、执行优先级 + 时间估计
-
-| 优先级 | 阶段 | 核心任务 | 依赖 |
-|--------|------|---------|------|
-| P0 | Phase 1.1 | thirdweb Pay 入金 | 无 |
-| P0 | Phase 1.2 | Paymaster 无 gas | Phase 1.1 |
-| P1 | Phase 4.1-4.3 | 功能连接验证 | Phase 1 |
-| P1 | Phase 3.3 | publish 合约到 thirdweb | 无 |
-| P2 | Phase 2 | MA Token 升级 | 需要停服迁移 |
-| P2 | Phase 3.1-3.2 | Factory V2 + 重部署 | Phase 2 |
-| P3 | Phase 4.4-4.5 | 跨链 + 管理验证 | Phase 3 |
-| P3 | Phase 5 | 隐私增强 | Phase 4 |
-
----
-
-## 四、风险点
-
-| 风险 | 影响 | 缓解 |
+| **Vault** | `0xE0A80b82F42d009cdE772d5c34b1682C2D79e821` | Hardhat → UUPS Proxy | ✅ UUPS | ✅ depositPublic + purchaseNodePublic |
+| **BatchBridgeV2** | `0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db` | Hardhat | ❌ 固定 | ✅ 新部署，USDT→swap→USDC→Stargate |
+| **MA Token** | `0xdFaC84b2f9cfD02b3f44760E0Ff88b4EeC0e1593` | Hardhat | ❌ 固定 | 在用 |
+| **Oracle** | `0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD` | Hardhat → UUPS Proxy | ✅ UUPS | 在用，$0.53 |
+| **Engine** | `0x0990013669d28eC6401f46a78b612cdaBE88b789` | Hardhat → UUPS Proxy | ✅ UUPS | 在用 |
+| **Release** | `0x842b48a616fA107bcd18e3656edCe658D4279f92` | Hardhat → UUPS Proxy | ✅ UUPS | 在用 |
+| **FlashSwap BSC** | `0x95dfb27Fbd92A5C71C4028a4612e9Cbefdb8EE10` | Hardhat → UUPS Proxy | ✅ UUPS | 在用，需流动性 |
+| **NodesV2** | `0x17DDad4C9c2fD61859D37dD40300c419cBdd4cE2` | Hardhat | ❌ 固定 | MINI=$100/MAX=$600 |
+| **NodePool** | `0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a` | Hardhat | ❌ 固定 | →0xeb8A |
+| **cUSD** | `0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6` | Hardhat | ❌ 固定 | Vault记账用 |
+| **Forwarder** | `0x6EF9AD688dFD9B545158b05FC51ab38B9D5a8556` | Hardhat | ❌ 固定 | EIP-2771 |
+| **Timelock** | `0x857c472F8587B2D3E7F90B10b99458104CcaCdfC` | Hardhat | ❌ 固定 | 24h延迟 |
+| **PancakeSwap Pool** | `0x92b7807bF19b7DDdf89b706143896d05228f3121` | - | - | 0.01% USDT/USDC |
+
+### ARB 在用合约
+
+| 合约 | 地址 | 状态 |
 |------|------|------|
-| MA Token 迁移 — 用户余额 | 高 | 快照+批量 airdrop, 旧合约 pause 不销毁 |
-| Paymaster 费用 | 中 | 设置每用户每日限额, 仅限核心合约 |
-| Factory 升级 — 权限丢失 | 高 | 先在 testnet 验证, deployer 保留紧急权限 |
-| 中继器 EIP-7702 不工作 | 已知 | BatchBridge owner 转回 deployer |
-| thirdweb 服务中断 | 中 | 保留 deployer EOA 作为降级方案 |
+| **FundRouter** | `0x71237E535d5E00CDf18A609eA003525baEae3489` | UUPS，30/8/12/20/30 分配 |
+| **FlashSwap ARB** | `0x681a734AbE80D9f52236d70d29cA5504207b6d7C` | UUPS，placeholder config |
+
+### 已废弃合约（不再使用）
+
+| 合约 | 地址 | 废弃原因 |
+|------|------|---------|
+| SwapRouter | `0x5650383D9f8d8f80fc972b8F49A3cc31d3A7F7E3` | ✅ 被 Vault.depositPublic 替代 |
+| BatchBridge V1 | `0x670dbfAA27C9a32023484B4BF7688171E70962f6` | ✅ 被 BatchBridgeV2 替代 |
+| Gateway ×3 | `0xaC12...`, `0x38a6...`, `0x2F6E...` | PancakeSwap STF 错误 |
+| Splitter | `0xcfF14557337368E4A9E09586B0833C5Bbf323845` | 被 BatchBridge 跨链替代 |
+| InterestEngine | - | 利息走 DB 结算 |
+| Factory | - | 部署完未再用 |
+
+### 钱包
+
+| 钱包 | 地址 | 用途 |
+|------|------|------|
+| deployer (全部admin) | `0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1` | 所有合约 admin |
+| 节点钱包 | `0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9` | 节点资金接收 |
+| VIP接收 | `0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A` | VIP付款 |
+| Server Wallet (4337) | `0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b` | mint/role (非payable) |
 
 ---
 
-## 五、合约地址规划
+## 二、当前资金链路（已实现）
 
-### BSC 链 (保持)
+### 金库入金
 ```
-Factory V2:    待部署 (CREATE2 确定性地址)
-Vault:         0xE0A80b82... (保持, UUPS 可升级)
-Release:       0xC80724a4... (保持, UUPS 可升级)
-FlashSwap:     0xabF96083... (保持, UUPS 可升级)
-MA Token V2:   0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b ✅ (thirdweb ERC20 Core + MintableERC20)
-Oracle V2:     待部署 (UUPS 代理, CREATE2)
-Splitter:      0xcfF14557... (保持, 隐私设计)
-BatchBridge:   0x670dbfAA... (Owner 转回 deployer)
-NodePool:      0x7dE393D0... (Owner 转回 deployer)
-```
+用户 USDT → approve Vault → Vault.depositPublic(amount, planIndex)
+  → 拉取 USDT → 送 BatchBridgeV2 (累积)
+  → mint cUSD 1:1 记账 → Oracle定价 → mint MA → 锁仓
 
-### ARB 链 (新增)
-```
-MA Token V2:   同 BSC 地址 (CREATE2 跨链同地址)
-Treasury:      0x60D416dA... (HL 操作钱包)
-HL Vault:      0xdfc24b07... (HLP)
+BatchBridgeV2 (4h cron):
+  → PancakeSwap V3 批量 swap USDT→USDC (0.01%)
+  → Stargate 桥 USDC → ARB FundRouter
+  → 5钱包 (30/8/12/20/30)
 ```
 
-### 钱包角色
+### 节点购买
 ```
-Deployer (0x1B6B):     Factory Owner + 紧急恢复
-Server Wallet (0x85e4): MINTER/ENGINE/GATEWAY + 链上操作 (ERC-4337)
-HL Wallet (0x60D4):     ARB Treasury + HL 存取
-VIP Receiver (0x927e):  VIP 收款
-Node Receiver (0xeb8A): 节点收款
+用户 USDT → approve Vault → Vault.purchaseNodePublic(type, amount)
+  → 拉取 USDT → 送 BatchBridgeV2
+  → 同上跨链路径 → ARB → API分发 → 节点钱包
 ```
+
+### MA 闪兑
+```
+卖: MA → FlashSwap → Oracle定价 → USDT (50%持仓规则, 0.3%手续费)
+买: USDT → FlashSwap → Oracle定价 → MA
+```
+
+### 每日利息
+```
+Engine (cron) → 读 Vault 仓位 × dailyRate × Oracle价格
+  → mint MA → Release 合约 → 线性释放
+```
+
+### 赎回
+```
+到期: claimPrincipal → 100% MA → 用户钱包
+提前: earlyClaimPrincipal → 80% MA + 20% burn
+  → 触发 recheck_ranks_on_vault_change (无限层上线降级检查)
+```
+
+---
+
+## 三、升级计划（待执行）
+
+### Phase 1: thirdweb 部署迁移 🔄 待执行
+
+**目标**: 所有合约通过 thirdweb 部署，Dashboard 可视化管理
+
+**为什么用 thirdweb 部署？**
+- Dashboard 直接管理合约（读/写/升级）
+- 内置 Explorer 查看合约状态
+- 一键 publish + 多链部署
+- Paymaster 集成（用户 0 gas）
+
+**1.1 需要重新部署的合约（thirdweb CLI）**
+
+| 合约 | 当前 | thirdweb 方案 | 优先级 |
+|------|------|-------------|--------|
+| MA Token | Hardhat 固定 | `npx thirdweb deploy` ERC20 Core + MintableERC20 模块 | P0 |
+| Oracle | Hardhat UUPS | `npx thirdweb publish` → Dashboard 部署 UUPS proxy | P1 |
+| Vault | Hardhat UUPS | `npx thirdweb publish` → Dashboard 升级 impl | P1 |
+| Engine | Hardhat UUPS | `npx thirdweb publish` → Dashboard 升级 impl | P2 |
+| Release | Hardhat UUPS | `npx thirdweb publish` → Dashboard 升级 impl | P2 |
+| FlashSwap | Hardhat UUPS | `npx thirdweb publish` → Dashboard 升级 impl | P2 |
+| BatchBridgeV2 | Hardhat 固定 | 保持，非核心 | P3 |
+
+**1.2 MA Token 迁移（P0）**
+- [ ] thirdweb Dashboard 部署 ERC20 Core (BSC)
+- [ ] 安装 MintableERC20 模块
+- [ ] grantRoles: Vault + Engine → minter
+- [ ] 前端 + edge functions 切换地址
+- [ ] 旧 MA Token pause
+
+**1.3 publish 合约到 thirdweb**
+- [ ] `npx thirdweb publish` — CoinMaxVault
+- [ ] `npx thirdweb publish` — MAPriceOracle
+- [ ] `npx thirdweb publish` — CoinMaxFlashSwap
+- [ ] `npx thirdweb publish` — CoinMaxInterestEngine
+- [ ] `npx thirdweb publish` — CoinMaxRelease
+- [ ] Dashboard 可视化管理所有合约
+
+### Phase 2: Paymaster + 0 Gas 体验
+
+**目标**: 用户不需要 BNB，所有操作 0 gas
+
+- [ ] thirdweb Dashboard 开启 BSC Paymaster
+- [ ] 设置赞助规则：仅 Vault/FlashSwap 合约交互
+- [ ] 每用户每日 gas 赞助上限
+- [ ] 前端所有合约调用走 paymaster
+- [ ] 测试：0 BNB 钱包完成存入/闪兑
+
+### Phase 3: 功能验证
+
+**3.1 入金流程**
+- [x] Vault.depositPublic 接受 USDT ✅
+- [x] Vault.purchaseNodePublic 接受 USDT ✅
+- [x] BatchBridgeV2 USDT→swap→USDC→Stargate ✅ 已部署
+- [ ] 真实用户存入测试
+- [ ] BatchBridgeV2 跨链测试（需 BNB gas fee）
+- [ ] ARB FundRouter 接收验证
+
+**3.2 收益流程**
+- [ ] 日利息结算: settle_vault_daily() → MA mint
+- [ ] 收益提取: claim-yield → MA mintTo
+- [ ] 释放: Release.createRelease() → 线性领取
+- [ ] 闪兑: FlashSwap (需存入 USDT+MA 流动性)
+
+**3.3 等级系统**
+- [x] 升级: check_rank_promotion() 双向（升+降）✅
+- [x] 降级: recheck_ranks_on_vault_change() 无限层 ✅
+- [x] 每日批量: batch_check_rank_promotions() 含降级 ✅
+- [x] 排除 BONUS 仓位 ✅
+- [ ] 等级降级实际触发验证
+
+**3.4 跨链**
+- [x] BatchBridgeV2 部署 ✅
+- [x] Vault.fundDistributor → BatchBridgeV2 ✅
+- [ ] BatchBridgeV2 充值 BNB (Stargate gas)
+- [ ] 首次 swapAndBridge() 执行验证
+- [ ] ARB FundRouter flushAll() 验证
+- [ ] 节点资金 ARB → API → 节点钱包
+
+### Phase 4: 隐私增强
+
+```
+链上公开（投资者可验证）:
+  ├── Vault: totalAssets() — 总存入
+  ├── MA Token: totalSupply() — MA总量
+  └── BatchBridgeV2: totalBridged/totalSwapped — 跨链统计
+
+链下隐私（DB）:
+  ├── 个人仓位/收益/推荐关系/等级
+  └── 4h批量跨链混合多笔存入
+
+增强:
+  ├── 随机延迟 (3-5h)
+  ├── 最小/最大批量金额
+  └── 多路径跨链轮换
+```
+
+---
+
+## 四、已完成清单
+
+| 日期 | 完成项 |
+|------|--------|
+| 2026-03-30 | Vault 升级: depositPublic(USDT) + purchaseNodePublic(USDT) |
+| 2026-03-30 | Vault 升级: 1:1 shares fix (首次存入 bug) |
+| 2026-03-30 | Vault 最低存入 50 USDT |
+| 2026-03-30 | BatchBridgeV2 部署: USDT→PancakeSwap→USDC→Stargate |
+| 2026-03-30 | Vault.fundDistributor → BatchBridgeV2 |
+| 2026-03-30 | SwapRouter 废弃（前端不再调用）|
+| 2026-03-30 | 等级降级逻辑 + 无限层上线检查 |
+| 2026-03-30 | Admin 合约页面: 3 tab (链路/配置/跨链) + 链路图 |
+| 2026-03-30 | Admin 资金页面: 5 tab (余额/流转/跨链/闪兑/流水) |
+| 2026-03-30 | Admin Cron 面板: 可编辑调度 + 手动触发 |
+| 2026-03-30 | cUSD 地址修正为链上实际 (0x90B99a) |
+| 2026-03-30 | 前端删除 EARLY_BIRD_DEPOSIT_RATE |
+
+---
+
+## 五、下一步优先级
+
+| 优先级 | 任务 | 依赖 |
+|--------|------|------|
+| **P0** | 真实用户金库存入测试 | 无 |
+| **P0** | BatchBridgeV2 充值 BNB + 首次跨链测试 | 无 |
+| **P0** | FlashSwap 存入 USDT+MA 流动性 | 无 |
+| **P1** | MA Token 迁移到 thirdweb 模块化 | 需停服 |
+| **P1** | `npx thirdweb publish` 所有合约 | 无 |
+| **P1** | Paymaster 0 gas 配置 | thirdweb Dashboard |
+| **P2** | ARB 跨链端到端验证 | BatchBridgeV2 |
+| **P2** | 节点考核 V6/V4 达标验证 | 等级系统 |
+| **P3** | 隐私增强（随机延迟等）| Phase 3 完成 |
