@@ -105,7 +105,7 @@ const FLASH_SWAP_READ_ABI = {
 
 // ── Server Wallets for gas monitoring ──
 const SERVER_WALLETS = [
-  { label: "Server Wallet (ERC-4337·MINTER/FEEDER/ENGINE)", address: "0xeBAB6D22278c9839A46B86775b3AC9469710F84b" },
+  { label: "Server Wallet (ERC-4337·MINTER/FEEDER/ENGINE)", address: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b" },
   { label: "Deployer (EOA·合约admin·跨链)", address: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1" },
   { label: "Relayer (EIP-7702·BSC不可用)", address: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA" },
   { label: "VIP接收钱包", address: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A" },
@@ -619,19 +619,21 @@ export default function AdminContracts() {
             icon={<FileCode2 className="h-4 w-4 text-amber-400" />}
             address=""
             items={[
-              { label: "SwapRouter (金库+节点入口)", value: SWAP_ROUTER_ADDRESS, type: "address" },
-              { label: "Vault (ERC4626金库) UUPS", value: VAULT_V3_ADDRESS, type: "address" },
+              { label: "── 核心 ──", value: "" },
+              { label: "Vault (存入+节点) UUPS", value: VAULT_V3_ADDRESS, type: "address" },
+              { label: "BatchBridgeV2 (USDT→swap→USDC→跨链)", value: "0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db", type: "address" },
+              { label: "Oracle (价格预言机) UUPS", value: PRICE_ORACLE_ADDRESS, type: "address" },
+              { label: "── 收益 ──", value: "" },
               { label: "Engine (利息引擎) UUPS", value: ENGINE_ADDRESS, type: "address" },
               { label: "Release (释放合约) UUPS", value: RELEASE_ADDRESS, type: "address" },
-              { label: "Oracle (价格预言机) UUPS", value: PRICE_ORACLE_ADDRESS, type: "address" },
               { label: "FlashSwap (MA闪兑) UUPS", value: FLASH_SWAP_ADDRESS, type: "address" },
-              { label: "BatchBridge (跨链累积)", value: BATCH_BRIDGE_ADDRESS, type: "address" },
-              { label: "NodePool (节点中转)", value: "0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a", type: "address" },
-              { label: "NodesV2 (节点合约)", value: NODE_V2_CONTRACT_ADDRESS, type: "address" },
+              { label: "── 代币 ──", value: "" },
               { label: "MA Token", value: MA_TOKEN_ADDRESS, type: "address" },
-              { label: "cUSD (记账代币)", value: "0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6", type: "address" },
+              { label: "cUSD (记账)", value: "0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6", type: "address" },
+              { label: "── 安全 ──", value: "" },
               { label: "Forwarder (EIP-2771)", value: FORWARDER_ADDRESS, type: "address" },
               { label: "Timelock (24h延迟)", value: TIMELOCK_ADDRESS, type: "address" },
+              { label: "── DEX ──", value: "" },
               { label: "PancakeSwap V3 Pool (0.01%)", value: "0x92b7807bF19b7DDdf89b706143896d05228f3121", type: "address" },
             ]}
             loading={false}
@@ -666,7 +668,7 @@ export default function AdminContracts() {
             address=""
             items={[
               { label: "── 执行钱包 ──", value: "" },
-              { label: "Server Wallet (ERC-4337·主执行)", value: "0xeBAB6D22278c9839A46B86775b3AC9469710F84b", type: "address" },
+              { label: "Server Wallet (ERC-4337·主执行)", value: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b", type: "address" },
               { label: "Deployer (EOA·跨链+紧急恢复)", value: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", type: "address" },
               { label: "Relayer (EIP-7702·BSC不可用)", value: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA", type: "address" },
               { label: "── 接收钱包 ──", value: "" },
@@ -761,8 +763,9 @@ export default function AdminContracts() {
             address=""
             items={[
               { label: "── BSC ──", value: "" },
-              { label: "BatchBridge (累积跨链)", value: BATCH_BRIDGE_ADDRESS, type: "address" },
-              { label: "Vault (USDC来源)", value: VAULT_V3_ADDRESS, type: "address" },
+              { label: "BatchBridgeV2 (USDT→swap→USDC→桥)", value: "0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db", type: "address" },
+              { label: "Vault (USDT来源)", value: VAULT_V3_ADDRESS, type: "address" },
+              { label: "PancakeSwap Pool (swap用)", value: "0x92b7807bF19b7DDdf89b706143896d05228f3121", type: "address" },
               { label: "── ARB ──", value: "" },
               { label: "FundRouter (分配)", value: ARB_FUND_ROUTER_ADDRESS, type: "address" },
               { label: "Trading 30%", value: "0xd12097C9A12617c49220c032C84aCc99B6fFf57b", type: "address" },
@@ -1279,7 +1282,7 @@ function BatchGasPanel() {
 
 const THIRDWEB_SECRET = import.meta.env.VITE_THIRDWEB_SECRET_KEY || "";
 const THIRDWEB_VAULT_TOKEN = import.meta.env.VITE_THIRDWEB_VAULT_TOKEN || "";
-const EXECUTOR_ADDR = "0xeBAB6D22278c9839A46B86775b3AC9469710F84b";
+const EXECUTOR_ADDR = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
 const FEEDER_ROLE_HASH = "0x80a586cc4ecf40a390b370be075aa38ab3cc512c5c1a7bc1007974dbdf2663c7";
 
 async function callExecutor(calls: { contractAddress: string; method: string; params: string[] }[]) {
@@ -1756,22 +1759,21 @@ function VaultFlowDiagram() {
       title="金库存入链路"
       icon={<Wallet className="h-4 w-4 text-primary/60" />}
       flows={[
-        { label: "存入: 用户USDT → SwapRouter → Vault → 跨链", steps: [
+        { label: "存入: 用户USDT → Vault.depositPublic() → 累积跨链", steps: [
           { label: "用户", addr: "USDT (BSC)", color: "text-blue-400", bg: "bg-blue-500/10" },
-          { label: "SwapRouter", addr: formatAddress(SWAP_ROUTER_ADDRESS), fullAddr: SWAP_ROUTER_ADDRESS, color: "text-purple-400", bg: "bg-purple-500/10" },
-          { label: "PancakeSwap", addr: "USDT→USDC (0.01%)", fullAddr: "0x92b7807bF19b7DDdf89b706143896d05228f3121", color: "text-pink-400", bg: "bg-pink-500/10" },
           { label: "Vault", addr: formatAddress(VAULT_V3_ADDRESS), fullAddr: VAULT_V3_ADDRESS, color: "text-primary", bg: "bg-primary/10" },
-          { label: "BatchBridge", addr: formatAddress(BATCH_BRIDGE_ADDRESS), fullAddr: BATCH_BRIDGE_ADDRESS, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+          { label: "BatchBridgeV2", addr: formatAddress("0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db"), fullAddr: "0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db", color: "text-emerald-400", bg: "bg-emerald-500/10" },
         ]},
-        { label: "Vault内部: USDC→cUSD记账 + Oracle定价 → mint MA锁仓", steps: [
+        { label: "Vault内部: USDT→cUSD记账 + Oracle定价 → mint MA锁仓", steps: [
           { label: "mint cUSD", addr: formatAddress("0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6"), fullAddr: "0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6", color: "text-cyan-400", bg: "bg-cyan-500/10" },
           { label: "Oracle", addr: formatAddress(PRICE_ORACLE_ADDRESS), fullAddr: PRICE_ORACLE_ADDRESS, color: "text-amber-400", bg: "bg-amber-500/10" },
           { label: "mint MA", addr: formatAddress(MA_TOKEN_ADDRESS), fullAddr: MA_TOKEN_ADDRESS, color: "text-yellow-400", bg: "bg-yellow-500/10" },
           { label: "锁仓", addr: "5/45/90/180天", color: "text-green-400", bg: "bg-green-500/10" },
         ]},
-        { label: "跨链: BatchBridge → Stargate(4h) → ARB FundRouter → 5钱包", steps: [
-          { label: "BatchBridge", addr: formatAddress(BATCH_BRIDGE_ADDRESS), fullAddr: BATCH_BRIDGE_ADDRESS, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-          { label: "Stargate", addr: "4h cron 桥接", color: "text-indigo-400", bg: "bg-indigo-500/10" },
+        { label: "跨链(4h cron): BatchBridgeV2 swap USDT→USDC → Stargate → ARB", steps: [
+          { label: "BatchBridgeV2", addr: formatAddress("0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db"), fullAddr: "0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+          { label: "PancakeSwap", addr: "USDT→USDC (0.01%)", fullAddr: "0x92b7807bF19b7DDdf89b706143896d05228f3121", color: "text-pink-400", bg: "bg-pink-500/10" },
+          { label: "Stargate", addr: "USDC桥接→ARB", color: "text-indigo-400", bg: "bg-indigo-500/10" },
           { label: "FundRouter", addr: formatAddress(ARB_FUND_ROUTER_ADDRESS), fullAddr: ARB_FUND_ROUTER_ADDRESS, color: "text-blue-400", bg: "bg-blue-500/10" },
           { label: "5钱包", addr: "30/8/12/20/30%", color: "text-green-400", bg: "bg-green-500/10" },
         ]},
@@ -1815,13 +1817,12 @@ function NodeFlowDiagram() {
       title="节点购买链路"
       icon={<Zap className="h-4 w-4 text-green-400/60" />}
       flows={[
-        { label: "购买: USDT → SwapRouter → NodesV2 → NodePool → 节点钱包", steps: [
-          { label: "用户", addr: "USDT", color: "text-blue-400", bg: "bg-blue-500/10" },
-          { label: "SwapRouter", addr: formatAddress(SWAP_ROUTER_ADDRESS), fullAddr: SWAP_ROUTER_ADDRESS, color: "text-purple-400", bg: "bg-purple-500/10" },
-          { label: "PancakeSwap", addr: "USDT→USDC", fullAddr: "0x92b7807bF19b7DDdf89b706143896d05228f3121", color: "text-pink-400", bg: "bg-pink-500/10" },
-          { label: "NodesV2", addr: formatAddress(NODE_V2_CONTRACT_ADDRESS), fullAddr: NODE_V2_CONTRACT_ADDRESS, color: "text-green-400", bg: "bg-green-500/10" },
-          { label: "NodePool", addr: formatAddress("0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a"), fullAddr: "0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-          { label: "节点钱包", addr: formatAddress("0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9"), fullAddr: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", color: "text-amber-400", bg: "bg-amber-500/10" },
+        { label: "购买: USDT → Vault.purchaseNodePublic() → 跨链 → ARB → 节点钱包", steps: [
+          { label: "用户", addr: "USDT (MINI=$100/MAX=$600)", color: "text-blue-400", bg: "bg-blue-500/10" },
+          { label: "Vault", addr: formatAddress(VAULT_V3_ADDRESS), fullAddr: VAULT_V3_ADDRESS, color: "text-primary", bg: "bg-primary/10" },
+          { label: "BatchBridgeV2", addr: formatAddress("0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db"), fullAddr: "0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db", color: "text-emerald-400", bg: "bg-emerald-500/10" },
+          { label: "4h cron", addr: "swap+Stargate→ARB", color: "text-indigo-400", bg: "bg-indigo-500/10" },
+          { label: "API分发", addr: "→节点钱包", color: "text-amber-400", bg: "bg-amber-500/10" },
         ]},
         { label: "激活: 金库存入达标 → 等级升级", steps: [
           { label: "金库存入", addr: "≥100U", color: "text-cyan-400", bg: "bg-cyan-500/10" },
