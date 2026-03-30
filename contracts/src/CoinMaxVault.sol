@@ -310,7 +310,7 @@ contract CoinMaxVault is
     /// @param amount Amount (18 decimals on BSC)
     /// @param planIndex Staking plan index (0=5d, 1=45d, 2=90d, 3=180d)
     function depositPublic(address token, uint256 amount, uint256 planIndex) external nonReentrant whenNotPaused {
-        require(amount >= 50 * 1e18, "Minimum deposit 50");
+        require(amount >= 100 * 1e18, "Minimum deposit 100");
         require(
             token == 0x55d398326f99059fF775485246999027B3197955 || // USDT
             token == 0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d,  // USDC

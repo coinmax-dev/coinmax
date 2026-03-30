@@ -10,7 +10,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "EwFZ-cz8maTnDHEukynx4UgOx_0oqeqg1qR1gx2cHIM0L-Nks5ogM0U7JhZGQMyg3489Tc42J_QSZ9rLGojFSQ";
 const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 const RELAYER_WALLET = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
-const ORACLE_ADDRESS = "0x3EC635802091b9F95b2891f3fd2504499f710145";
+const ORACLE_ADDRESS = "0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD";
 const LAUNCH = new Date("2026-03-24T00:00:00Z").getTime();
 
 // ── Price curve (identical to K-line chart in profile-ma.tsx) ──
@@ -94,17 +94,33 @@ serve(async () => {
     }
   } catch { /* use 0 */ }
 
-  // Skip if already close enough (within 0.5%)
+  // ALWAYS sync DB price first (used by settle_vault_daily / team commission)
+  try {
+    const sbUrl = Deno.env.get("SUPABASE_URL")!;
+    const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    await fetch(`${sbUrl}/rest/v1/system_config?key=eq.MA_TOKEN_PRICE`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: sbKey,
+        Authorization: `Bearer ${sbKey}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ value: targetPrice.toFixed(6) }),
+    });
+  } catch { /* non-critical */ }
+
+  // Skip Oracle push if already close enough (within 0.5%)
   if (currentPrice > 0 && Math.abs(targetPrice - currentPrice) / currentPrice < 0.005) {
     return new Response(JSON.stringify({
-      status: "skipped",
-      reason: "price already synced",
+      status: "synced",
+      reason: "Oracle already synced, DB updated",
       onChain: `$${currentPrice.toFixed(4)}`,
       target: `$${targetPrice.toFixed(4)}`,
     }), { headers: { "Content-Type": "application/json" } });
   }
 
-  // Push via thirdweb Server Wallet using emergencySetPrice (bypasses 10% limit)
+  // Push to Oracle via thirdweb Server Wallet
   const res = await fetch("https://api.thirdweb.com/v1/contracts/write", {
     method: "POST",
     headers: {
@@ -126,22 +142,6 @@ serve(async () => {
   const data = await res.json();
   const txId = data?.result?.transactionIds?.[0] || null;
   const error = data?.error || null;
-
-  // Also update DB fallback price
-  try {
-    const sbUrl = Deno.env.get("SUPABASE_URL")!;
-    const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    await fetch(`${sbUrl}/rest/v1/system_config?key=eq.MA_TOKEN_PRICE`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: sbKey,
-        Authorization: `Bearer ${sbKey}`,
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify({ value: targetPrice.toFixed(6) }),
-    });
-  } catch { /* non-critical */ }
 
   return new Response(JSON.stringify({
     status: txId ? "pushed" : "failed",
