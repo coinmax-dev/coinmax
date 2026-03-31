@@ -507,6 +507,57 @@ function FundReservePanel() {
             <Button size="sm" variant="outline" className="h-7 text-[9px] flex-1" onClick={handleAuto}>按比例自动分配全部</Button>
             <Button size="sm" variant="outline" className="h-7 text-[9px] flex-1 text-cyan-400 border-cyan-500/20" onClick={handleMintMA}>铸造 MA → 闪兑</Button>
           </div>
+
+          {/* Auto allocation schedule */}
+          <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] text-foreground/50">定时自动分配</p>
+                <p className="text-[9px] text-foreground/20">
+                  {cfg.withdraw_auto_split === "true"
+                    ? `每 ${cfg.withdraw_auto_interval || 60} 分钟自动按比例分配`
+                    : "已关闭"}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const newVal = cfg.withdraw_auto_split === "true" ? "false" : "true";
+                  await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fund-reserve`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "config", key: "withdraw_auto_split", value: newVal }),
+                  });
+                  toast({ title: "定时分配", description: newVal === "true" ? "已开启" : "已关闭" });
+                  fetchStatus();
+                }}
+                className={cn("w-10 h-5 rounded-full transition-colors relative",
+                  cfg.withdraw_auto_split === "true" ? "bg-green-500" : "bg-foreground/10")}
+              >
+                <div className={cn("w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform",
+                  cfg.withdraw_auto_split === "true" ? "translate-x-5" : "translate-x-0.5")} />
+              </button>
+            </div>
+            {cfg.withdraw_auto_split === "true" && (
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] text-foreground/30">间隔</span>
+                <Input
+                  defaultValue={cfg.withdraw_auto_interval || "60"}
+                  type="number"
+                  className="h-6 w-16 text-[10px] font-mono"
+                  onBlur={async (e) => {
+                    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fund-reserve`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "config", key: "withdraw_auto_interval", value: e.target.value }),
+                    });
+                    toast({ title: "已更新", description: `间隔 ${e.target.value} 分钟` });
+                    fetchStatus();
+                  }}
+                />
+                <span className="text-[9px] text-foreground/30">分钟</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Recent Logs */}

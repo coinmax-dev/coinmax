@@ -125,7 +125,7 @@ export default function AdminFunds() {
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [section, setSection] = useState<"balances" | "flow" | "bridge" | "swap" | "transactions">("balances");
+  const [section, setSection] = useState<"balances" | "flow" | "bridge" | "allocations" | "swap" | "transactions">("balances");
   const pageSize = 50;
 
   const { data: balances, isLoading: balLoading, refetch: refetchBal } = useOnChainBalances();
@@ -152,6 +152,20 @@ export default function AdminFunds() {
       return data || [];
     },
     enabled: !!adminUser && section === "bridge",
+  });
+
+  // Fund allocation records
+  const { data: allocations = [] } = useQuery({
+    queryKey: ["admin", "funds", "allocations"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("fund_reserve_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return data || [];
+    },
+    enabled: !!adminUser && section === "allocations",
   });
 
   // MA swap records
@@ -195,6 +209,7 @@ export default function AdminFunds() {
     { id: "balances" as const, label: "合约余额", icon: Wallet },
     { id: "flow" as const, label: "资金流转", icon: ArrowRightLeft },
     { id: "bridge" as const, label: "跨链记录", icon: Globe },
+    { id: "allocations" as const, label: "分配记录", icon: ArrowRightLeft },
     { id: "swap" as const, label: "闪兑记录", icon: Zap },
     { id: "transactions" as const, label: "交易流水", icon: Database },
   ];
@@ -368,6 +383,76 @@ export default function AdminFunds() {
                     {b.fees_usd > 0 && <p className="text-[9px] text-red-400/50">费用 ${Number(b.fees_usd).toFixed(2)}</p>}
                     <p className="text-[9px] text-foreground/20">{b.started_at ? new Date(b.started_at).toLocaleDateString("zh-CN") : "-"}</p>
                   </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* ── Section: Fund Allocation Records ── */}
+      {section === "allocations" && (
+        <div className="space-y-2">
+          <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 mb-3">
+            <p className="text-[10px] text-foreground/30 mb-2">资金分配路径</p>
+            <div className="flex items-center gap-1 text-[9px] flex-wrap">
+              <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400">跨链到 ARB</span>
+              <span className="text-foreground/15">→</span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Server Wallet</span>
+              <span className="text-foreground/15">→</span>
+              <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">闪兑流动性</span>
+              <span className="text-foreground/15">/</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">HL金库</span>
+              <span className="text-foreground/15">/</span>
+              <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">5钱包分配</span>
+            </div>
+          </div>
+
+          {/* Stats */}
+          {allocations.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              {["ALLOCATE_FLASHSWAP", "ALLOCATE_HL", "AUTO_"].map(prefix => {
+                const filtered = allocations.filter((a: any) => a.action?.startsWith(prefix) || (prefix === "AUTO_" && a.initiated_by === "auto"));
+                const total = filtered.reduce((s: number, a: any) => s + Number(a.amount || 0), 0);
+                const label = prefix === "ALLOCATE_FLASHSWAP" ? "闪兑流动性" : prefix === "ALLOCATE_HL" ? "HL 金库" : "自动分配";
+                const color = prefix === "ALLOCATE_FLASHSWAP" ? "text-cyan-400" : prefix === "ALLOCATE_HL" ? "text-amber-400" : "text-green-400";
+                return (
+                  <div key={prefix} className="text-center p-2 rounded-lg bg-white/[0.02]">
+                    <p className="text-[9px] text-foreground/25">{label}</p>
+                    <p className={cn("text-[13px] font-bold font-mono", color)}>${total.toFixed(0)}</p>
+                    <p className="text-[8px] text-foreground/15">{filtered.length} 笔</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {allocations.length === 0 ? (
+            <p className="text-center py-8 text-foreground/20 text-sm">暂无分配记录</p>
+          ) : (
+            allocations.map((a: any) => {
+              const isAuto = a.initiated_by === "auto";
+              const actionColor = a.action?.includes("HL") ? "text-amber-400 bg-amber-500/10" :
+                a.action?.includes("FLASHSWAP") || a.action?.includes("LIQUIDITY") ? "text-cyan-400 bg-cyan-500/10" :
+                a.action?.includes("MA") ? "text-yellow-400 bg-yellow-500/10" :
+                "text-foreground/40 bg-foreground/5";
+              return (
+                <div key={a.id} className="rounded-xl bg-white/[0.02] border border-white/[0.04] px-3 py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <ArrowRightLeft className={cn("h-4 w-4", isAuto ? "text-green-400/50" : "text-foreground/25")} />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Badge className={cn("text-[8px]", actionColor)}>{a.action?.replace("ALLOCATE_", "").replace("AUTO_", "自动→")}</Badge>
+                        <span className="text-[11px] font-bold font-mono text-foreground/60">{Number(a.amount).toFixed(2)} {a.token}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[8px] text-foreground/20">→ {a.destination}</span>
+                        {a.tx_id && <span className="text-[8px] text-primary/40 font-mono">{a.tx_id.slice(0, 12)}...</span>}
+                        <Badge className={cn("text-[7px]", isAuto ? "bg-green-500/10 text-green-400" : "bg-foreground/5 text-foreground/30")}>{a.initiated_by}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[8px] text-foreground/15 shrink-0">{a.created_at ? new Date(a.created_at).toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}</span>
                 </div>
               );
             })
