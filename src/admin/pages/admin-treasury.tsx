@@ -4,7 +4,7 @@
  * Global switches + manual triggers + cycle history
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAdminAuth } from "@/admin/admin-auth";
@@ -280,6 +280,9 @@ export default function AdminTreasury() {
         </div>
       </div>
 
+      {/* Fund Reserve Management */}
+      <FundReservePanel />
+
       {/* Cycle History */}
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
         <div className="px-4 lg:px-5 py-3 border-b border-white/[0.06] flex items-center gap-2">
@@ -320,6 +323,204 @@ export default function AdminTreasury() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Fund Reserve Panel ──
+
+function FundReservePanel() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<any>(null);
+  const [allocAmount, setAllocAmount] = useState("");
+  const [allocDest, setAllocDest] = useState("flashswap");
+  const [allocToken, setAllocToken] = useState("USDT");
+
+  const fetchStatus = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fund-reserve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "status" }),
+      });
+      setStatus(await res.json());
+    } catch { setStatus(null); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchStatus(); }, []);
+
+  const handleAllocate = async () => {
+    const amt = parseFloat(allocAmount);
+    if (!amt || amt <= 0) return;
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fund-reserve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "allocate", destination: allocDest, amount: amt, token: allocToken }),
+      });
+      const data = await res.json();
+      toast({ title: data.success ? "分配成功" : "分配失败", description: `${amt} ${allocToken} → ${allocDest}` });
+      setAllocAmount("");
+      setTimeout(fetchStatus, 5000);
+    } catch (e: any) {
+      toast({ title: "失败", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleAuto = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fund-reserve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto" }),
+      });
+      const data = await res.json();
+      toast({ title: "自动分配", description: data.status === "allocated" ? `$${data.total?.toFixed(0)} 已分配` : data.reason || "跳过" });
+      setTimeout(fetchStatus, 5000);
+    } catch (e: any) {
+      toast({ title: "失败", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleMintMA = async () => {
+    const amt = parseFloat(allocAmount);
+    if (!amt || amt <= 0) return;
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fund-reserve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add-ma", amount: amt }),
+      });
+      const data = await res.json();
+      toast({ title: data.success ? "MA 铸造成功" : "失败", description: `${amt} MA → FlashSwap` });
+      setAllocAmount("");
+      setTimeout(fetchStatus, 5000);
+    } catch (e: any) {
+      toast({ title: "失败", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const sw = status?.serverWallet || {};
+  const fs = status?.flashSwap || {};
+  const cfg = status?.config || {};
+
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+      <div className="px-4 lg:px-5 py-3 border-b border-white/[0.06] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ArrowRightLeft className="h-4 w-4 text-primary/60" />
+          <h2 className="text-sm font-bold text-foreground/60">资金储备分配</h2>
+        </div>
+        <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={fetchStatus}>
+          <RefreshCw className="h-3 w-3 mr-1" />刷新
+        </Button>
+      </div>
+      <div className="p-4 lg:p-5 space-y-4">
+        {/* Balances */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3">
+            <p className="text-[10px] text-foreground/30">Server Wallet 储备</p>
+            <p className="text-[16px] font-bold font-mono text-foreground/60">${(sw.usdt || 0).toFixed(2)} <span className="text-[10px] text-foreground/25">USDT</span></p>
+            <p className="text-[11px] font-mono text-foreground/30">{(sw.ma || 0).toFixed(0)} MA</p>
+          </div>
+          <div className="rounded-xl bg-white/[0.03] border border-cyan-500/10 p-3">
+            <p className="text-[10px] text-foreground/30">FlashSwap 流动性</p>
+            <p className="text-[16px] font-bold font-mono text-cyan-400">${(fs.usdt || 0).toFixed(2)} <span className="text-[10px] text-foreground/25">USDT</span></p>
+            <p className="text-[11px] font-mono text-foreground/30">{(fs.ma || 0).toFixed(0)} MA</p>
+          </div>
+        </div>
+
+        {/* Distribution Config */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] text-foreground/30">跨链分配比例</p>
+          <div className="grid grid-cols-5 gap-1.5 text-center">
+            {[
+              { label: "交易", key: "fund_trading_ratio", color: "text-blue-400" },
+              { label: "运营", key: "fund_ops_ratio", color: "text-green-400" },
+              { label: "市场", key: "fund_marketing_ratio", color: "text-purple-400" },
+              { label: "资方", key: "fund_investor_ratio", color: "text-amber-400" },
+              { label: "提现", key: "fund_withdraw_ratio", color: "text-red-400" },
+            ].map(item => (
+              <div key={item.key} className="rounded-lg bg-white/[0.02] border border-white/[0.05] p-1.5">
+                <p className="text-[9px] text-foreground/25">{item.label}</p>
+                <p className={cn("text-[12px] font-bold font-mono", item.color)}>{((parseFloat(cfg[item.key] || "0")) * 100).toFixed(0)}%</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Withdraw Split: liquidity vs reserve */}
+        <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
+          <p className="text-[10px] text-foreground/30 mb-2">提现 30% 分配 → 闪兑流动性 / 提现储备</p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <p className="text-[9px] text-cyan-400">闪兑流动性 {((parseFloat(cfg.withdraw_liquidity_ratio || "0.50")) * 100).toFixed(0)}%</p>
+              <div className="h-1.5 rounded-full bg-white/[0.05] mt-1 overflow-hidden">
+                <div className="h-full bg-cyan-400 rounded-full" style={{ width: `${(parseFloat(cfg.withdraw_liquidity_ratio || "0.50")) * 100}%` }} />
+              </div>
+            </div>
+            <div className="flex-1">
+              <p className="text-[9px] text-red-400">提现储备 {((parseFloat(cfg.withdraw_reserve_ratio || "0.50")) * 100).toFixed(0)}%</p>
+              <div className="h-1.5 rounded-full bg-white/[0.05] mt-1 overflow-hidden">
+                <div className="h-full bg-red-400 rounded-full" style={{ width: `${(parseFloat(cfg.withdraw_reserve_ratio || "0.50")) * 100}%` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Trading → HL switch */}
+        <div className="flex items-center justify-between rounded-xl bg-white/[0.02] border border-white/[0.06] px-3 py-2">
+          <div>
+            <p className="text-[11px] text-foreground/50">交易 30% 去向</p>
+            <p className="text-[9px] text-foreground/20">{cfg.trading_to_hl === "true" ? "→ HL 金库 (USDC)" : "→ 交易钱包"}</p>
+          </div>
+          <Badge className={cn("text-[9px]", cfg.trading_to_hl === "true" ? "bg-cyan-500/10 text-cyan-400" : "bg-foreground/5 text-foreground/30")}>
+            {cfg.trading_to_hl === "true" ? "HL 金库" : "交易钱包"}
+          </Badge>
+        </div>
+
+        {/* Manual Allocation */}
+        <div className="space-y-2">
+          <p className="text-[10px] text-foreground/30">手动分配</p>
+          <div className="flex gap-1.5">
+            <Input value={allocAmount} onChange={e => setAllocAmount(e.target.value)} placeholder="金额" type="number" className="h-8 text-xs w-24" />
+            <select value={allocToken} onChange={e => setAllocToken(e.target.value)} className="h-8 text-xs bg-background border rounded-md px-2 text-foreground/60">
+              <option value="USDT">USDT</option>
+              <option value="MA">MA</option>
+            </select>
+            <select value={allocDest} onChange={e => setAllocDest(e.target.value)} className="h-8 text-xs bg-background border rounded-md px-2 text-foreground/60 flex-1">
+              <option value="flashswap">闪兑流动性</option>
+              <option value="hl">HL 金库</option>
+              <option value="trading">交易钱包</option>
+              <option value="withdraw">提现储备</option>
+              <option value="ops">运营钱包</option>
+              <option value="marketing">市场钱包</option>
+              <option value="investor">资方钱包</option>
+            </select>
+            <Button size="sm" className="h-8 text-[10px]" onClick={handleAllocate}>分配</Button>
+          </div>
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="outline" className="h-7 text-[9px] flex-1" onClick={handleAuto}>按比例自动分配全部</Button>
+            <Button size="sm" variant="outline" className="h-7 text-[9px] flex-1 text-cyan-400 border-cyan-500/20" onClick={handleMintMA}>铸造 MA → 闪兑</Button>
+          </div>
+        </div>
+
+        {/* Recent Logs */}
+        {status?.recentLogs?.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[10px] text-foreground/25">最近分配</p>
+            {status.recentLogs.slice(0, 5).map((log: any) => (
+              <div key={log.id} className="flex items-center justify-between text-[9px] px-2 py-1 rounded bg-white/[0.02]">
+                <span className="text-foreground/40">{log.action} → {log.destination}</span>
+                <span className="font-mono text-foreground/30">{Number(log.amount).toFixed(2)} {log.token}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
