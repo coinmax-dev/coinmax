@@ -625,7 +625,9 @@ export default function ProfileNodesPage() {
                       </div>
                       <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                         <div className="text-[10px] text-white/30 mb-0.5">{t("profile.nodeStatus")}</div>
-                        <div className="text-[13px] font-bold text-amber-400">{t("profile.vaultNotActive")}</div>
+                        <div className={`text-[13px] font-bold ${m.activatedRank ? 'text-green-400' : 'text-amber-400'}`}>
+                          {m.activatedRank ? `${t("profile.activatedLabel")} ${m.activatedRank}` : t("profile.vaultNotActive")}
+                        </div>
                       </div>
                     </div>
 
