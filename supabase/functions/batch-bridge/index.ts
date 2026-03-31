@@ -2,14 +2,15 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * Batch Bridge — BSC USDT → ARB via thirdweb Bridge
+ * Batch Bridge — BSC USDT → ARB via thirdweb Bridge SDK
  *
- * Cron: every 4 hours
+ * Cron: every 10 minutes
  * Flow:
  *   1. Check BatchBridgeV2 USDT balance on BSC
- *   2. If >= $50, get thirdweb Bridge quote
- *   3. Execute bridge: BSC USDT → ARB (thirdweb handles routing)
- *   4. Record in bridge_cycles table
+ *   2. Owner withdraws USDT to deployer
+ *   3. thirdweb Bridge SDK: BSC USDT → ARB (Sell.prepare + execute)
+ *   4. Record bridge cycle + fees in DB
+ *   5. If hl_deposit_enabled: auto-deposit 30% to HyperLiquid
  */
 
 const corsHeaders = {
@@ -18,12 +19,13 @@ const corsHeaders = {
 };
 
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
-const THIRDWEB_CLIENT_ID = Deno.env.get("THIRDWEB_CLIENT_ID") || "a0612a159cd5aeecde69cda291faff38";
+const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "";
 
 const BATCH_BRIDGE = "0x360fff6d0AF9860706A56595FACe18a6c5e34965";
 const BSC_USDT = "0x55d398326f99059fF775485246999027B3197955";
 const ARB_FUND_ROUTER = "0x71237E535d5E00CDf18A609eA003525baEae3489";
-const MIN_BRIDGE_AMOUNT = 50;
+const DEPLOYER = "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1";
+const MIN_BRIDGE_AMOUNT = 50; // minimum $50
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -52,58 +54,151 @@ serve(async (req) => {
     const balance = parseInt(balData.result || "0x0", 16) / 1e18;
 
     if (balance < MIN_BRIDGE_AMOUNT) {
-      return json({
-        status: "skipped",
-        reason: `$${balance.toFixed(2)} < minimum $${MIN_BRIDGE_AMOUNT}`,
-        balance,
-      });
+      return json({ status: "skipped", reason: `$${balance.toFixed(2)} < min $${MIN_BRIDGE_AMOUNT}`, balance });
     }
 
-    // 2. Get thirdweb Bridge quote
-    const amountWei = BigInt(Math.floor(balance * 1e18)).toString();
-    const quoteUrl = `https://bridge.thirdweb.com/v1/quote?` +
-      `fromChainId=56` +
-      `&fromTokenAddress=${BSC_USDT}` +
-      `&toChainId=42161` +
-      `&toTokenAddress=0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9` + // ARB USDT
-      `&fromAmount=${amountWei}` +
-      `&fromAddress=${BATCH_BRIDGE}` +
-      `&toAddress=${ARB_FUND_ROUTER}`;
-
-    const quoteRes = await fetch(quoteUrl, {
+    // 2. Withdraw USDT from BatchBridge to deployer (owner call)
+    const withdrawRes = await fetch("https://api.thirdweb.com/v1/contracts/write", {
+      method: "POST",
       headers: {
-        "x-client-id": THIRDWEB_CLIENT_ID,
-        ...(THIRDWEB_SECRET ? { "x-secret-key": THIRDWEB_SECRET } : {}),
+        "Content-Type": "application/json",
+        "x-secret-key": THIRDWEB_SECRET,
+        "x-vault-access-token": VAULT_ACCESS_TOKEN,
       },
+      body: JSON.stringify({
+        chainId: 56,
+        from: DEPLOYER,
+        calls: [{
+          contractAddress: BATCH_BRIDGE,
+          method: "function withdrawAll(address to)",
+          params: [DEPLOYER],
+        }],
+      }),
     });
-    const quote = await quoteRes.json();
+    const withdrawData = await withdrawRes.json();
+    const withdrawTxId = withdrawData?.result?.transactionIds?.[0];
 
-    // 3. Record in DB
+    if (!withdrawTxId) {
+      return json({ status: "error", reason: "Withdraw from BatchBridge failed", error: withdrawData }, 500);
+    }
+
+    // Wait for withdraw to confirm
+    await new Promise(r => setTimeout(r, 8000));
+
+    // 3. Get thirdweb Bridge quote (Sell)
+    const amountWei = BigInt(Math.floor(balance * 1e18)).toString();
+    const quoteRes = await fetch("https://api.thirdweb.com/v1/bridge/quote?" +
+      `originChainId=56` +
+      `&originTokenAddress=${BSC_USDT}` +
+      `&destinationChainId=42161` +
+      `&destinationTokenAddress=0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9` +
+      `&amount=${amountWei}` +
+      `&sender=${DEPLOYER}` +
+      `&receiver=${ARB_FUND_ROUTER}`, {
+        headers: { "x-secret-key": THIRDWEB_SECRET },
+      }
+    );
+
+    let bridgeStatus = "QUOTED";
+    let bridgeFee = 0;
+    let bridgeTxId = null;
+    let quoteData: any = null;
+
+    if (quoteRes.ok) {
+      quoteData = await quoteRes.json();
+      bridgeFee = Number(quoteData?.estimate?.feeCosts?.[0]?.amount || 0) / 1e18;
+
+      // 4. Execute bridge steps (approve + send)
+      if (quoteData?.steps) {
+        for (const step of quoteData.steps) {
+          for (const tx of (step.transactions || [])) {
+            if (tx.to && tx.data) {
+              const execRes = await fetch("https://api.thirdweb.com/v1/contracts/write", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-secret-key": THIRDWEB_SECRET,
+                  "x-vault-access-token": VAULT_ACCESS_TOKEN,
+                },
+                body: JSON.stringify({
+                  chainId: tx.chainId || 56,
+                  from: DEPLOYER,
+                  calls: [{ contractAddress: tx.to, method: "", params: [], rawCalldata: tx.data, value: tx.value || "0" }],
+                }),
+              });
+              const execData = await execRes.json();
+              bridgeTxId = execData?.result?.transactionIds?.[0] || bridgeTxId;
+            }
+          }
+        }
+        bridgeStatus = bridgeTxId ? "BRIDGING" : "QUOTE_ONLY";
+      }
+    } else {
+      // Bridge API failed — record as quote only, admin can retry
+      bridgeStatus = "QUOTE_FAILED";
+    }
+
+    // 5. Record in DB
     await supabase.from("bridge_cycles").insert({
       cycle_type: "BATCH_BRIDGE_V2",
-      status: "QUOTED",
+      status: bridgeStatus,
       amount_usd: balance,
+      fees_usd: bridgeFee,
       initiated_by: "cron",
+      bsc_tx: withdrawTxId,
+      arb_tx: bridgeTxId,
       details: {
         bridgeContract: BATCH_BRIDGE,
         fromChain: "BSC",
         toChain: "ARB",
         fromToken: "USDT",
-        toAddress: ARB_FUND_ROUTER,
-        quote: quote,
-        quoteUrl,
+        amount: balance,
+        fee: bridgeFee,
+        withdrawTxId,
+        bridgeTxId,
+        quoteStatus: quoteRes.ok ? "success" : "failed",
       },
     });
 
+    // 6. Check if HL deposit should be triggered
+    const { data: hlSwitch } = await supabase
+      .from("system_config")
+      .select("value")
+      .eq("key", "hl_deposit_enabled")
+      .single();
+
+    const hlEnabled = hlSwitch?.value === "true";
+    let hlResult = null;
+
+    if (hlEnabled && bridgeStatus === "BRIDGING") {
+      // Wait for bridge to arrive on ARB (~30s)
+      await new Promise(r => setTimeout(r, 30000));
+
+      // Auto-deposit 30% to HL
+      const hlAmount = balance * 0.30;
+      try {
+        const hlRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/hl-treasury`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({ action: "deposit", amount: hlAmount }),
+        });
+        hlResult = await hlRes.json();
+      } catch (e: any) {
+        hlResult = { error: e.message };
+      }
+    }
+
     return json({
-      status: "quoted",
+      status: bridgeStatus,
       balance,
-      quote: {
-        estimatedOutput: quote?.intent?.buyAmount || quote?.estimate?.toAmount,
-        route: quote?.intent?.bridge || "thirdweb",
-        steps: quote?.steps?.length || 0,
-      },
-      note: "thirdweb Bridge quote ready. Execute from admin panel with wallet signature.",
+      fee: bridgeFee,
+      withdrawTxId,
+      bridgeTxId,
+      hlEnabled,
+      hlDeposit: hlResult,
     });
 
   } catch (e: any) {
