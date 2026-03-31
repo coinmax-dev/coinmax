@@ -22,7 +22,7 @@ const row = (mod, sub, task, criteria, method = "手动", status = "未开始", 
 const testRows = [
   // ═══ 一、金库 (Vault) ═══
   row("金库", "存入", "选择质押计划 (5D/45D/90D/180D)", "正确显示每日收益率、预估MA数量、锁仓天数", "代码+DB", "通过", "", "100%", "", "4f4f用户有5D/45D/90D三个仓位"),
-  row("金库", "存入", "USDT 输入金额验证", "最低限制、余额不足提示、非法输入拦截", "代码", "待优化", "BUG-001", "80%", "minAmount=50U，但bonus需100U才解锁，建议统一为100U"),
+  row("金库", "存入", "USDT 输入金额验证", "最低50U限制、余额不足提示、非法输入拦截", "代码", "通过", "", "100%", "", "minAmount=50U，用户确认保留50U"),
   row("金库", "存入", "USDT → SwapRouter → PancakeSwap → USDC → Vault 链路", "链上交易成功，Vault 合约收到 USDC，mint cUSD 记账", "代码+链上", "通过", "", "100%", "", "VaultDepositDialog 正确调用 swapAndDepositVault"),
   row("金库", "存入", "交易确认后前端回调", "vault_positions 表写入正确数据，前端刷新显示新仓位", "代码+DB", "通过", "", "100%", "", "4f4f: 3条vault_positions记录，invalidateQueries正确"),
   row("金库", "存入", "存入后 MA 铸造 + 锁仓", "MA 按 Oracle 价格铸造，锁仓期正确", "代码", "通过", "", "100%", "", "vault-record edge fn 调用 check_bonus_yield_unlock"),
@@ -67,9 +67,9 @@ const testRows = [
   row("VIP", "试用", "7天免费试用激活", "activate-vip-trial edge fn 调用成功，is_vip=true", "代码+DB", "通过", "", "100%", "", "4f4f: is_vip=true, trial tx记录存在"),
   row("VIP", "试用", "试用到期自动失效", "7天后 is_vip 恢复 false，功能受限", "代码", "通过", "", "100%", "", "vip_expires_at=3/31, 比较当前时间"),
   row("VIP", "试用", "重复试用拦截", "已试用过的用户不能再次激活试用", "代码", "通过", "", "100%", "", "vip_trial_used flag 检查"),
-  row("VIP", "购买", "月度VIP购买 (USDT)", "支付成功，subscribe_vip RPC 激活，vip_expiry 更新", "代码", "失败", "BUG-002", "30%", "VipGate组件中VIP购买TODO未完成，无实际支付集成", "vip-gate.tsx line 213有TODO"),
-  row("VIP", "购买", "半年VIP购买 (USDT)", "折扣价支付，6个月有效期设置正确", "代码", "失败", "BUG-002", "30%", "同上，VIP付费购买未集成支付流程"),
-  row("VIP", "购买", "链上支付确认", "USDT 到 VIP receiver 0x927e，tx hash 记录", "代码", "失败", "BUG-002", "0%", "use-payment有payVIPSubscribe但VipGate未调用"),
+  row("VIP", "购买", "月度VIP购买 ($49 USDT)", "支付成功，subscribe_vip RPC 激活，vip_expiry 更新", "代码", "通过", "BUG-002已修复", "100%", "", "VipGate已集成payVIPSubscribe"),
+  row("VIP", "购买", "半年VIP购买 ($250 USDT)", "折扣价支付，6个月有效期设置正确", "代码", "通过", "BUG-002已修复", "100%", "", "VipGate已集成payVIPSubscribe"),
+  row("VIP", "购买", "链上支付确认", "USDT transfer到0x927e→vip-subscribe edge fn激活", "代码", "通过", "BUG-002已修复", "100%", "", "支付状态: paying→confirming→activating"),
   row("VIP", "激活", "VIP 状态生效", "购买/试用后立即解锁跟单和策略功能", "代码+DB", "通过", "", "100%", "", "4f4f: is_vip=true, VipGate放行"),
   row("VIP", "激活", "VIP 到期检查", "到期后 VipGate 组件拦截，提示续费", "代码", "通过", "", "100%", "", "Date比较逻辑正确"),
   row("VIP", "UI显示", "VIP 状态指示器", "显示 VIP/试用/过期 标签，到期日期", "代码", "通过", "", "100%"),
@@ -184,9 +184,9 @@ const issueHeaders = [
 ];
 
 const issueRows = [
-  ["BUG-001", "#2", "金库最低存入额 minAmount=50U，但 bonus yield 需100U才解锁，用户可存50-99U但无法获得bonus", "P2-一般", "金库", "Claude", "2026-03-29", "", "待处理", "统一minAmount为100U或在UI说明bonus条件", "", "", "", "src/lib/data.ts:26-29"],
-  ["BUG-002", "#44-46", "VIP付费购买未集成实际支付流程，VipGate组件中有TODO标记", "P1-严重", "VIP", "Claude", "2026-03-29", "", "待处理", "在VipGate中调用payVIPSubscribe(planKey)，已有use-payment实现", "", "", "", "vip-gate.tsx line 213"],
-  ["BUG-003", "", "", "P2-一般", "", "", "", "", "待处理", "", "", "", "", ""],
+  ["BUG-001", "#2", "金库最低存入额 minAmount=50U，但 bonus yield 需100U才解锁", "P2-一般", "金库", "Claude", "2026-03-29", "", "保留50U", "用户确认保留50U门槛，bonus条件单独说明", "2026-03-30", "用户", "确认", "用户手动恢复为50U"],
+  ["BUG-002", "#44-46", "VIP付费购买未集成实际支付流程，VipGate组件中有TODO标记", "P1-严重", "VIP", "Claude", "2026-03-29", "", "已修复", "VipGate集成payVIPSubscribe，月度$49/半年$250", "2026-03-30", "", "", "commit bee6e5b"],
+  ["BUG-003", "#绑定", "交易所API: Aster不在验证列表, OKX/Bitget stub验证, dYdX无执行器", "P1-严重", "AI跟单", "Claude", "2026-03-29", "", "已修复", "OKX/Bitget真实HMAC验证, Aster加入列表, dYdX标记Soon", "2026-03-30", "", "", "commit bee6e5b"],
 ];
 
 // ═══════════════════════════════════════════════════════════════

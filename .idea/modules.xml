@@ -2,8 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/AxomX.iml" filepath="$PROJECT_DIR$/.idea/AxomX.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../hummingbot/.idea/hummingbot.iml" filepath="$PROJECT_DIR$/../hummingbot/.idea/hummingbot.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/coinmax-dev.iml" filepath="$PROJECT_DIR$/.idea/coinmax-dev.iml" />
     </modules>
   </component>
 </project>

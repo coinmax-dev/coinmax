@@ -629,7 +629,7 @@ export default function AdminContracts() {
               { label: "FlashSwap (MA闪兑) UUPS", value: FLASH_SWAP_ADDRESS, type: "address" },
               { label: "── 代币 ──", value: "" },
               { label: "MA Token", value: MA_TOKEN_ADDRESS, type: "address" },
-              { label: "cUSD (记账)", value: "0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6", type: "address" },
+              { label: "cUSD (记账)", value: "0xDDB67fe20382868d7378FB3F4f5e23DBd1B2C4D6", type: "address" },
               { label: "── 安全 ──", value: "" },
               { label: "Forwarder (EIP-2771)", value: FORWARDER_ADDRESS, type: "address" },
               { label: "Timelock (24h延迟)", value: TIMELOCK_ADDRESS, type: "address" },
@@ -1765,7 +1765,7 @@ function VaultFlowDiagram() {
           { label: "BatchBridgeV2", addr: formatAddress("0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db"), fullAddr: "0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db", color: "text-emerald-400", bg: "bg-emerald-500/10" },
         ]},
         { label: "Vault内部: USDT→cUSD记账 + Oracle定价 → mint MA锁仓", steps: [
-          { label: "mint cUSD", addr: formatAddress("0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6"), fullAddr: "0x90B99a1495E5DBf8bF44c3623657020BB1BDa3C6", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+          { label: "mint cUSD", addr: formatAddress("0xDDB67fe20382868d7378FB3F4f5e23DBd1B2C4D6"), fullAddr: "0xDDB67fe20382868d7378FB3F4f5e23DBd1B2C4D6", color: "text-cyan-400", bg: "bg-cyan-500/10" },
           { label: "Oracle", addr: formatAddress(PRICE_ORACLE_ADDRESS), fullAddr: PRICE_ORACLE_ADDRESS, color: "text-amber-400", bg: "bg-amber-500/10" },
           { label: "mint MA", addr: formatAddress(MA_TOKEN_ADDRESS), fullAddr: MA_TOKEN_ADDRESS, color: "text-yellow-400", bg: "bg-yellow-500/10" },
           { label: "锁仓", addr: "5/45/90/180天", color: "text-green-400", bg: "bg-green-500/10" },
