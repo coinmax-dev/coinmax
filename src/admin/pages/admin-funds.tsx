@@ -327,13 +327,15 @@ export default function AdminFunds() {
           <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 mb-3">
             <p className="text-[10px] text-foreground/30 mb-2">跨链路径</p>
             <div className="flex items-center gap-1 text-[9px] flex-wrap">
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">BatchBridge (BSC)</span>
-              <span className="text-foreground/15">→ 每4h</span>
-              <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400">Stargate (LayerZero)</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">BatchBridge USDT (BSC)</span>
+              <span className="text-foreground/15">→ 10min</span>
+              <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400">thirdweb Bridge</span>
               <span className="text-foreground/15">→</span>
-              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">FundRouter (ARB)</span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">ARB</span>
               <span className="text-foreground/15">→</span>
-              <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">5钱包分配</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">30% HL金库 (可开关)</span>
+              <span className="text-foreground/15">+</span>
+              <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">70% 管理钱包</span>
             </div>
           </div>
 

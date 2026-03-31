@@ -1474,7 +1474,7 @@ function CrossChainPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jsonrpc: "2.0", method: "eth_call", id: 1,
-          params: [{ to: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", data: "0x70a08231000000000000000000000000" + BATCH_BRIDGE_ADDRESS.slice(2).toLowerCase() }, "latest"],
+          params: [{ to: "0x55d398326f99059fF775485246999027B3197955", data: "0x70a08231000000000000000000000000" + BATCH_BRIDGE_ADDRESS.slice(2).toLowerCase() }, "latest"],
         }),
       });
       const d = await res.json();
@@ -1529,10 +1529,10 @@ function CrossChainPanel() {
         </Button>
       </div>
       <div className="p-4 space-y-3">
-        {/* BatchBridge USDC balance */}
+        {/* BatchBridge USDT balance */}
         <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">
           <div>
-            <div className="text-[11px] text-foreground/50">BatchBridge 待跨链 USDC</div>
+            <div className="text-[11px] text-foreground/50">BatchBridge 待跨链 USDT</div>
             <div className="text-[10px] text-foreground/30 font-mono">{BATCH_BRIDGE_ADDRESS.slice(0,6)}...{BATCH_BRIDGE_ADDRESS.slice(-4)}</div>
           </div>
           <div className="text-[16px] font-bold font-mono text-indigo-400">
@@ -1542,10 +1542,10 @@ function CrossChainPanel() {
 
         {/* Cron status */}
         <div className="text-[10px] text-foreground/30 space-y-1">
-          <div className="flex justify-between"><span>BSC→ARB 跨链</span><span>Cron 每 4 小时 (Stargate)</span></div>
-          <div className="flex justify-between"><span>NodePool 归集</span><span>Cron 每 30 分钟 → 0xeb8A</span></div>
+          <div className="flex justify-between"><span>BSC→ARB 跨链</span><span>Cron 每 10 分钟 (thirdweb Bridge)</span></div>
+          <div className="flex justify-between"><span>NodePool 归集</span><span>即时 (购买后触发)</span></div>
           <div className="flex justify-between"><span>MA 价格喂价</span><span>Cron 每 5 分钟</span></div>
-          <div className="flex justify-between"><span>每日结算</span><span>每天 00:00 UTC</span></div>
+          <div className="flex justify-between"><span>每日结算</span><span>每天 SGT 00:00 (UTC 16:00)</span></div>
         </div>
 
         {/* Manual triggers */}
