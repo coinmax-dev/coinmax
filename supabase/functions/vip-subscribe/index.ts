@@ -182,11 +182,25 @@ serve(async (req) => {
       return buildPaymentRequired(plan.price, planKey);
     }
 
-    // ── Settle payment via server wallet ──
-    const resourceUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/vip-subscribe`;
-    const verification = SERVER_WALLET_ADDRESS
-      ? await settlePayment(paymentHeader, plan.price, resourceUrl)
-      : await verifyPayment(paymentHeader, plan.price);
+    // ── Verify payment ──
+    let verification: { settled: boolean; txHash?: string } | null = null;
+
+    try {
+      const paymentData = JSON.parse(paymentHeader);
+
+      if (paymentData.settled === true && paymentData.txHash) {
+        // Direct BSC USDT transfer mode — frontend already confirmed receipt
+        verification = { settled: true, txHash: paymentData.txHash };
+      } else {
+        // x402 protocol mode
+        const resourceUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/vip-subscribe`;
+        verification = SERVER_WALLET_ADDRESS
+          ? await settlePayment(paymentHeader, plan.price, resourceUrl)
+          : await verifyPayment(paymentHeader, plan.price);
+      }
+    } catch {
+      verification = null;
+    }
 
     if (!verification || !verification.settled) {
       return new Response(
