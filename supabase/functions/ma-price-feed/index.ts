@@ -11,74 +11,81 @@ const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "EwFZ-cz8maTnDHEu
 const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 const RELAYER_WALLET = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
 const ORACLE_ADDRESS = "0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD";
-const LAUNCH = new Date("2026-03-24T00:00:00Z").getTime();
+/**
+ * Dynamic price model:
+ * - Base: $1.00 (stable around $0.95 - $1.05)
+ * - 金库入金 / 收益产生 → 小幅涨价 (max +5%/month)
+ * - 闪兑卖出 MA → 小幅跌价 (max -5%/month)
+ * - 随机波动 (hourly noise)
+ * - Hard bounds: $0.95 - $1.05
+ */
 
-// ── Price curve (identical to K-line chart in profile-ma.tsx) ──
+const SUPABASE_URL_INTERNAL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY_INTERNAL = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const DAILY_MOMENTUM = [
-  { base: 0.6, vol: 0.015 },
-  { base: 0.8, vol: 0.020 },
-  { base: 1.0, vol: 0.025 },
-  { base: 0.3, vol: 0.020 },
-  { base: 0.9, vol: 0.025 },
-  { base: 1.2, vol: 0.030 },
-  { base: 0.7, vol: 0.020 },
-];
+async function calculateDynamicPrice(currentPrice: number): Promise<number> {
+  const now = Date.now();
+  const hour = Math.floor(now / 3600000);
 
-const HOUR_PATTERN = [0.3,0.2,0.1,0,-0.1,-0.2,0.4,0.6,0.8,0.7,0.5,0.3,0.5,0.7,0.9,1,0.8,0.6,0.4,0.2,0,-0.1,0.1,0.2];
+  // ── 1. Read recent activity from DB (last 5 min) ──
+  let depositCount = 0;
+  let swapSellCount = 0;
+  let yieldCount = 0;
 
-function rng(seed: number): number {
-  let h = Math.abs(seed | 0) * 2654435761;
+  try {
+    const headers = { "Content-Type": "application/json", apikey: SUPABASE_KEY_INTERNAL, Authorization: `Bearer ${SUPABASE_KEY_INTERNAL}` };
+    const fiveMinAgo = new Date(now - 5 * 60 * 1000).toISOString();
+
+    // Vault deposits in last 5 min
+    const depRes = await fetch(`${SUPABASE_URL_INTERNAL}/rest/v1/vault_positions?select=id&created_at=gte.${fiveMinAgo}&status=eq.ACTIVE`, { headers });
+    const depData = await depRes.json();
+    depositCount = Array.isArray(depData) ? depData.length : 0;
+
+    // MA swap sells in last 5 min
+    const swapRes = await fetch(`${SUPABASE_URL_INTERNAL}/rest/v1/ma_swap_records?select=id&created_at=gte.${fiveMinAgo}&direction=eq.sell`, { headers });
+    const swapData = await swapRes.json();
+    swapSellCount = Array.isArray(swapData) ? swapData.length : 0;
+
+    // Vault yields in last hour (settled daily but check)
+    const yieldRes = await fetch(`${SUPABASE_URL_INTERNAL}/rest/v1/vault_rewards?select=id&created_at=gte.${new Date(now - 3600000).toISOString()}&limit=10`, { headers });
+    const yieldData = await yieldRes.json();
+    yieldCount = Array.isArray(yieldData) ? yieldData.length : 0;
+  } catch { /* use 0 counts */ }
+
+  // ── 2. Calculate pressure ──
+  // Deposits + yields = upward pressure (+0.001 per event, max +0.002 per 5min)
+  const upPressure = Math.min((depositCount + yieldCount * 0.5) * 0.001, 0.002);
+
+  // Swap sells = downward pressure (-0.001 per event, max -0.002 per 5min)
+  const downPressure = Math.min(swapSellCount * 0.001, 0.002);
+
+  // Net pressure
+  const netPressure = upPressure - downPressure;
+
+  // ── 3. Random hourly noise (deterministic by hour) ──
+  let h = Math.abs(hour) * 2654435761;
   h = ((h >>> 16) ^ h) * 0x45d9f3b;
   h = ((h >>> 16) ^ h) * 0x45d9f3b;
-  return ((h >>> 16) ^ h & 0xFFFF) / 0xFFFF;
-}
+  const rng = ((h >>> 16) ^ h & 0xFFFF) / 0xFFFF;
+  const noise = (rng - 0.5) * 0.006; // ±0.3% random noise
 
-function smoothStep(x: number): number {
-  x = Math.max(0, Math.min(1, x));
-  return x * x * x * (x * (x * 6 - 15) + 10);
-}
+  // ── 4. Apply to current price ──
+  let newPrice = currentPrice * (1 + netPressure + noise);
 
-function calculateCurrentPrice(hoursSinceLaunch: number): number {
-  const h = Math.floor(hoursSinceLaunch);
+  // ── 5. Hard bounds: $0.95 - $1.05 ──
+  newPrice = Math.max(0.95, Math.min(1.05, newPrice));
 
-  // Phase 0: $0.30 → $0.90 in 168 hours (7 days)
-  if (h <= 168) {
-    const dayIndex = Math.min(Math.floor(h / 24), 6);
-    const daily = DAILY_MOMENTUM[dayIndex];
-    const progress = h / 168;
-    const trendPrice = 0.30 + 0.60 * smoothStep(progress);
-    const hourlyBias = HOUR_PATTERN[h % 24] * 0.005 * daily.base;
-    const noise = (rng(h * 7 + 1) - 0.5) * 2 * daily.vol;
-    const isDip = rng(h * 31 + 3) < 0.15;
-    const isSpike = !isDip && rng(h * 47 + 5) < 0.12;
-    let p = trendPrice * (1 + noise + hourlyBias + (isDip ? -daily.vol * 1.5 : 0) + (isSpike ? daily.vol * 2 : 0));
-    return Math.max(0.28, p);
-  }
+  // ── 6. Mean reversion (pull toward $1.00) ──
+  const reversion = (1.00 - newPrice) * 0.01; // 1% pull toward $1.00
+  newPrice += reversion;
+  newPrice = Math.max(0.95, Math.min(1.05, newPrice));
 
-  // Phase 1: $0.90 → $1.00 (30 days)
-  if (h <= 168 + 30 * 24) {
-    const progress = (h - 168) / (30 * 24);
-    const base = 0.90 + 0.10 * smoothStep(progress);
-    const noise = (rng(h * 19 + 7) - 0.5) * 2 * 0.008;
-    return Math.max(0.85, base * (1 + noise));
-  }
-
-  // Phase 2: 5%/month growth
-  const monthsIn = (h - 168 - 30 * 24) / (30 * 24);
-  const base = 1.0 * Math.pow(1.05, monthsIn);
-  const noise = (rng(h * 23 + 11) - 0.5) * 2 * 0.010;
-  return base * (1 + noise);
+  return newPrice;
 }
 
 serve(async () => {
-  const now = Date.now();
-  const hoursSinceLaunch = (now - LAUNCH) / (1000 * 3600);
-  const targetPrice = calculateCurrentPrice(hoursSinceLaunch);
-  const targetRaw = Math.round(targetPrice * 1e6);
-
   // Read current on-chain price
-  let currentPrice = 0;
+  let currentPrice = 1.0; // default
   try {
     const rpcRes = await fetch("https://bsc-dataseed1.binance.org", {
       method: "POST",
@@ -92,7 +99,11 @@ serve(async () => {
     if (rpcData.result && rpcData.result !== "0x") {
       currentPrice = parseInt(rpcData.result, 16) / 1e6;
     }
-  } catch { /* use 0 */ }
+  } catch { /* use default */ }
+
+  // Calculate new price based on activity
+  const targetPrice = await calculateDynamicPrice(currentPrice);
+  const targetRaw = Math.round(targetPrice * 1e6);
 
   // ALWAYS sync DB price first (used by settle_vault_daily / team commission)
   try {
