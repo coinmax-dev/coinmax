@@ -326,16 +326,62 @@ function setUSDC(address _usdc) external onlyRole(DEFAULT_ADMIN_ROLE) { usdc = I
 
 ---
 
-## 八、执行顺序
+## 八、正式部署原则
+
+### ⚠️ 全量重新部署（新 deployer + 干净数据）
+
+**测试阶段合约不可用于生产**。正式上线前：
+
+1. **新 deployer 钱包** — 生成全新 EOA，不复用测试 deployer
+2. **所有合约全部重新部署** — 通过 Factory 一键部署，零历史数据
+3. **MA Token 重新部署** — totalSupply=0，无测试铸造残留
+4. **cUSD 重新部署** — 无测试记账数据
+5. **Release 合约重新部署** — 无测试待释放记录
+6. **Oracle 重新部署** — 初始化正确价格
+7. **FlashSwap CREATE2 重新部署** — 新 impl + 新 proxy
+8. **DB 数据清理** — vault_positions / vault_rewards / node_rewards / broker_rewards / earnings_releases 全部清空或新建 Supabase 项目
+
+### 正式部署检查清单
+
+- [ ] 新 deployer 钱包生成（保管好私钥）
+- [ ] 新 deployer 充值 BNB (BSC) + ETH (ARB)
+- [ ] Factory 部署 + 所有子合约一键部署
+- [ ] Factory.setupRoles() 一键授权
+- [ ] Vault 添加 4 个 stake plan
+- [ ] Oracle 设置初始价格
+- [ ] FlashSwap 存入初始流动性 (USDT + MA)
+- [ ] Server Wallet 注册到新合约（MINTER/ENGINE/ADMIN）
+- [ ] 前端 .env 更新所有合约地址
+- [ ] Edge functions 更新所有合约地址
+- [ ] DB system_config 更新（MA_TOKEN_PRICE 等）
+- [ ] Cron jobs 验证
+- [ ] 端到端测试全部通过
+- [ ] 旧合约 pause（防止误操作）
+
+### 数据隔离
 
 ```
-1. 先执行 Phase 1（测试当前部署的合约链路）
+测试环境              正式环境
+├── Deployer A        ├── Deployer B (新)
+├── 合约地址 set A    ├── 合约地址 set B (新)
+├── Supabase project  ├── Supabase project (新或清理)
+└── 测试数据          └── 干净，零数据
+```
+
+---
+
+## 九、执行顺序
+
+```
+1. 先执行 Phase 1（用当前测试合约验证所有链路）
    ↓ 所有测试通过
 2. 编写 Factory 合约（Phase 0）
 3. npx thirdweb publish
-4. thirdweb Dashboard 部署（Phase 2+3）
-5. 前端 + Admin 对接（Phase 4+5）
-6. ARB 部署（Phase 6）
-7. 端到端测试（Phase 7）
-8. 上线
+4. 生成新 deployer 钱包 + 充值 gas
+5. thirdweb Dashboard 部署 Factory（Phase 2）— 用新 deployer
+6. Factory 一键部署所有子合约 + setupRoles（Phase 3）
+7. 前端 + Admin + Edge functions 对接新地址（Phase 4+5）
+8. ARB 部署（Phase 6）— 同一个新 deployer
+9. 端到端测试（Phase 7）— 全部链路验证
+10. 旧合约 pause + 正式上线
 ```
