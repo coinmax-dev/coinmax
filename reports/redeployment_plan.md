@@ -196,6 +196,39 @@ Factory.deployFlashSwap() 内部使用 CREATE2:
 - [ ] claim-yield → 新 MA + Release 地址
 - [ ] vault-early-redeem → 新 MA + Release 地址
 
+### Phase 4.5: 资金分配管理（Admin 面板）
+
+**分配架构：**
+```
+跨链到 ARB 后 FundRouter 分配:
+├── Trading   30% → trading_to_hl=true → HL金库(USDC)
+│                  → trading_to_hl=false → 交易钱包 0xd120
+├── Ops       8%  → 运营钱包 0xDf90
+├── Marketing 12% → 市场钱包 0x1C4D
+├── Investor  20% → 资方钱包 0x85c3
+└── Withdraw  30% → Server Wallet 管理:
+                    ├── withdraw_liquidity_ratio (默认50%) → FlashSwap 闪兑流动性
+                    └── withdraw_reserve_ratio (默认50%) → 提现储备钱包 0x7DEa
+```
+
+**Admin 面板需要：**
+- [ ] Trading 开关: 去交易钱包 / 去 HL 金库 (trading_to_hl)
+- [ ] Withdraw 分配: 闪兑流动性 vs 提现钱包 (比例滑块)
+- [ ] 手动分配按钮: 指定金额 → 闪兑/提现/HL
+- [ ] 自动分配开关: withdraw_auto_split + interval
+- [ ] FlashSwap 流动性监控: USDT + MA 余额
+- [ ] 补充 MA 流动性按钮: mintTo FlashSwap
+- [ ] 分配记录列表: fund_reserve_logs
+
+**配置项：**
+| Key | 默认 | 说明 |
+|-----|------|------|
+| trading_to_hl | false | Trading 30% 去 HL 还是交易钱包 |
+| withdraw_liquidity_ratio | 0.50 | Withdraw 30% 中去闪兑的比例 |
+| withdraw_reserve_ratio | 0.50 | Withdraw 30% 中去提现的比例 |
+| withdraw_auto_split | false | 自动定时分配开关 |
+| withdraw_auto_interval | 60 | 自动分配间隔(分钟) |
+
 ### Phase 5: Admin 面板更新
 - [ ] admin-contracts.tsx 链路 tab
   - [ ] 更新所有合约地址
