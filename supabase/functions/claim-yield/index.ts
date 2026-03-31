@@ -72,22 +72,28 @@ serve(async (req) => {
     if (!plan) return json({ error: "Invalid plan" }, 400);
 
     // Get profile + yield
-    const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", walletAddress).single();
+    const { data: profile } = await supabase.from("profiles").select("id, referral_earnings").eq("wallet_address", walletAddress).single();
     if (!profile) return json({ error: "Profile not found" }, 404);
 
-    const { data: positions } = await supabase.from("vault_positions").select("*").eq("user_id", profile.id).eq("status", "ACTIVE");
-    if (!positions || positions.length === 0) return json({ error: "No active positions" }, 400);
+    // Read settled yield from vault_rewards (already in MA)
+    const { data: rewards } = await supabase
+      .from("vault_rewards")
+      .select("ar_amount, vault_positions!inner(plan_type, bonus_yield_locked)")
+      .eq("user_id", profile.id)
+      .eq("reward_type", "DAILY_YIELD");
 
-    // Calculate available yield in MA
-    const maPrice = await getMAPrice();
-    const now = new Date();
-    let totalYieldUsd = 0;
-    for (const pos of positions) {
-      const start = new Date(pos.start_date);
-      const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86400_000));
-      totalYieldUsd += Number(pos.principal) * Number(pos.daily_rate) * days;
+    let totalYieldMA = 0;
+    for (const r of (rewards || [])) {
+      const vp = (r as any).vault_positions;
+      if (vp?.plan_type === "BONUS_5D" && vp?.bonus_yield_locked) continue;
+      totalYieldMA += Number(r.ar_amount || 0);
     }
-    const totalYieldMA = totalYieldUsd / maPrice;
+
+    // Also add broker commissions (already in MA)
+    const brokerMA = Number(profile.referral_earnings || 0);
+    totalYieldMA += brokerMA;
+
+    const maPrice = await getMAPrice();
 
     // Use requested amount or total available
     const claimMA = amount ? Math.min(Number(amount), totalYieldMA) : totalYieldMA;
@@ -124,7 +130,7 @@ serve(async (req) => {
       }
 
       const result = await callThirdweb(calls);
-      txIds = result?.result?.transactionIds || [];
+      txIds = result?.result?.transactionIds || result?.result?.transactions?.map((t: any) => t.id) || [];
 
     } else {
       // LINEAR RELEASE: mint to Release contract + addAccumulated
@@ -145,7 +151,7 @@ serve(async (req) => {
       ];
 
       const result = await callThirdweb(calls);
-      txIds = result?.result?.transactionIds || [];
+      txIds = result?.result?.transactionIds || result?.result?.transactions?.map((t: any) => t.id) || [];
     }
 
     // Record in DB
@@ -161,7 +167,7 @@ serve(async (req) => {
         planDays: plan.days,
         releaseMA,
         burnMA,
-        yieldUsd: totalYieldUsd,
+        yieldMA: totalYieldMA,
         maPrice,
       },
     });
