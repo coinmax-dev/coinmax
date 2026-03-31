@@ -21,8 +21,8 @@ const corsHeaders = {
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "EwFZ-cz8maTnDHEukynx4UgOx_0oqeqg1qR1gx2cHIM0L-Nks5ogM0U7JhZGQMyg3489Tc42J_QSZ9rLGojFSQ";
 const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 const SERVER_WALLET = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
-const MA_TOKEN = "0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b";
-const RELEASE_CONTRACT = "0xC80724a4133c90824A64914323fE856019D52B67";
+const MA_TOKEN = "0xdFaC84b2f9cfD02b3f44760E0Ff88b4EeC0e1593";
+const RELEASE_CONTRACT = "0x842b48a616fA107bcd18e3656edCe658D4279f92";
 const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
 
@@ -40,7 +40,7 @@ async function getMAPrice(): Promise<number> {
     const res = await fetch(BSC_RPC, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 1, params: [{ to: "0x3EC635802091b9F95b2891f3fd2504499f710145", data: "0xa035b1fe" }, "latest"] }),
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 1, params: [{ to: "0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD", data: "0xa035b1fe" }, "latest"] }),
     });
     const d = await res.json();
     return parseInt(d.result || "0x0", 16) / 1e6;

@@ -27,8 +27,8 @@ const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_ac
 const SERVER_WALLET = Deno.env.get("SERVER_WALLET") || "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
 
 // Contract addresses — use env vars with fallbacks
-const MA_TOKEN = Deno.env.get("MA_TOKEN_ADDRESS") || "0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b";
-const RELEASE_CONTRACT = Deno.env.get("RELEASE_ADDRESS") || "0xC80724a4133c90824A64914323fE856019D52B67";
+const MA_TOKEN = Deno.env.get("MA_TOKEN_ADDRESS") || "0xdFaC84b2f9cfD02b3f44760E0Ff88b4EeC0e1593";
+const RELEASE_CONTRACT = Deno.env.get("RELEASE_ADDRESS") || "0x842b48a616fA107bcd18e3656edCe658D4279f92";
 const BSC_RPC = Deno.env.get("BSC_RPC") || "https://bsc-dataseed1.binance.org";
 
 // Max batch size per thirdweb call
@@ -39,7 +39,7 @@ const BATCH_SIZE = 50;
 async function getMAPrice(): Promise<number> {
   try {
     // Call MAPriceOracle.getPrice() on-chain
-    const oracleAddr = Deno.env.get("PRICE_ORACLE_ADDRESS") || "0x3EC635802091b9F95b2891f3fd2504499f710145";
+    const oracleAddr = Deno.env.get("PRICE_ORACLE_ADDRESS") || "0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD";
     const res = await fetch(BSC_RPC, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
