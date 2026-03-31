@@ -1,280 +1,146 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-/// @title CoinMax Factory
-/// @notice Deploys all CoinMax contracts via ERC1967Proxy (upgradeable) or
-///         minimal clones (lightweight per-chain deployment).
-///
-///  Deployment pattern:
-///    1. Deploy implementations (CoinMaxVault, InterestEngine, Release, Gateway)
-///    2. Deploy Factory
-///    3. Call deployVaultChain() — deploys Vault + Engine + Release proxies on ARB
-///    4. Call deployGatewayClone() — deploys Gateway clone per source chain
-///
-///  Proxy strategy:
-///    - Vault, InterestEngine, Release: ERC1967Proxy (upgradeable)
-///      → These hold state and may need bug fixes / feature upgrades
-///    - Gateway: Minimal Clone (lightweight)
-///      → Per-chain deployment, lower gas, stateless (config only)
-///
-///  Role setup:
-///    - Factory automatically grants cross-contract roles:
-///      Gateway → GATEWAY_ROLE on Vault
-///      Engine  → ENGINE_ROLE on Vault
-///      Engine  → VAULT_ROLE on Release
-///      Server Wallet → SERVER_ROLE on Engine, Gateway
+/// @title CoinMax Factory — Deploy + manage all contracts
+/// @notice Owner = deployer EOA (NEVER relayer/server wallet)
+/// @dev All child contracts' ADMIN → deployer. Server Wallet only gets MINTER/ENGINE/OPERATOR.
 contract CoinMaxFactory is Ownable {
-    using Clones for address;
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  STORAGE
-    // ═══════════════════════════════════════════════════════════════════
+    // ═══ Registry ═══
+    address public vault;
+    address public oracle;
+    address public engine;
+    address public release;
+    address public flashSwap;
+    address public batchBridge;
+    address public maToken;
+    address public cusd;
 
-    /// @notice Implementation addresses (set once, used for all proxies)
+    // ═══ Implementations ═══
     address public vaultImpl;
+    address public oracleImpl;
     address public engineImpl;
     address public releaseImpl;
-    address public gatewayImpl;
+    address public flashSwapImpl;
 
-    /// @notice Deployed proxy addresses (vault chain)
-    address public vaultProxy;
-    address public engineProxy;
-    address public releaseProxy;
-
-    /// @notice Deployed gateway clones per chain
-    mapping(uint32 => address) public gatewayClones;
-
-    /// @notice thirdweb Engine Server Wallet address
     address public serverWallet;
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  EVENTS
-    // ═══════════════════════════════════════════════════════════════════
-
-    event ImplementationsSet(address vault, address engine, address release, address gateway);
-    event VaultChainDeployed(address vault, address engine, address release);
-    event GatewayCloneDeployed(uint32 chainId, address gateway);
-    event ServerWalletUpdated(address wallet);
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  CONSTRUCTOR
-    // ═══════════════════════════════════════════════════════════════════
+    event Deployed(string name, address proxy, address impl);
+    event Upgraded(string name, address proxy, address newImpl);
+    event RolesSet(address by);
 
     constructor(address _serverWallet) Ownable(msg.sender) {
+        require(_serverWallet != address(0));
         serverWallet = _serverWallet;
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  STEP 1: SET IMPLEMENTATIONS
-    // ═══════════════════════════════════════════════════════════════════
+    // ═══ DEPLOY ═══
 
-    /// @notice Register implementation contracts (deploy them first, then set here)
-    function setImplementations(
-        address _vault,
-        address _engine,
-        address _release,
-        address _gateway
-    ) external onlyOwner {
-        require(_vault != address(0), "Invalid vault impl");
-        require(_engine != address(0), "Invalid engine impl");
-        require(_release != address(0), "Invalid release impl");
-        require(_gateway != address(0), "Invalid gateway impl");
-
-        vaultImpl = _vault;
-        engineImpl = _engine;
-        releaseImpl = _release;
-        gatewayImpl = _gateway;
-
-        emit ImplementationsSet(_vault, _engine, _release, _gateway);
+    function deployMAToken(address impl) external onlyOwner {
+        require(maToken == address(0));
+        maToken = _proxy(impl, abi.encodeWithSignature("initialize(string,string,address)", "MA Token", "MA", address(this)));
+        emit Deployed("MA", maToken, impl);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  STEP 2: DEPLOY VAULT CHAIN (ARB) — Proxy contracts
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// @notice Deploy Vault + InterestEngine + Release as ERC1967 proxies.
-    ///         Automatically wires roles between contracts.
-    /// @param cUsd cUSD token address
-    /// @param maToken MA token address
-    /// @param admin Admin address (gets DEFAULT_ADMIN_ROLE on all contracts)
-    /// @param maPrice Initial MA price (6 decimals)
-    function deployVaultChain(
-        address cUsd,
-        address maToken,
-        address admin,
-        uint256 maPrice
-    ) external onlyOwner returns (address _vault, address _engine, address _release) {
-        require(vaultImpl != address(0), "Implementations not set");
-        require(vaultProxy == address(0), "Already deployed");
-
-        // 1. Deploy Release proxy first (Vault needs its address)
-        //    Initialize with placeholder engine (will update after engine deploy)
-        bytes memory releaseInit = abi.encodeCall(
-            ICoinMaxReleaseInit.initialize,
-            (maToken, admin, address(0), serverWallet)
-        );
-        releaseProxy = address(new ERC1967Proxy(releaseImpl, releaseInit));
-
-        // 2. Deploy Vault proxy
-        //    Gateway will be set later via setGateway on vault
-        bytes memory vaultInit = abi.encodeCall(
-            ICoinMaxVaultInit.initialize,
-            (cUsd, maToken, admin, address(0), address(0), maPrice)
-        );
-        vaultProxy = address(new ERC1967Proxy(vaultImpl, vaultInit));
-
-        // 3. Deploy InterestEngine proxy
-        bytes memory engineInit = abi.encodeCall(
-            ICoinMaxEngineInit.initialize,
-            (vaultProxy, maToken, releaseProxy, admin, serverWallet)
-        );
-        engineProxy = address(new ERC1967Proxy(engineImpl, engineInit));
-
-        // 4. Wire roles: Engine needs ENGINE_ROLE on Vault, VAULT_ROLE on Release
-        ICoinMaxRoles(vaultProxy).grantRole(keccak256("ENGINE_ROLE"), engineProxy);
-        ICoinMaxRoles(releaseProxy).grantRole(keccak256("VAULT_ROLE"), engineProxy);
-
-        _vault = vaultProxy;
-        _engine = engineProxy;
-        _release = releaseProxy;
-
-        emit VaultChainDeployed(vaultProxy, engineProxy, releaseProxy);
+    function deployCUSD(address impl) external onlyOwner {
+        require(cusd == address(0));
+        cusd = _proxy(impl, abi.encodeWithSignature("initialize(string,string,address)", "cUSD", "cUSD", address(this)));
+        emit Deployed("cUSD", cusd, impl);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  STEP 3: DEPLOY GATEWAY (per chain) — Clone contracts
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// @notice Deploy a Gateway clone for a specific chain.
-    ///         On vault chain (ARB): wire to Vault directly.
-    ///         On source chains: set bridge adapter separately.
-    /// @param chainId Chain identifier for tracking
-    /// @param isVaultChain true for ARB gateway
-    /// @param usdt_ USDT on this chain
-    /// @param usdc_ USDC on this chain
-    /// @param dexRouter_ DEX router on this chain
-    /// @param poolFee_ DEX pool fee
-    /// @param treasury_ Treasury wallet on this chain
-    /// @param admin_ Admin address
-    function deployGatewayClone(
-        uint32 chainId,
-        bool isVaultChain,
-        address usdt_,
-        address usdc_,
-        address dexRouter_,
-        uint24 poolFee_,
-        address treasury_,
-        address admin_
-    ) external onlyOwner returns (address gateway) {
-        require(gatewayImpl != address(0), "Gateway impl not set");
-        require(gatewayClones[chainId] == address(0), "Chain already deployed");
-
-        // Deploy minimal clone
-        gateway = gatewayImpl.clone();
-
-        // Initialize
-        ICoinMaxGatewayInit(gateway).initialize(
-            isVaultChain,
-            usdt_,
-            usdc_,
-            dexRouter_,
-            poolFee_,
-            treasury_,
-            admin_,
-            serverWallet
-        );
-
-        gatewayClones[chainId] = gateway;
-
-        // If vault chain: wire Gateway → Vault (GATEWAY_ROLE)
-        if (isVaultChain && vaultProxy != address(0)) {
-            ICoinMaxRoles(vaultProxy).grantRole(keccak256("GATEWAY_ROLE"), gateway);
-        }
-
-        emit GatewayCloneDeployed(chainId, gateway);
+    function deployOracle(address impl, uint256 price, uint256 heartbeat, uint256 maxChange) external onlyOwner {
+        require(oracle == address(0));
+        oracleImpl = impl;
+        oracle = _proxy(impl, abi.encodeWithSignature("initialize(uint256,uint256,uint256,address)", price, heartbeat, maxChange, address(this)));
+        emit Deployed("Oracle", oracle, impl);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  ADMIN
-    // ═══════════════════════════════════════════════════════════════════
-
-    function setServerWallet(address _wallet) external onlyOwner {
-        require(_wallet != address(0), "Invalid");
-        serverWallet = _wallet;
-        emit ServerWalletUpdated(_wallet);
+    function deployVault(address impl) external onlyOwner {
+        require(vault == address(0) && cusd != address(0) && maToken != address(0) && oracle != address(0));
+        vaultImpl = impl;
+        vault = _proxy(impl, abi.encodeWithSignature("initialize(address,address,address,address)", cusd, maToken, oracle, msg.sender));
+        emit Deployed("Vault", vault, impl);
     }
 
-    /// @notice Grant a role on a deployed contract (for manual wiring)
-    function grantRoleOn(
-        address target,
-        bytes32 role,
-        address account
-    ) external onlyOwner {
-        ICoinMaxRoles(target).grantRole(role, account);
+    function deployRelease(address impl) external onlyOwner {
+        require(release == address(0) && maToken != address(0));
+        releaseImpl = impl;
+        release = _proxy(impl, abi.encodeWithSignature("initialize(address,address)", maToken, msg.sender));
+        emit Deployed("Release", release, impl);
     }
 
-    /// @notice Revoke a role on a deployed contract
-    function revokeRoleOn(
-        address target,
-        bytes32 role,
-        address account
-    ) external onlyOwner {
-        ICoinMaxRoles(target).revokeRole(role, account);
+    function deployEngine(address impl) external onlyOwner {
+        require(engine == address(0) && vault != address(0));
+        engineImpl = impl;
+        engine = _proxy(impl, abi.encodeWithSignature("initialize(address,address,address,address,address)", vault, maToken, oracle, release, msg.sender));
+        emit Deployed("Engine", engine, impl);
     }
-}
 
-// ═══════════════════════════════════════════════════════════════════════
-//  INIT INTERFACES (for abi.encodeCall)
-// ═══════════════════════════════════════════════════════════════════════
+    function deployFlashSwap(address impl, address usdt, address usdc, bytes32 salt) external onlyOwner {
+        require(flashSwap == address(0) && maToken != address(0) && oracle != address(0));
+        flashSwapImpl = impl;
+        bytes memory init = abi.encodeWithSignature("initialize(address,address,address,address,address)", maToken, usdt, usdc, oracle, msg.sender);
+        bytes memory code = abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(impl, init));
+        address proxy;
+        assembly { proxy := create2(0, add(code, 0x20), mload(code), salt) }
+        require(proxy != address(0), "CREATE2 failed");
+        flashSwap = proxy;
+        emit Deployed("FlashSwap", flashSwap, impl);
+    }
 
-interface ICoinMaxVaultInit {
-    function initialize(
-        address cUsd,
-        address maToken,
-        address admin,
-        address gateway,
-        address engine,
-        uint256 maPrice
-    ) external;
-}
+    function registerBatchBridge(address _bb) external onlyOwner { batchBridge = _bb; }
 
-interface ICoinMaxEngineInit {
-    function initialize(
-        address vault,
-        address maToken,
-        address releaseContract,
-        address admin,
-        address serverWallet
-    ) external;
-}
+    // ═══ SETUP ROLES (one-click) ═══
 
-interface ICoinMaxReleaseInit {
-    function initialize(
-        address maToken,
-        address admin,
-        address engine,
-        address serverWallet
-    ) external;
-}
+    bytes32 constant MINTER = keccak256("MINTER_ROLE");
+    bytes32 constant ENGINE_R = keccak256("ENGINE_ROLE");
+    bytes32 constant ADMIN = 0x00;
 
-interface ICoinMaxGatewayInit {
-    function initialize(
-        bool isVaultChain,
-        address usdt,
-        address usdc,
-        address dexRouter,
-        uint24 poolFee,
-        address treasury,
-        address admin,
-        address serverWallet
-    ) external;
-}
+    function setupRoles() external onlyOwner {
+        // Vault → MA MINTER + cUSD MINTER
+        _grant(maToken, MINTER, vault);
+        if (cusd != address(0)) _grant(cusd, MINTER, vault);
+        // Engine → MA MINTER
+        if (engine != address(0)) _grant(maToken, MINTER, engine);
+        // Server Wallet → operational roles only (NEVER admin)
+        _grant(maToken, MINTER, serverWallet);
+        if (release != address(0)) _grant(release, ADMIN, serverWallet);
+        if (vault != address(0)) _grant(vault, ENGINE_R, serverWallet);
+        // Deployer → ADMIN on all
+        address d = msg.sender;
+        _grant(maToken, ADMIN, d);
+        if (cusd != address(0)) _grant(cusd, ADMIN, d);
+        if (oracle != address(0)) _grant(oracle, ADMIN, d);
+        if (vault != address(0)) _grant(vault, ADMIN, d);
+        if (engine != address(0)) _grant(engine, ADMIN, d);
+        if (release != address(0)) _grant(release, ADMIN, d);
+        if (flashSwap != address(0)) _grant(flashSwap, ADMIN, d);
+        emit RolesSet(d);
+    }
 
-interface ICoinMaxRoles {
-    function grantRole(bytes32 role, address account) external;
-    function revokeRole(bytes32 role, address account) external;
+    // ═══ UPGRADE ═══
+
+    function upgradeVault(address impl) external onlyOwner { _up(vault, impl); vaultImpl = impl; emit Upgraded("Vault", vault, impl); }
+    function upgradeOracle(address impl) external onlyOwner { _up(oracle, impl); oracleImpl = impl; emit Upgraded("Oracle", oracle, impl); }
+    function upgradeEngine(address impl) external onlyOwner { _up(engine, impl); engineImpl = impl; emit Upgraded("Engine", engine, impl); }
+    function upgradeRelease(address impl) external onlyOwner { _up(release, impl); releaseImpl = impl; emit Upgraded("Release", release, impl); }
+    function upgradeFlashSwap(address impl) external onlyOwner { _up(flashSwap, impl); flashSwapImpl = impl; emit Upgraded("FlashSwap", flashSwap, impl); }
+
+    // ═══ CONFIG ═══
+
+    function setServerWallet(address _sw) external onlyOwner { serverWallet = _sw; }
+    function setVaultDistributor(address _fd) external onlyOwner { _call(vault, abi.encodeWithSignature("setFundDistributor(address)", _fd)); }
+    function setOraclePrice(uint256 p) external onlyOwner { _call(oracle, abi.encodeWithSignature("updatePrice(uint256)", p)); }
+    function pause(address t) external onlyOwner { _call(t, abi.encodeWithSignature("pause()")); }
+    function unpause(address t) external onlyOwner { _call(t, abi.encodeWithSignature("unpause()")); }
+
+    // ═══ INTERNAL ═══
+
+    function _proxy(address impl, bytes memory init) internal returns (address) { return address(new ERC1967Proxy(impl, init)); }
+    function _grant(address t, bytes32 r, address a) internal { _call(t, abi.encodeWithSignature("grantRole(bytes32,address)", r, a)); }
+    function _up(address p, address impl) internal { _call(p, abi.encodeWithSignature("upgradeToAndCall(address,bytes)", impl, "")); }
+    function _call(address t, bytes memory d) internal { (bool ok,) = t.call(d); require(ok); }
 }
