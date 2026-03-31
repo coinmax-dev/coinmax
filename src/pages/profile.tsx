@@ -54,13 +54,21 @@ export default function ProfilePage() {
     enabled: isConnected,
   });
 
+  // Personal vault holding (excludes bonus positions)
+  const personalHolding = useMemo(() => {
+    if (!vaultPositions) return 0;
+    return vaultPositions
+      .filter(p => p.status === "ACTIVE" && p.planType !== "BONUS_5D" && !p.isBonus)
+      .reduce((s, p) => s + Number(p.principal || 0), 0);
+  }, [vaultPositions]);
+
+  // Vault yield calculated from DB (for display)
   const vaultYield = useMemo(() => {
     if (!vaultPositions) return 0;
     const now = new Date();
     let yieldSum = 0;
     for (const p of vaultPositions) {
       if (p.status !== "ACTIVE") continue;
-      // Skip bonus positions with locked yield — they don't count as available earnings
       if (p.bonusYieldLocked) continue;
       const amt = Number(p.principal || 0);
       const start = new Date(p.startDate!);
@@ -68,6 +76,22 @@ export default function ProfilePage() {
       yieldSum += amt * Number(p.dailyRate || 0) * days;
     }
     return yieldSum;
+  }, [vaultPositions]);
+
+  // Locked bonus yield (bonus positions with locked yield)
+  const lockedBonusYield = useMemo(() => {
+    if (!vaultPositions) return 0;
+    const now = new Date();
+    let sum = 0;
+    for (const p of vaultPositions) {
+      if (p.status !== "ACTIVE") continue;
+      if (!p.bonusYieldLocked) continue;
+      const amt = Number(p.principal || 0);
+      const start = new Date(p.startDate!);
+      const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      sum += amt * Number(p.dailyRate || 0) * days;
+    }
+    return sum;
   }, [vaultPositions]);
 
   const payment = usePayment();
@@ -111,7 +135,7 @@ export default function ProfilePage() {
     },
   });
 
-  const deposited = Number(profile?.totalDeposited || 0);
+  const deposited = personalHolding; // excludes bonus
   const withdrawn = Number(profile?.totalWithdrawn || 0);
   // Node earnings = fixed yield + pool dividend (NOT team commission)
   const nodeFixedYield = Number(nodeOverview?.rewards?.fixedYield || 0);
@@ -124,7 +148,7 @@ export default function ProfilePage() {
   const totalEarnings = nodeEarnings + vaultYield + referralEarnings;
   const net = deposited - withdrawn;
 
-  // Query claimed yield to calculate available balance
+  // Claimed yield = sum of YIELD_CLAIM transactions
   const { data: claimedYield = 0 } = useQuery({
     queryKey: ["claimed-yield", walletAddr],
     queryFn: async () => {
@@ -136,6 +160,7 @@ export default function ProfilePage() {
     },
     enabled: !!walletAddr,
   });
+  // Available = total unlocked earnings - already claimed
   const availableEarnings = Math.max(0, totalEarnings - claimedYield);
 
   const refCode = profile?.refCode;
@@ -209,7 +234,7 @@ export default function ProfilePage() {
                   style={{ background: "rgba(255,255,255,0.08)", backdropFilter: "blur(8px)" }}
                   data-testid="badge-rank"
                 >
-                  {t("common.rank")}: {profile.rank}
+                  {t("common.rank")}: {profile.rank || "V0"}
                 </span>
                 <span
                   className="text-[11px] px-2.5 py-1 rounded-full font-semibold text-white/90"
@@ -316,6 +341,12 @@ export default function ProfilePage() {
                     </div>
                   ))}
                 </div>
+                {lockedBonusYield > 0 && (
+                  <div className="mt-2 rounded-xl p-2.5 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.1)" }}>
+                    <div className="text-[10px] text-amber-400/60">{t("profile.lockedYield", "锁仓收益 (体验金)")}</div>
+                    <div className="text-[12px] font-bold text-amber-400/80">{formatCompactMA(lockedBonusYield)}</div>
+                  </div>
+                )}
               </div>
             </>
           )}
