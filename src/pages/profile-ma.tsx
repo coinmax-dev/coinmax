@@ -7,8 +7,7 @@ import { readContract, prepareContractCall, waitForReceipt, getContract } from "
 import { approve } from "thirdweb/extensions/erc20";
 import { useQuery } from "@tanstack/react-query";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
-import { getMATokenContract, getUsdtContract, MA_TOKEN_ADDRESS, RELEASE_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
-import { transfer } from "thirdweb/extensions/erc20";
+import { getMATokenContract, getUsdtContract, MA_TOKEN_ADDRESS, FLASH_SWAP_ADDRESS, USDT_ADDRESS, USDC_ADDRESS, RELEASE_ADDRESS, BSC_CHAIN } from "@/lib/contracts";
 import { supabase } from "@/lib/supabase";
 import { VAULT_PLANS } from "@/lib/data";
 import { useMaPrice } from "@/hooks/use-ma-price";
@@ -284,37 +283,69 @@ function MASwap() {
 
   const handleSwap = async () => {
     if (!account || !client || inputAmount <= 0 || exceedsQuota) return;
-    const receiverAddress = import.meta.env.VITE_VIP_RECEIVER_ADDRESS || "0x93F655C3C6B595600fc735118dcEE10cd63d4C8f";
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const flashSwap = getContract({ client, chain: BSC_CHAIN, address: FLASH_SWAP_ADDRESS });
+    const amountWei = BigInt(Math.floor(inputAmount * 1e18));
 
     setSwapError("");
     try {
       setSwapStatus("transferring");
 
-      // MA→USDT: transfer MA; USDT→MA: transfer USDT
-      const contract = isSwapped ? getUsdtContract(client) : getMATokenContract(client);
-      const tx = transfer({ contract, to: receiverAddress, amount: inputAmount });
-      const result = await sendTransaction(tx);
-      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
-      if (receipt.status === "reverted") throw new Error("Transaction reverted");
+      if (!isSwapped) {
+        // ═══ SELL MA → USDT/USDC (via FlashSwap contract) ═══
+        // Step 1: Approve MA to FlashSwap
+        const maContract = getMATokenContract(client);
+        const approveTx = prepareContractCall({
+          contract: maContract,
+          method: "function approve(address spender, uint256 amount) returns (bool)",
+          params: [FLASH_SWAP_ADDRESS, amountWei],
+        });
+        const approveResult = await sendTransaction(approveTx);
+        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+
+        // Step 2: Call swapMAtoUSDT or swapMAtoUSDC
+        const method = outputToken === "USDC" ? "function swapMAtoUSDC(uint256 maAmount)" : "function swapMAtoUSDT(uint256 maAmount)";
+        const swapTx = prepareContractCall({ contract: flashSwap, method, params: [amountWei] });
+        const result = await sendTransaction(swapTx);
+        const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
+        if (receipt.status === "reverted") throw new Error("Transaction reverted");
+      } else {
+        // ═══ BUY MA with USDT/USDC (via FlashSwap contract) ═══
+        // Step 1: Approve USDT/USDC to FlashSwap
+        const tokenAddr = outputToken === "USDC" ? USDC_ADDRESS : USDT_ADDRESS;
+        const tokenContract = getContract({ client, chain: BSC_CHAIN, address: tokenAddr });
+        const approveTx = prepareContractCall({
+          contract: tokenContract,
+          method: "function approve(address spender, uint256 amount) returns (bool)",
+          params: [FLASH_SWAP_ADDRESS, amountWei],
+        });
+        const approveResult = await sendTransaction(approveTx);
+        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+
+        // Step 2: Call swapUSDTtoMA or swapUSDCtoMA
+        const method = outputToken === "USDC" ? "function swapUSDCtoMA(uint256 usdcAmount)" : "function swapUSDTtoMA(uint256 usdtAmount)";
+        const swapTx = prepareContractCall({ contract: flashSwap, method, params: [amountWei] });
+        const result = await sendTransaction(swapTx);
+        const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
+        if (receipt.status === "reverted") throw new Error("Transaction reverted");
+      }
 
       // Record via edge function
       setSwapStatus("recording");
-      const resp = await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletAddress: account.address,
-          txHash: receipt.transactionHash,
-          direction: isSwapped ? "buy" : "sell",
-          maAmount: inputAmount,
-          outputToken,
-          maPrice,       // oracle price follows K-line
-          maBalance,
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Swap failed");
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            walletAddress: account.address,
+            direction: isSwapped ? "buy" : "sell",
+            maAmount: inputAmount,
+            outputToken,
+            maPrice,
+            maBalance,
+          }),
+        });
+      } catch { /* non-critical */ }
 
       setSwapStatus("success");
       setMaAmount("");
