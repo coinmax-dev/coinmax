@@ -20,7 +20,7 @@ const corsHeaders = {
 };
 
 const SWAP_FEE_PCT = 0.003; // 0.3%
-const MA_TOKEN = "0x4f71f2d1bD1480EC002e5c7A331BfA5F7A6c5C5b";
+const MA_TOKEN = "0xdFaC84b2f9cfD02b3f44760E0Ff88b4EeC0e1593";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
 
 async function getMABalance(wallet: string): Promise<number> {
