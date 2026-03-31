@@ -346,7 +346,51 @@ function setUSDC(address _usdc) external onlyRole(DEFAULT_ADMIN_ROLE) { usdc = I
 
 ---
 
-## 七、风险控制
+## 七、安全规则（铁律）
+
+### ⛔ 绝对禁止
+
+| 规则 | 原因 |
+|------|------|
+| **禁止用 Server Wallet / Relayer 做合约 owner** | $13,340 教训：relayer 签名失败 → 资金永久锁死 |
+| **禁止用 thirdweb 托管密钥做 admin** | 密钥在 thirdweb enclave，你无法导出 |
+| **禁止单点 owner** | 一个钱包挂了全部合约卡住 |
+
+### ✅ 正确做法
+
+| 项目 | 规则 |
+|------|------|
+| **合约 owner / DEFAULT_ADMIN_ROLE** | → 新 deployer EOA（自己保管私钥） |
+| **Server Wallet** | → 只给操作角色：MINTER, ENGINE, OPERATOR |
+| **Factory owner** | → deployer EOA |
+| **紧急恢复** | → Timelock 24h 延迟 + deployer 做 proposer |
+| **私钥保管** | → 硬件钱包 或 多签 (后期) |
+
+### 角色矩阵（正式部署）
+
+```
+Deployer EOA (新生成，自己保管私钥)
+  ├── Factory → owner
+  ├── Vault → DEFAULT_ADMIN_ROLE
+  ├── Oracle → DEFAULT_ADMIN_ROLE
+  ├── Engine → DEFAULT_ADMIN_ROLE
+  ├── Release → DEFAULT_ADMIN_ROLE
+  ├── FlashSwap → DEFAULT_ADMIN_ROLE
+  ├── BatchBridge → owner
+  ├── MA Token → DEFAULT_ADMIN_ROLE
+  └── cUSD → DEFAULT_ADMIN_ROLE
+
+Server Wallet (0x85e4 或新的 ERC-4337)
+  ├── MA Token → MINTER_ROLE (铸造收益)
+  ├── Release → OPERATOR_ROLE (addAccumulated)
+  ├── Vault → ENGINE_ROLE (读取仓位)
+  └── ❌ 不给任何 ADMIN/owner
+
+Timelock (24h)
+  └── 备用紧急升级路径
+```
+
+### 风险控制
 
 | 风险 | 缓解措施 |
 |------|---------|
@@ -356,6 +400,8 @@ function setUSDC(address _usdc) external onlyRole(DEFAULT_ADMIN_ROLE) { usdc = I
 | Oracle 价格中断 | DB fallback 价格 + heartbeat 检查 |
 | 跨链失败 | thirdweb Bridge + 手动回退 |
 | Gas 不足 | Admin 批量 Gas 面板监控 |
+| **deployer 私钥丢失** | Timelock 有 24h 延迟恢复路径 |
+| **Server Wallet 不能签名** | 不影响任何 owner 操作，只影响日常 mint |
 
 ---
 
