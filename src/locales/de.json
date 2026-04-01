@@ -154,6 +154,7 @@
     "selectPlanDesc": "Wählen Sie einen Plan, um Erträge zu verdienen",
     "dailyRate": "Tagesrate",
     "lockPeriod": "Sperrfrist",
+    "notYetOpen": "Noch nicht verfügbar",
     "daysUnit": "{{count}} Tage",
     "positions": "positions",
     "start": "Start",

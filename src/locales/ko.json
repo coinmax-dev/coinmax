@@ -154,6 +154,7 @@
     "selectPlanDesc": "플랜을 선택하여 자산 수익 획득 시작",
     "dailyRate": "일일 이율",
     "lockPeriod": "락업 기간",
+    "notYetOpen": "미개방",
     "daysUnit": "{{count}}일",
     "positions": "건 보유",
     "start": "시작",

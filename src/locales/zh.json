@@ -154,6 +154,7 @@
     "selectPlanDesc": "选择一个方案开始赚取收益",
     "dailyRate": "日利率",
     "lockPeriod": "锁仓期",
+    "notYetOpen": "暂未开放",
     "daysUnit": "{{count}} 天",
     "positions": "笔持仓",
     "start": "开始",

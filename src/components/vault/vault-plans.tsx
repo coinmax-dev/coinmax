@@ -57,23 +57,35 @@ export function VaultPlans({ selectedPlan, onSelectPlan }: VaultPlansProps) {
           <div className="space-y-3 py-2">
             {Object.entries(VAULT_PLANS).map(([key, plan]) => {
               const isSelected = selectedPlan === key;
+              const isDisabled = key === "180_DAYS";
               return (
                 <Card
                   key={key}
-                  className={`border-border bg-background cursor-pointer transition-all duration-200 hover-elevate ${
-                    isSelected
-                      ? "ring-2 ring-primary border-primary/50 shadow-[0_0_12px_rgba(0,188,165,0.15)]"
-                      : ""
+                  className={`border-border bg-background transition-all duration-200 ${
+                    isDisabled
+                      ? "opacity-40 cursor-not-allowed"
+                      : `cursor-pointer hover-elevate ${
+                          isSelected
+                            ? "ring-2 ring-primary border-primary/50 shadow-[0_0_12px_rgba(0,188,165,0.15)]"
+                            : ""
+                        }`
                   }`}
-                  onClick={() => handleSelect(key)}
+                  onClick={() => !isDisabled && handleSelect(key)}
                   data-testid={`vault-plan-${key}`}
                 >
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-                      <span className={`text-sm font-bold ${isSelected ? "text-primary" : ""}`}>
+                      <span className={`text-sm font-bold ${isSelected && !isDisabled ? "text-primary" : ""}`}>
                         {plan.label}
                       </span>
-                      <span className="text-xl font-bold text-neon-value">{plan.apr} APR</span>
+                      <div className="flex items-center gap-2">
+                        {isDisabled && (
+                          <span className="px-2 py-0.5 rounded bg-white/10 text-[11px] text-foreground/40">
+                            {t("vault.notYetOpen", "暂未开放")}
+                          </span>
+                        )}
+                        <span className="text-xl font-bold text-neon-value">{plan.apr} APR</span>
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">

@@ -195,18 +195,27 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
               {PLAN_KEYS.map((key) => {
                 const p = VAULT_PLANS[key];
                 const isSelected = selectedPlan === key;
+                const isDisabled = key === "180_DAYS";
                 return (
                   <button
                     key={key}
-                    onClick={() => setSelectedPlan(key)}
+                    onClick={() => !isDisabled && setSelectedPlan(key)}
+                    disabled={isDisabled}
                     className={cn(
                       "relative rounded-xl p-3 text-left transition-all",
-                      isSelected
-                        ? "bg-primary/10 border-2 border-primary/40 shadow-[0_0_15px_rgba(0,188,165,0.1)]"
-                        : "bg-white/[0.02] border border-white/5 hover:border-white/15"
+                      isDisabled
+                        ? "opacity-40 cursor-not-allowed bg-white/[0.01] border border-white/5"
+                        : isSelected
+                          ? "bg-primary/10 border-2 border-primary/40 shadow-[0_0_15px_rgba(0,188,165,0.1)]"
+                          : "bg-white/[0.02] border border-white/5 hover:border-white/15"
                     )}
                   >
-                    {isSelected && (
+                    {isDisabled && (
+                      <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-white/10 text-[9px] text-foreground/40">
+                        {t("vault.notYetOpen", "暂未开放")}
+                      </div>
+                    )}
+                    {isSelected && !isDisabled && (
                       <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
                         <Check className="h-2.5 w-2.5 text-black" />
                       </div>

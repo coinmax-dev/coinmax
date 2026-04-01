@@ -154,6 +154,7 @@
     "selectPlanDesc": "Выберите план, чтобы начать зарабатывать",
     "dailyRate": "Дневная Ставка",
     "lockPeriod": "Период Блокировки",
+    "notYetOpen": "Ещё не доступно",
     "daysUnit": "{{count}} дней",
     "positions": "positions",
     "start": "Старт",

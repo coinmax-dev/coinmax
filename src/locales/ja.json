@@ -154,6 +154,7 @@
     "selectPlanDesc": "プランを選択して資産の利回りを獲得",
     "dailyRate": "日次レート",
     "lockPeriod": "ロック期間",
+    "notYetOpen": "近日公開",
     "daysUnit": "{{count}} 日",
     "positions": "件の持倉",
     "start": "開始",

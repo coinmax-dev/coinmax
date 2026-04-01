@@ -154,6 +154,7 @@
     "selectPlanDesc": "Sélectionnez un plan pour commencer à gagner du rendement",
     "dailyRate": "Taux Journalier",
     "lockPeriod": "Période de Verrouillage",
+    "notYetOpen": "Pas encore disponible",
     "daysUnit": "{{count}} jours",
     "positions": "positions",
     "start": "Début",

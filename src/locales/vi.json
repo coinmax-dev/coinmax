@@ -154,6 +154,7 @@
     "selectPlanDesc": "Chọn một gói để bắt đầu kiếm lợi suất",
     "dailyRate": "Tỷ lệ hàng ngày",
     "lockPeriod": "Thời gian khóa",
+    "notYetOpen": "Chưa mở",
     "daysUnit": "{{count}} ngày",
     "positions": "vị thế",
     "start": "Bắt đầu",

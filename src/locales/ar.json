@@ -154,6 +154,7 @@
     "selectPlanDesc": "اختر خطة لبدء كسب العائد على أصولك",
     "dailyRate": "المعدل اليومي",
     "lockPeriod": "فترة القفل",
+    "notYetOpen": "لم يُفتح بعد",
     "daysUnit": "{{count}} أيام",
     "positions": "المراكز",
     "start": "البداية",

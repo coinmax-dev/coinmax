@@ -154,6 +154,7 @@
     "selectPlanDesc": "Select a plan to start earning yield on your assets",
     "dailyRate": "Daily Rate",
     "lockPeriod": "Lock Period",
+    "notYetOpen": "Not Yet Available",
     "daysUnit": "{{count}} days",
     "positions": "positions",
     "start": "Start",

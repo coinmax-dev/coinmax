@@ -154,6 +154,7 @@
     "selectPlanDesc": "Seleccione un plan para comenzar a obtener rendimiento",
     "dailyRate": "Tasa Diaria",
     "lockPeriod": "Período de Bloqueo",
+    "notYetOpen": "Aún no disponible",
     "daysUnit": "{{count}} días",
     "positions": "positions",
     "start": "Inicio",
