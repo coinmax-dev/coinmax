@@ -56,6 +56,7 @@ export default function AdminNodes() {
                   { label: "价格", value: formatUSD(Number(n.price)) },
                   { label: "里程碑", value: `${n.milestoneStage} / ${n.totalMilestones}` },
                   { label: "开始时间", value: n.startDate ? new Date(n.startDate).toLocaleDateString() : "-" },
+                  ...(n.tag ? [{ label: "标签", value: <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/20 text-[10px] h-5">{n.tag}</Badge> }] : []),
                 ]}
               />
             ))}
@@ -67,18 +68,19 @@ export default function AdminNodes() {
               <TableHeader>
                 <TableRow className="border-border/20 hover:bg-transparent">
                   <TableHead>用户钱包</TableHead><TableHead>节点类型</TableHead><TableHead>价格</TableHead>
-                  <TableHead>状态</TableHead><TableHead>开始时间</TableHead><TableHead>里程碑</TableHead>
+                  <TableHead>状态</TableHead><TableHead>标签</TableHead><TableHead>开始时间</TableHead><TableHead>里程碑</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {memberships.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center text-foreground/40 py-8">暂无数据</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-foreground/40 py-8">暂无数据</TableCell></TableRow>
                 ) : memberships.map((n: any) => (
                   <TableRow key={n.id} className="border-border/10 hover:bg-white/[0.015]">
                     <TableCell className="font-mono text-xs text-foreground/70">{shortenAddress(n.userWallet ?? n.userId)}</TableCell>
                     <TableCell><Badge variant="outline" className="text-xs capitalize">{n.nodeType}</Badge></TableCell>
                     <TableCell className="text-foreground/70">{formatUSD(Number(n.price))}</TableCell>
                     <TableCell><Badge className={n.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-gray-500/15 text-gray-400 border-gray-500/20"}>{n.status}</Badge></TableCell>
+                    <TableCell>{n.tag ? <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/20 text-[10px]">{n.tag}</Badge> : <span className="text-foreground/20">-</span>}</TableCell>
                     <TableCell className="text-foreground/40 text-xs">{n.startDate ? new Date(n.startDate).toLocaleDateString() : "-"}</TableCell>
                     <TableCell className="text-foreground/70">{n.milestoneStage} / {n.totalMilestones}</TableCell>
                   </TableRow>
