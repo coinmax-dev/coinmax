@@ -23,19 +23,19 @@ export const VIP_RECEIVER_ADDRESS = import.meta.env.VITE_VIP_RECEIVER_ADDRESS ||
 export const SWAP_ROUTER_ADDRESS = import.meta.env.VITE_SWAP_ROUTER_ADDRESS || "0x5650383D9f8d8f80fc972b8F49A3cc31d3A7F7E3";
 export const NODE_V2_CONTRACT_ADDRESS = import.meta.env.VITE_NODE_V2_CONTRACT_ADDRESS || "0x17DDad4C9c2fD61859D37dD40300c419cBdd4cE2";
 
-// ── V3 Contract addresses (Clean deployment 2026-03-31) ──
-export const MA_TOKEN_ADDRESS = import.meta.env.VITE_MA_TOKEN_ADDRESS || "0x89b70f36168429604cE3c084552e9cF453A91d06";
+// ── V3 Contract addresses (Verified 2026-04-01) ──
+export const MA_TOKEN_ADDRESS = import.meta.env.VITE_MA_TOKEN_ADDRESS || "0xdFaC84b2f9cfD02b3f44760E0Ff88b4EeC0e1593";
 export const CUSD_ADDRESS = import.meta.env.VITE_CUSD_ADDRESS || "0xDDB67fe20382868d7378FB3F4f5e23DBd1B2C4D6";
-export const PRICE_ORACLE_ADDRESS = import.meta.env.VITE_PRICE_ORACLE_ADDRESS || "0x3F994e6AF97D3153C22AbFDcE55361e932bD0DAA";
-export const VAULT_V3_ADDRESS = import.meta.env.VITE_VAULT_V3_ADDRESS || "0x2E07f56219FB9f39DcAce289288DE07F2bA96B93";
-export const ENGINE_ADDRESS = import.meta.env.VITE_ENGINE_ADDRESS || "";
-export const RELEASE_ADDRESS = import.meta.env.VITE_RELEASE_ADDRESS || "0x22d7E4b936c504d124767a8B4fB9C8F3724438Ef";
+export const PRICE_ORACLE_ADDRESS = import.meta.env.VITE_PRICE_ORACLE_ADDRESS || "0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD";
+export const VAULT_V3_ADDRESS = import.meta.env.VITE_VAULT_V3_ADDRESS || "0xE0A80b82F42d009cdE772d5c34b1682C2D79e821";
+export const ENGINE_ADDRESS = import.meta.env.VITE_ENGINE_ADDRESS || "0x0990013669d28eC6401f46a78b612cdaBE88b789";
+export const RELEASE_ADDRESS = import.meta.env.VITE_RELEASE_ADDRESS || "0x842b48a616fA107bcd18e3656edCe658D4279f92";
 export const FORWARDER_ADDRESS = import.meta.env.VITE_FORWARDER_ADDRESS || "0x6EF9AD688dFD9B545158b05FC51ab38B9D5a8556";
 export const TIMELOCK_ADDRESS = import.meta.env.VITE_TIMELOCK_ADDRESS || "0x857c472F8587B2D3E7F90B10b99458104CcaCdfC";
-export const BATCH_BRIDGE_ADDRESS = import.meta.env.VITE_BATCH_BRIDGE_ADDRESS || "0x1Baa40837a253DA171a458A979f87b9A29CE0Efa";
+export const BATCH_BRIDGE_ADDRESS = import.meta.env.VITE_BATCH_BRIDGE_ADDRESS || "0x96dBfe3aAa877A4f9fB41d592f1D990368a4B2C1";
 export const ARB_FUND_ROUTER_ADDRESS = import.meta.env.VITE_ARB_FUND_ROUTER_ADDRESS || "0x71237E535d5E00CDf18A609eA003525baEae3489";
 export const NODE_ENGINE_ADDRESS = import.meta.env.VITE_NODE_ENGINE_ADDRESS || "";
-export const FLASH_SWAP_ADDRESS = import.meta.env.VITE_FLASH_SWAP_ADDRESS || "0x7cEdABFaB97DAbc6ceF4e36b560D174D09d05d1C";
+export const FLASH_SWAP_ADDRESS = import.meta.env.VITE_FLASH_SWAP_ADDRESS || "0x95dfb27Fbd92A5C71C4028a4612e9Cbefdb8EE10";
 export const ARB_FLASH_SWAP_ADDRESS = "0x681a734AbE80D9f52236d70d29cA5504207b6d7C";
 export const MA_DECIMALS = 18;
 
@@ -93,9 +93,7 @@ export function getVaultV3Contract(client: ThirdwebClient) {
   return getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
 }
 
-export function getGatewayContract(client: ThirdwebClient) {
-  return getContract({ client, chain: BSC_CHAIN, address: GATEWAY_ADDRESS });
-}
+// Gateway contract deprecated — vault deposits go directly to Server Wallet
 
 // ── ABIs (minimal, only the pay functions) ──
 

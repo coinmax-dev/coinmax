@@ -40,7 +40,7 @@ async function getMAPrice(): Promise<number> {
     const res = await fetch(BSC_RPC, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 1, params: [{ to: "0x3F994e6AF97D3153C22AbFDcE55361e932bD0DAA", data: "0xa035b1fe" }, "latest"] }),
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 1, params: [{ to: "0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD", data: "0xa035b1fe" }, "latest"] }),
     });
     const d = await res.json();
     return parseInt(d.result || "0x0", 16) / 1e6;
