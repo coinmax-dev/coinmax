@@ -65,9 +65,17 @@ contract CoinMaxBatchBridgeV2 is Ownable, ReentrancyGuard, Pausable {
     uint256 public totalBridged;
     uint256 public bridgeCount;
 
+    mapping(address => bool) public keepers;
+
     event SwappedAndBridged(uint256 usdtIn, uint256 usdcOut, uint256 stargeFee, uint256 timestamp);
     event ConfigUpdated(string param);
     event Withdrawn(address indexed to, uint256 amount);
+    event KeeperUpdated(address indexed keeper, bool active);
+
+    modifier onlyKeeper() {
+        require(msg.sender == owner() || keepers[msg.sender], "Not keeper");
+        _;
+    }
 
     constructor(
         address _usdt,
@@ -95,7 +103,7 @@ contract CoinMaxBatchBridgeV2 is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice Swap all USDT → USDC via PancakeSwap, then bridge to ARB via Stargate
     ///         Uses contract's BNB balance for Stargate gas fee
-    function swapAndBridge() external onlyOwner nonReentrant whenNotPaused {
+    function swapAndBridge() external onlyKeeper nonReentrant whenNotPaused {
         require(block.timestamp >= lastBridgeTime + bridgeInterval, "Too soon");
 
         uint256 usdtBalance = usdt.balanceOf(address(this));
@@ -161,6 +169,9 @@ contract CoinMaxBatchBridgeV2 is Ownable, ReentrancyGuard, Pausable {
         IStargateRouter.MessagingFee memory fee = stargateRouter.quoteSend(params, false);
         return (fee.nativeFee, usdtBalance);
     }
+
+    // ─── Keeper ─────────────────────────────────────────────
+    function setKeeper(address _k, bool _active) external onlyOwner { keepers[_k] = _active; emit KeeperUpdated(_k, _active); }
 
     // ─── Admin ──────────────────────────────────────────────
     function pendingBalance() external view returns (uint256) { return usdt.balanceOf(address(this)); }

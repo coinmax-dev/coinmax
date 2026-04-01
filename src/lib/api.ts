@@ -365,7 +365,7 @@ export async function purchaseNode(walletAddress: string, nodeType: string, txHa
     // Mark code as used
     await supabase
       .from("node_auth_codes")
-      .update({ status: "USED", used_by_wallet: walletAddress, used_at: new Date().toISOString(), used_count: 1 })
+      .update({ status: "USED", used_by: walletAddress, used_at: new Date().toISOString(), used_count: 1 })
       .eq("id", codeData.id);
   }
   const { data, error } = await supabase.rpc("purchase_node", {

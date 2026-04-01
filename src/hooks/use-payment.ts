@@ -193,7 +193,7 @@ export function usePayment() {
         const approveResult = await sendTransaction(approveTx);
         await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
 
-        // Step 2: Vault.purchaseNodePublic
+        // Step 2: Vault.purchaseNodePublic (fixed gas to avoid estimation revert)
         setStatus("paying");
         const vault = getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
         const tx = prepareContractCall({
@@ -201,6 +201,7 @@ export function usePayment() {
           method: "function purchaseNodePublic(string nodeType, address token, uint256 amount)",
           params: [nodeType, payToken, usdcAmount],
         });
+        (tx as any).gas = BigInt(600000);
         const payResult = await sendTransaction(tx);
 
         setStatus("confirming");

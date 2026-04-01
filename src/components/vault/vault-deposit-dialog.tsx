@@ -137,12 +137,12 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
         });
       } catch { /* non-critical */ }
 
-      // Auto-trigger batch bridge (BSC → ARB)
+      // Auto-trigger bridge + flush (BSC → ARB → 5 wallets)
       try {
-        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/batch-bridge`, {
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vault-bridge-flush`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-        });
+        }); // fire-and-forget, takes ~90s
       } catch { /* non-critical */ }
 
       // Refresh profile + vault data
