@@ -172,6 +172,10 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
     if (!account || inputAmount <= 0) return;
     setStep("creating");
     try {
+      // Refresh balance before submitting to prevent double-claim
+      await queryClient.invalidateQueries({ queryKey: ["release-db-total-ma"] });
+      await queryClient.invalidateQueries({ queryKey: ["claimed-yield"] });
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
       // Step 1: Call edge function to mint MA + prepare release
@@ -215,6 +219,8 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
       queryClient.invalidateQueries({ queryKey: ["vault-yield-settled"] });
       queryClient.invalidateQueries({ queryKey: ["claimed-yield"] });
       queryClient.invalidateQueries({ queryKey: ["node-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["earnings-releases"] });
       setAmount("");
     } catch (e: any) {
       console.error("createRelease failed:", e);

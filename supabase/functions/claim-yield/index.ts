@@ -190,6 +190,22 @@ serve(async (req) => {
       },
     });
 
+    // Record earnings release
+    const releaseEndDt = new Date(Date.now() + plan.days * 86400000).toISOString();
+    await supabase.from("earnings_releases").insert({
+      user_id: profile.id,
+      source_type: "VAULT",
+      gross_amount: claimMA,
+      burn_rate: plan.burn / 100,
+      burn_amount: burnMA,
+      net_amount: releaseMA,
+      release_days: plan.days,
+      status: plan.days === 0 ? "COMPLETED" : "RELEASING",
+      release_start: new Date().toISOString(),
+      release_end: releaseEndDt,
+      released_at: plan.days === 0 ? new Date().toISOString() : null,
+    });
+
     return json({
       success: true,
       claimMA,
