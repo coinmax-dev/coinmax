@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveAccount } from "thirdweb/react";
 import { useMaPrice } from "@/hooks/use-ma-price";
-import { Copy, Crown, WalletCards, Wallet, ArrowUpFromLine, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp, Share2, Link2, ArrowLeftRight, User, Coins } from "lucide-react";
+import { Copy, Crown, WalletCards, Wallet, ArrowUpFromLine, ChevronRight, Bell, Settings, History, GitBranch, Loader2, Server, TrendingUp, Share2, Link2, ArrowLeftRight, User, Coins, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { copyText } from "@/lib/copy";
 import { useMemo, useState } from "react";
@@ -91,6 +91,10 @@ export default function ProfilePage() {
   const payment = usePayment();
   const [showVipPlans, setShowVipPlans] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawPlan, setWithdrawPlan] = useState("A");
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
 
   const mintReleaseMutation = useMutation({
     mutationFn: () => mintRelease(walletAddr),
@@ -107,6 +111,35 @@ export default function ProfilePage() {
       toast({ title: t("profile.releaseFailed", "释放失败"), description: err.message, variant: "destructive" });
     },
   });
+  const handleWithdraw = async () => {
+    const amt = parseFloat(withdrawAmount);
+    if (!walletAddr || !amt || amt <= 0 || amt > availableEarnings || withdrawBusy) return;
+    setWithdrawBusy(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const res = await fetch(`${supabaseUrl}/functions/v1/claim-v4`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
+        body: JSON.stringify({ walletAddress: walletAddr, amount: amt, splitRatio: withdrawPlan }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast({
+        title: t("profile.withdrawSuccess", "提现成功"),
+        description: `${data.released?.toFixed(2) || amt} MA → ${withdrawPlan === "E" ? t("profile.instantRelease", "即时释放") : data.releaseDays + t("profile.dayLinearRelease", "天线性释放")}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["v4-all-earnings", walletAddr] });
+      queryClient.invalidateQueries({ queryKey: ["release-balances", walletAddr] });
+      setWithdrawOpen(false);
+      setWithdrawAmount("");
+    } catch (e: any) {
+      toast({ title: t("profile.withdrawFailed", "提现失败"), description: e.message, variant: "destructive" });
+    } finally {
+      setWithdrawBusy(false);
+    }
+  };
+
   const [selectedVipPlan, setSelectedVipPlan] = useState<"monthly" | "halfyear" | null>(null);
 
   const vipMutation = useMutation({
@@ -210,8 +243,10 @@ export default function ProfilePage() {
   // 待释放余额 (线性释放出来的 - 已转钱包, 每日递增, 可一键释放)
   const claimableMA = releaseBalances.claimable;
 
-  // 总资产 = 未提现余额 + 提现金额 + 待释放余额
-  const totalAssetMA = availableEarnings + withdrawnInProgress + claimableMA;
+  // 锁仓MA = 金库本金 ÷ MA价格 (赎回后转入可提收益)
+  const lockedMA = maPrice > 0 ? personalHolding / maPrice : 0;
+  // 总资产 = 锁仓MA + 未提现余额 + 提现金额 + 待释放余额
+  const totalAssetMA = lockedMA + availableEarnings + withdrawnInProgress + claimableMA;
 
   const refCode = profile?.refCode;
   // Self-referral link: both sponsor and placement = self
@@ -349,36 +384,8 @@ export default function ProfilePage() {
           {isConnected && (
             <>
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", margin: "0 16px" }} />
-              <div className="p-4 relative">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: "linear-gradient(135deg, rgba(74,222,128,0.2), rgba(74,222,128,0.05))", border: "1px solid rgba(74,222,128,0.15)" }}
-                    >
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-white/45 font-medium">{t("profile.availableEarnings", "未提现余额")}</div>
-                      {profileLoading ? (
-                        <Skeleton className="h-5 w-20" />
-                      ) : (
-                        <div className="text-[18px] font-bold text-white" data-testid="text-total-earnings">
-                          {formatMA(availableEarnings)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="rounded-xl text-[12px] h-8"
-                    onClick={() => setReleaseOpen(true)}
-                    disabled={availableEarnings <= 0}
-                    data-testid="button-withdraw-earnings"
-                  >
-                    <ArrowUpFromLine className="mr-1 h-3 w-3" /> {t("common.withdraw")}
-                  </Button>
-                </div>
+              <div className="p-4 relative space-y-2.5">
+                {/* 收益来源 */}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   {[
                     { label: t("profile.nodeEarningsLabel"), value: formatCompactMA(nodeEarnings) },
@@ -391,34 +398,50 @@ export default function ProfilePage() {
                     </div>
                   ))}
                 </div>
-                {(claimableMA > 0 || withdrawnInProgress > 0) && (
-                  <div className="mt-2 space-y-1.5">
-                    {withdrawnInProgress > 0 && (
-                      <div className="rounded-xl p-2.5 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.03)", border: "1px solid rgba(251,191,36,0.08)" }}>
-                        <div className="text-[10px] text-amber-400/60">{t("profile.withdrawnInProgress", "提现金额")}</div>
-                        <div className="text-[12px] font-bold text-amber-400/70">{formatCompactMA(withdrawnInProgress)}</div>
-                      </div>
-                    )}
-                    {claimableMA > 0 && (
-                      <div className="rounded-xl p-2.5 flex items-center justify-between" style={{ background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.1)" }}>
-                        <div>
-                          <div className="text-[10px] text-white/40">{t("profile.claimableRelease", "待释放余额")}</div>
-                          <div className="text-[12px] font-bold text-primary/80">{formatCompactMA(claimableMA)}</div>
-                        </div>
-                        <Button
-                          size="sm"
-                          className="h-7 text-[10px] rounded-lg bg-primary/20 text-primary hover:bg-primary/30"
-                          onClick={() => mintReleaseMutation.mutate()}
-                          disabled={mintReleaseMutation.isPending}
-                        >
-                          {mintReleaseMutation.isPending ? t("common.processing") : t("profile.oneClickRelease", "一键释放")}
-                        </Button>
-                      </div>
-                    )}
+
+                {/* ① 未提现余额 + 提现按钮 */}
+                <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.12)" }}>
+                  <div>
+                    <div className="text-[10px] text-white/40">{t("profile.unwithdraw", "未提现余额")}</div>
+                    <div className="text-[18px] font-bold text-white">{formatMA(availableEarnings)}</div>
                   </div>
-                )}
+                  <Button
+                    size="sm"
+                    className="rounded-xl text-[12px] h-8"
+                    onClick={() => { setWithdrawOpen(true); setWithdrawAmount(""); }}
+                    disabled={availableEarnings <= 0}
+                  >
+                    <ArrowUpFromLine className="mr-1 h-3 w-3" /> {t("profile.withdraw", "提现")}
+                  </Button>
+                </div>
+
+                {/* ② 提现金额 (线性释放中, 每日减少) */}
+                <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.03)", border: "1px solid rgba(251,191,36,0.08)" }}>
+                  <div>
+                    <div className="text-[10px] text-amber-400/60">{t("profile.withdrawnAmount", "提现金额")}</div>
+                    <div className="text-[16px] font-bold text-amber-400/80">{formatMA(withdrawnInProgress)}</div>
+                  </div>
+                </div>
+
+                {/* ③ 待释放余额 + 释放按钮 */}
+                <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.1)" }}>
+                  <div>
+                    <div className="text-[10px] text-white/40">{t("profile.claimableBalance", "待释放余额")}</div>
+                    <div className="text-[16px] font-bold text-primary">{formatMA(claimableMA)}</div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="h-7 text-[10px] rounded-lg bg-primary/20 text-primary hover:bg-primary/30"
+                    onClick={() => mintReleaseMutation.mutate()}
+                    disabled={mintReleaseMutation.isPending || claimableMA <= 0}
+                  >
+                    <Download className="mr-1 h-3 w-3" />
+                    {mintReleaseMutation.isPending ? t("common.processing") : t("profile.release", "释放")}
+                  </Button>
+                </div>
+
                 {lockedBonusYield > 0 && (
-                  <div className="mt-2 rounded-xl p-2.5 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.1)" }}>
+                  <div className="rounded-xl p-2.5 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.1)" }}>
                     <div className="text-[10px] text-amber-400/60">{t("profile.lockedYield", "锁仓收益 (体验金)")}</div>
                     <div className="text-[12px] font-bold text-amber-400/80">{formatCompactMA(lockedBonusYield)}</div>
                   </div>
@@ -678,7 +701,90 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-      <MAReleaseDialog open={releaseOpen} onOpenChange={setReleaseOpen} />
+      {/* 提现弹窗 — 选择 A/B/C/D/E */}
+      {withdrawOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4" onClick={() => setWithdrawOpen(false)}>
+          <div className="bg-card border border-border rounded-2xl max-w-sm w-full p-4 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold">{t("profile.withdrawTitle", "提现")}</h3>
+              <button onClick={() => setWithdrawOpen(false)} className="text-white/30 hover:text-white/60 text-lg">×</button>
+            </div>
+
+            {/* Amount input */}
+            <div>
+              <div className="text-[10px] text-white/40 mb-1">{t("profile.withdrawAmountLabel", "提现金额 (MA)")}</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={withdrawAmount}
+                  onChange={e => setWithdrawAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="flex-1 bg-white/5 rounded-xl px-3 py-2.5 text-[16px] font-mono text-white outline-none border border-white/10 focus:border-primary/30"
+                />
+                <button onClick={() => setWithdrawAmount(availableEarnings.toFixed(2))} className="text-[10px] text-primary px-2 py-1 bg-primary/10 rounded-lg">MAX</button>
+              </div>
+              <div className="text-[9px] text-white/25 mt-1">{t("profile.available", "可用")}: {availableEarnings.toFixed(2)} MA</div>
+            </div>
+
+            {/* Plan selection A/B/C/D/E */}
+            <div>
+              <div className="text-[10px] text-white/40 mb-1.5">{t("profile.selectPlan", "选择分成比例")}</div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { key: "A", burn: "0%", days: "60天" },
+                  { key: "B", burn: "5%", days: "30天" },
+                  { key: "C", burn: "10%", days: "15天" },
+                  { key: "D", burn: "15%", days: "7天" },
+                  { key: "E", burn: "20%", days: "即时" },
+                ].map(p => (
+                  <button
+                    key={p.key}
+                    onClick={() => setWithdrawPlan(p.key)}
+                    className={`rounded-lg p-2 text-center transition-all ${withdrawPlan === p.key ? "bg-primary/15 border border-primary/30" : "bg-white/5 border border-white/5"}`}
+                  >
+                    <div className="text-[12px] font-bold">{p.key}</div>
+                    <div className="text-[8px] text-red-400">{t("profile.burn", "销毁")}{p.burn}</div>
+                    <div className="text-[8px] text-white/30">{p.days}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Preview */}
+            {(() => {
+              const amt = parseFloat(withdrawAmount) || 0;
+              const burnPcts: Record<string, number> = { A: 0, B: 5, C: 10, D: 15, E: 20 };
+              const burnPct = burnPcts[withdrawPlan] || 0;
+              const burned = amt * burnPct / 100;
+              const released = amt - burned;
+              const dayMap: Record<string, number> = { A: 60, B: 30, C: 15, D: 7, E: 0 };
+              const days = dayMap[withdrawPlan] || 60;
+              const daily = days > 0 ? released / days : released;
+              return amt > 0 ? (
+                <div className="bg-white/5 rounded-xl p-3 text-[11px] space-y-1">
+                  <div className="flex justify-between"><span className="text-white/40">{t("profile.totalWithdraw", "提现总额")}</span><span>{amt.toFixed(2)} MA</span></div>
+                  {burned > 0 && <div className="flex justify-between text-red-400"><span>{t("profile.burnAmount", "销毁")}</span><span>-{burned.toFixed(2)} MA</span></div>}
+                  <div className="flex justify-between"><span className="text-white/40">{t("profile.releaseAmount", "实际释放")}</span><span className="text-primary">{released.toFixed(2)} MA</span></div>
+                  {days > 0 ? (
+                    <div className="flex justify-between"><span className="text-white/40">{t("profile.dailyRelease", "每日释放")}</span><span>{daily.toFixed(4)} MA × {days}{t("profile.days", "天")}</span></div>
+                  ) : (
+                    <div className="flex justify-between"><span className="text-white/40">{t("profile.releaseType", "释放方式")}</span><span className="text-primary">{t("profile.instant", "即时到账待释放")}</span></div>
+                  )}
+                </div>
+              ) : null;
+            })()}
+
+            <Button
+              className="w-full h-10 text-[13px] bg-gradient-to-r from-emerald-600 to-teal-500 text-white"
+              onClick={handleWithdraw}
+              disabled={withdrawBusy || !parseFloat(withdrawAmount) || parseFloat(withdrawAmount) > availableEarnings}
+            >
+              {withdrawBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {withdrawBusy ? t("common.processing") : t("profile.confirmWithdraw", "确认提现")}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
