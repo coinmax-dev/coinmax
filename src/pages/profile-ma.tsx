@@ -665,28 +665,57 @@ function MAReleaseSection() {
   const account = useActiveAccount();
   const { client } = useThirdwebClient();
 
-  const { data: accumulatedRaw } = useQuery({
-    queryKey: ["ma-accumulated-section", account?.address],
+  // V4: Read pending balance from DB (vault_rewards + node_rewards + broker_rewards - claimed)
+  const { data: pendingBalance } = useQuery({
+    queryKey: ["ma-pending-balance", account?.address],
     queryFn: async () => {
-      if (!account?.address || !client || !RELEASE_ADDRESS) return BigInt(0);
-      const contract = getContract({ client, chain: BSC_CHAIN, address: RELEASE_ADDRESS });
-      return readContract({ contract, method: "function accumulated(address) view returns (uint256)", params: [account.address] });
+      if (!account?.address) return { vault: 0, node: 0, broker: 0, claimed: 0, total: 0 };
+      const supabase = (await import("@/lib/supabase")).supabase;
+      const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", account.address).single();
+      if (!profile) return { vault: 0, node: 0, broker: 0, claimed: 0, total: 0 };
+
+      const [vr, nr, br, cl] = await Promise.all([
+        supabase.from("vault_rewards").select("ar_amount").eq("user_id", profile.id),
+        supabase.from("node_rewards").select("amount").eq("user_id", profile.id),
+        supabase.from("broker_rewards").select("amount").eq("user_id", profile.id),
+        supabase.from("transactions").select("amount").eq("user_id", profile.id).eq("type", "MA_CLAIM"),
+      ]);
+
+      const vault = (vr.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || 0), 0);
+      const node = (nr.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+      const broker = (br.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+      const claimed = (cl.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+      return { vault, node, broker, claimed, total: vault + node + broker - claimed };
     },
-    enabled: !!account?.address && !!client && !!RELEASE_ADDRESS,
-    refetchInterval: 15000,
+    enabled: !!account?.address,
+    refetchInterval: 30000,
   });
 
-  const accumulated = Number(accumulatedRaw || BigInt(0)) / 1e18;
+  const accumulated = pendingBalance?.total || 0;
 
   if (!account || accumulated <= 0) return null;
 
   return (
     <div className="rounded-2xl p-3.5" style={{ background: "rgba(0,188,165,0.04)", border: "1px solid rgba(0,188,165,0.12)" }}>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[12px] font-bold text-white/50">{t("ma.profitDistribution", "MA 盈利分红")}</h3>
+        <h3 className="text-[12px] font-bold text-white/50">{t("ma.pendingBalance", "待释放余额")}</h3>
         <span className="text-[13px] font-bold font-mono text-primary">{accumulated.toFixed(2)} MA</span>
       </div>
-      <p className="text-[10px] text-white/30 mb-2">{t("ma.profitDistributionDesc", "可提取的收益，选择释放方案后进入线性释放")}</p>
+      <div className="grid grid-cols-3 gap-1 mb-2">
+        <div className="text-center">
+          <div className="text-[10px] text-white/30">{t("ma.vaultYield", "金库收益")}</div>
+          <div className="text-[11px] font-mono text-white/60">{(pendingBalance?.vault || 0).toFixed(2)}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] text-white/30">{t("ma.nodeYield", "节点收益")}</div>
+          <div className="text-[11px] font-mono text-white/60">{(pendingBalance?.node || 0).toFixed(2)}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-[10px] text-white/30">{t("ma.brokerYield", "经纪人收益")}</div>
+          <div className="text-[11px] font-mono text-white/60">{(pendingBalance?.broker || 0).toFixed(4)}</div>
+        </div>
+      </div>
+      <p className="text-[10px] text-white/30 mb-2">{t("ma.pendingDesc", "可提取的收益，选择释放方案后进入线性释放")}</p>
       <button
         onClick={() => window.location.href = "/vault"}
         className="w-full py-2 rounded-lg text-[11px] font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-all"
