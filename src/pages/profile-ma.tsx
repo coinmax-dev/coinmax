@@ -382,12 +382,12 @@ function MASwap() {
       const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: burnResult.transactionHash });
       if (receipt.status === "reverted") throw new Error("MA销毁失败");
 
-      // Step 2: Call edge function → Engine burns MA + swaps USDC→USDT to user
+      // Step 2: Call edge function → Server swaps USDC→USDT to user
       setSwapStatus("recording");
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const res = await fetch(`${supabaseUrl}/functions/v1/flash-swap-v4`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
         body: JSON.stringify({
           walletAddress: account.address,
           maAmount: inputAmount,
