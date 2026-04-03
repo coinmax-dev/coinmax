@@ -317,9 +317,10 @@ function MASwap() {
 
       // Edge function: EOA executes transferFrom + swap + send
       setSwapStatus("recording");
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const resp = await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
         body: JSON.stringify({
           walletAddress: account.address,
           direction: isSwapped ? "buy" : "sell",
