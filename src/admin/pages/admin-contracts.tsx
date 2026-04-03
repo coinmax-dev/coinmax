@@ -1487,7 +1487,7 @@ function CrossChainPanel() {
   const handleManualBridge = async () => {
     setBusy(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/batch-bridge`, {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vault-bridge-v4`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -1504,7 +1504,7 @@ function CrossChainPanel() {
   const handleManualNodeFlush = async () => {
     setBusy(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flush-node-pool`, {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vault-bridge-v4`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
