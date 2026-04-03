@@ -116,17 +116,38 @@ serve(async (req) => {
       }).eq("id", s.id);
     }
 
-    // 5. Record transaction
+    // 5. Wait for on-chain tx hash (poll thirdweb)
+    let onChainHash: string | null = null;
+    try {
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const statusRes = await fetch(`https://engine.thirdweb.com/v1/transactions/${txId}`, {
+          headers: { "x-secret-key": THIRDWEB_SECRET },
+        });
+        const statusData = await statusRes.json();
+        const tx = statusData?.result;
+        if (tx?.transactionHash) {
+          onChainHash = tx.transactionHash;
+          break;
+        }
+        if (tx?.status === "FAILED") break;
+      }
+    } catch (e) {
+      console.log("Polling error (non-critical):", e);
+    }
+
+    // 6. Record transaction with on-chain hash
     await supabase.from("transactions").insert({
       user_id: profile.id,
       type: "MA_RELEASE",
       amount: totalClaimable,
       token: "MA",
       status: "CONFIRMED",
+      tx_hash: onChainHash,
       details: {
         schedulesCount: claimableSchedules.length,
-        txId,
-        note: "一键释放",
+        engineTxId: txId,
+        note: "释放到账",
       },
     });
 
