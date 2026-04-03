@@ -37,11 +37,10 @@ interface MAReleaseDialogProps {
 }
 
 const PLAN_DATA = [
-  { index: 4, release: 80, burn: 20, days: 0, color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
-  { index: 3, release: 85, burn: 15, days: 7, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  { index: 2, release: 90, burn: 10, days: 15, color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/20" },
-  { index: 1, release: 95, burn: 5, days: 30, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-  { index: 0, release: 100, burn: 0, days: 60, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+  { index: 3, release: 80, burn: 20, days: 14, ratio: "D", color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
+  { index: 2, release: 90, burn: 10, days: 30, ratio: "C", color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/20" },
+  { index: 1, release: 95, burn: 5, days: 45, ratio: "B", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+  { index: 0, release: 100, burn: 0, days: 60, ratio: "A", color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
 ];
 
 export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
@@ -179,13 +178,13 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
       // Step 1: Call V4 claim edge function → mint MA + burn + create linear release schedule
-      const splitRatioMap: Record<number, string> = { 0: "A", 1: "B", 2: "C", 3: "D" };
+      const selectedPlanData = PLAN_DATA.find(p => p.index === selectedPlan);
       const resp = await fetch(`${supabaseUrl}/functions/v1/claim-v4`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           walletAddress: account.address,
-          splitRatio: splitRatioMap[selectedPlan] || "C",
+          splitRatio: selectedPlanData?.ratio || "C",
           amount: inputAmount,
         }),
       });
@@ -194,7 +193,7 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
 
       // V4: Engine handles everything (mint + burn + DB schedule)
       // No on-chain call from user needed
-      const plan = RELEASE_PLANS.find(p => p.index === selectedPlan) || RELEASE_PLANS[2];
+      const plan = PLAN_DATA.find(p => p.index === selectedPlan) || PLAN_DATA[2];
       setSuccessInfo({
         releaseMA: Number(data.released || data.releaseMA || 0),
         burnMA: Number(data.burned || data.burnMA || 0),
