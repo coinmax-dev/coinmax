@@ -67,39 +67,66 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
       const amountWei = BigInt(Math.floor(usdtAmount * 1e18));
       const vault = getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
 
-      // ═══ V4: Only USDC accepted. thirdweb payModal handles USDT→USDC swap ═══
+      // ═══ V4: USDT → PancakeSwap → USDC → Vault ═══
       setStep("depositing");
+      const { readContract: rc } = await import("thirdweb");
       const usdcC = getContract({ client, chain: BSC_CHAIN, address: USDC_ADDRESS });
-      const payToken = USDC_ADDRESS;
-      const tokenContract = usdcC;
+      const usdtC = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
+      const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
 
-      // ═══ Step 1: Approve token to Vault (skip if already enough) ═══
+      // Check USDC balance — if enough, skip swap
+      let usdcBalance = BigInt(0);
       try {
-        const { readContract: rc } = await import("thirdweb");
-        const currentAllowance = await rc({ contract: tokenContract, method: "function allowance(address owner, address spender) view returns (uint256)", params: [account.address, VAULT_V3_ADDRESS] });
+        usdcBalance = BigInt((await rc({ contract: usdcC, method: "function balanceOf(address) view returns (uint256)", params: [account.address] })).toString());
+      } catch {}
 
-        if (BigInt(currentAllowance.toString()) < amountWei) {
-          // BSC USDT: must approve(0) first if allowance > 0
-          if (BigInt(currentAllowance.toString()) > BigInt(0)) {
-            const resetTx = prepareContractCall({ contract: tokenContract, method: "function approve(address spender, uint256 amount) returns (bool)", params: [VAULT_V3_ADDRESS, BigInt(0)] });
-            const resetResult = await sendTx(resetTx);
-            await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: resetResult.transactionHash });
-          }
-          const approveTx = prepareContractCall({ contract: tokenContract, method: "function approve(address spender, uint256 amount) returns (bool)", params: [VAULT_V3_ADDRESS, amountWei] });
+      let depositAmountWei = amountWei;
+
+      // ═══ Step 1: Swap USDT → USDC if user doesn't have enough USDC ═══
+      if (usdcBalance < amountWei) {
+        // Approve USDT to PancakeSwap Router
+        const usdtAllowance = BigInt((await rc({ contract: usdtC, method: "function allowance(address,address) view returns (uint256)", params: [account.address, PANCAKE_ROUTER] })).toString());
+        if (usdtAllowance < amountWei) {
+          const approveTx = prepareContractCall({ contract: usdtC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [PANCAKE_ROUTER, amountWei] });
           const approveResult = await sendTx(approveTx);
           await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
         }
-        // else: allowance already enough, skip approve (save gas)
+
+        // Swap USDT → USDC via PancakeSwap V3
+        const router = getContract({ client, chain: BSC_CHAIN, address: PANCAKE_ROUTER });
+        const minOut = amountWei * BigInt(995) / BigInt(1000); // 0.5% slippage
+        const swapTx = prepareContractCall({
+          contract: router,
+          method: "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut)",
+          params: [{ tokenIn: USDT_ADDRESS, tokenOut: USDC_ADDRESS, fee: 100, recipient: account.address, amountIn: amountWei, amountOutMinimum: minOut, sqrtPriceLimitX96: BigInt(0) }],
+          gas: BigInt(300000),
+        });
+        const swapResult = await sendTx(swapTx);
+        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: swapResult.transactionHash });
+
+        // Re-read USDC balance after swap
+        usdcBalance = BigInt((await rc({ contract: usdcC, method: "function balanceOf(address) view returns (uint256)", params: [account.address] })).toString());
+        depositAmountWei = usdcBalance < amountWei ? usdcBalance : amountWei; // use swapped amount
+      }
+
+      // ═══ Step 2: Approve USDC to Vault ═══
+      try {
+        const currentAllowance = BigInt((await rc({ contract: usdcC, method: "function allowance(address,address) view returns (uint256)", params: [account.address, VAULT_V3_ADDRESS] })).toString());
+        if (currentAllowance < depositAmountWei) {
+          const approveTx = prepareContractCall({ contract: usdcC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [VAULT_V3_ADDRESS, depositAmountWei] });
+          const approveResult = await sendTx(approveTx);
+          await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+        }
       } catch (approveErr: any) {
         throw new Error(approveErr?.message || "Approve failed");
       }
 
-      // ═══ Step 2: VaultV4.depositPublic(usdcAmount, planType) ═══
+      // ═══ Step 3: VaultV4.depositPublic(usdcAmount, planType) ═══
       const planTypeMap: Record<number, string> = { 0: "5_DAYS", 1: "45_DAYS", 2: "90_DAYS", 3: "180_DAYS" };
       const depositTx = prepareContractCall({
         contract: vault,
         method: "function depositPublic(uint256 usdcAmount, string planType)",
-        params: [amountWei, planTypeMap[plan.planIndex] || "90_DAYS"],
+        params: [depositAmountWei, planTypeMap[plan.planIndex] || "90_DAYS"],
         gas: BigInt(500000),
       });
       const depositResult = await sendTx(depositTx);
