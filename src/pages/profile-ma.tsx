@@ -268,15 +268,51 @@ function MASwap() {
   const fee = inputAmount * maPrice * 0.003;
   const isBusy = swapStatus === "transferring" || swapStatus === "recording";
 
-  // Swap history
+  // V4: History = MA_CLAIM transactions + release_schedules
   const { data: swapHistory } = useQuery({
     queryKey: ["ma-swap-history", account?.address],
     queryFn: async () => {
       if (!account?.address) return [];
-      const { data } = await import("@/lib/supabase").then(m =>
-        m.supabase.from("ma_swap_records").select("*").eq("wallet_address", account!.address).order("created_at", { ascending: false }).limit(10)
-      );
-      return data || [];
+      const { data: prof } = await supabase.from("profiles").select("id").ilike("wallet_address", account.address).single();
+      if (!prof) return [];
+
+      // Get claims + schedules
+      const [claims, schedules] = await Promise.all([
+        supabase.from("transactions").select("amount, status, created_at, details").eq("user_id", prof.id).eq("type", "MA_CLAIM").order("created_at", { ascending: false }).limit(20),
+        supabase.from("release_schedules").select("*").eq("user_id", prof.id).order("created_at", { ascending: false }).limit(20),
+      ]);
+
+      // Merge into history format
+      const history: any[] = [];
+      for (const c of (claims.data || [])) {
+        const d = c.details || {};
+        history.push({
+          type: "claim",
+          amount: Number(c.amount),
+          burned: d.burnAmount || 0,
+          released: d.releaseAmount || 0,
+          releaseDays: d.releaseDays || 0,
+          splitRatio: d.splitRatio || "?",
+          status: c.status,
+          created_at: c.created_at,
+        });
+      }
+      for (const s of (schedules.data || [])) {
+        history.push({
+          type: "release_schedule",
+          amount: Number(s.total_amount),
+          burned: Number(s.burn_amount),
+          released: Number(s.released_amount),
+          remaining: Number(s.remaining_amount),
+          daysReleased: s.days_released,
+          daysTotal: s.days_total,
+          dailyAmount: Number(s.daily_amount),
+          splitRatio: s.split_ratio,
+          status: s.status,
+          created_at: s.created_at,
+        });
+      }
+      return history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     },
     enabled: !!account?.address,
   });
