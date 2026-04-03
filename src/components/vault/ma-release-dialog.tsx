@@ -117,46 +117,27 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
   const onChainAccumulated = Number(accumulatedRaw || BigInt(0)) / 1e18;
   const totalClaimable = Number(totalClaimableRaw || BigInt(0)) / 1e18;
 
-  // Read settled yield from vault_rewards + broker commissions (already in MA)
+  // V4: Read all earnings from DB (vault + node + broker - claimed)
   const { data: dbTotalMA = 0 } = useQuery({
     queryKey: ["release-db-total-ma", account?.address],
     queryFn: async () => {
       if (!account?.address) return 0;
-      const { data: profile } = await supabase.from("profiles").select("id, referral_earnings").eq("wallet_address", account.address).single();
+      const { data: profile } = await supabase.from("profiles").select("id").ilike("wallet_address", account.address).single();
       if (!profile) return 0;
 
-      // 1. Vault yield from vault_rewards (settled, in MA)
-      const { data: rewards } = await supabase
-        .from("vault_rewards")
-        .select("ar_amount, vault_positions!inner(plan_type, bonus_yield_locked)")
-        .eq("user_id", profile.id)
-        .eq("reward_type", "DAILY_YIELD");
-      let vaultMA = 0;
-      for (const r of (rewards || [])) {
-        const vp = (r as any).vault_positions;
-        if (vp?.plan_type === "BONUS_5D" && vp?.bonus_yield_locked) continue;
-        vaultMA += Number(r.ar_amount || 0);
-      }
+      const [vr, nr, br, cl] = await Promise.all([
+        supabase.from("vault_rewards").select("ar_amount").eq("user_id", profile.id),
+        supabase.from("node_rewards").select("amount").eq("user_id", profile.id),
+        supabase.from("broker_rewards").select("amount").eq("user_id", profile.id),
+        supabase.from("transactions").select("amount").eq("user_id", profile.id).in("type", ["MA_CLAIM", "YIELD_CLAIM"]),
+      ]);
 
-      // 2. Broker commissions (already in MA from settle_team_commission)
-      const brokerMA = Number(profile.referral_earnings || 0);
+      const vaultMA = (vr.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || 0), 0);
+      const nodeMA = (nr.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+      const brokerMA = (br.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+      const claimed = (cl.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
 
-      // 3. Node earnings (available_balance from node_memberships, already in MA)
-      let nodeMA = 0;
-      try {
-        const nodeOverview = await getNodeOverview(account.address);
-        nodeMA = Number(nodeOverview?.availableBalance || 0);
-      } catch { /* no node = 0 */ }
-
-      // 4. Subtract already claimed
-      const { data: claimedTxs } = await supabase
-        .from("transactions")
-        .select("amount")
-        .eq("user_id", profile.id)
-        .eq("type", "YIELD_CLAIM");
-      const alreadyClaimed = (claimedTxs || []).reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-
-      return Math.max(0, vaultMA + brokerMA + nodeMA - alreadyClaimed);
+      return Math.max(0, vaultMA + nodeMA + brokerMA - claimed);
     },
     enabled: !!account?.address,
   });
