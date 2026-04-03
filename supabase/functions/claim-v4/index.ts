@@ -72,17 +72,20 @@ serve(async (req) => {
     const isInstant = ratio.releaseDays === 0;
     const endDate = isInstant ? now : new Date(now.getTime() + ratio.releaseDays * 86400000);
 
+    // Linear: 当天释放第一笔, Instant: 全部释放
+    const firstRelease = isInstant ? releaseAmount : dailyRelease;
+    const afterFirstRemaining = isInstant ? 0 : releaseAmount - dailyRelease;
+
     await supabase.from("release_schedules").insert({
       user_id: profile.id,
       wallet_address: walletAddress,
       total_amount: releaseAmount,
       daily_amount: dailyRelease,
-      // Instant: fully released immediately; Linear: starts at 0
-      released_amount: isInstant ? releaseAmount : 0,
-      remaining_amount: isInstant ? 0 : releaseAmount,
+      released_amount: firstRelease,        // 第一笔当天到待释放余额
+      remaining_amount: afterFirstRemaining, // 提现金额 = 剩余线性释放
       claimed_amount: 0,
       days_total: isInstant ? 0 : ratio.releaseDays,
-      days_released: isInstant ? 0 : 0,
+      days_released: isInstant ? 0 : 1,     // 已释放1天
       split_ratio: splitRatio,
       burn_amount: burnAmount,
       start_date: now.toISOString(),
@@ -115,9 +118,10 @@ serve(async (req) => {
       released: releaseAmount,
       releaseDays: ratio.releaseDays,
       dailyRelease,
+      firstRelease: isInstant ? releaseAmount : dailyRelease,
       note: isInstant
-        ? `${releaseAmount.toFixed(2)} MA 即时待释放，点击一键释放领取`
-        : `${releaseAmount.toFixed(2)} MA 将在 ${ratio.releaseDays} 天内释放 (${dailyRelease.toFixed(4)} MA/天)`,
+        ? `${releaseAmount.toFixed(2)} MA 即时待释放，点击释放领取`
+        : `首日释放 ${dailyRelease.toFixed(4)} MA，剩余 ${afterFirstRemaining.toFixed(2)} MA 在 ${ratio.releaseDays - 1} 天内释放`,
     });
 
   } catch (e: unknown) {
