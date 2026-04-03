@@ -12,6 +12,7 @@ import { useMaPrice } from "@/hooks/use-ma-price";
 import { useToast } from "@/hooks/use-toast";
 import { NodePurchaseDialog } from "@/components/nodes/node-purchase-section";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabase";
 
 type TabKey = "purchase" | "earnings";
 
@@ -101,7 +102,19 @@ export default function ProfileNodesPage() {
 
   const nodes = overview?.nodes ?? [];
   const activeNodes = nodes.filter((n) => n.status === "ACTIVE" || n.status === "PENDING_MILESTONES");
-  const hasAnyNode = activeNodes.length > 0;
+
+  // Check node_type from profile (reliable, doesn't depend on overview RPC)
+  const { data: profileData } = useQuery({
+    queryKey: ["profile-node-check", walletAddr],
+    queryFn: async () => {
+      if (!walletAddr) return null;
+      const { data } = await supabase.from("profiles").select("node_type").ilike("wallet_address", walletAddr).single();
+      return data;
+    },
+    enabled: isConnected,
+  });
+  const profileNodeType = profileData?.node_type || "NONE";
+  const hasAnyNode = profileNodeType !== "NONE" || activeNodes.length > 0;
   const hasMAX = hasAnyNode;
   const hasMINI = hasAnyNode;
   const activeCount = activeNodes.length;
