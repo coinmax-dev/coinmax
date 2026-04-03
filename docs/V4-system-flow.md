@@ -384,17 +384,18 @@ MA 销毁 → 流通量减少 → 背书价上升 → 价格支撑
 
 ## 十、权限矩阵
 
-| 合约 | 角色 | 持有者 |
-|------|------|--------|
-| CUSD | MINTER_ROLE | VaultV4 |
-| MAToken | MINTER_ROLE | VaultV4, FlashSwapV4, ReleaseV4 |
-| VaultV4 | ENGINE_ROLE | Engine (0xDd66) |
-| VaultV4 | DEFAULT_ADMIN | Deployer |
-| FlashSwapV4 | ENGINE_ROLE | Engine (0xDd66) |
-| ReleaseV4 | ENGINE_ROLE | Engine (0xDd66), VaultV4 |
-| Oracle | FEEDER_ROLE | Engine (0xDd66), Deployer |
+| 合约 | 角色 | 持有者 | 说明 |
+|------|------|--------|------|
+| CUSD | MINTER_ROLE | VaultV4, Engine | Vault铸造质押cUSD, Engine铸造利息cUSD |
+| MAToken | MINTER_ROLE | Engine, FlashSwapV4, ReleaseV4 | Engine铸造MA, Flash/Release销毁MA |
+| VaultV4 | ENGINE_ROLE | Engine (0xDd66) | 只管cUSD质押, 不碰MA |
+| VaultV4 | DEFAULT_ADMIN | Deployer | |
+| FlashSwapV4 | ENGINE_ROLE | Engine (0xDd66) | |
+| ReleaseV4 | ENGINE_ROLE | Engine (0xDd66) | |
+| Oracle | FEEDER_ROLE | Engine (0xDd66), Deployer | |
 
-**用户不直接调任何合约。所有铸造/结算操作通过 Engine。**
+**核心分离：VaultV4 只管 cUSD 质押。MA 铸造/锁仓/释放/销毁全在 Engine + Release + FlashSwap。**
+**用户不直接调任何合约。所有操作通过 Engine。**
 
 ---
 
