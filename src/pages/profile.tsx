@@ -106,6 +106,11 @@ export default function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: ["release-balances", walletAddr] });
       queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
       queryClient.invalidateQueries({ queryKey: ["transactions", walletAddr] });
+      queryClient.invalidateQueries({ queryKey: ["v4-all-earnings", walletAddr] });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["release-balances", walletAddr] });
+        queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
+      }, 2000);
     },
     onError: (err: Error) => {
       toast({ title: t("profile.releaseFailed", "释放失败"), description: err.message, variant: "destructive" });
@@ -131,6 +136,12 @@ export default function ProfilePage() {
       });
       queryClient.invalidateQueries({ queryKey: ["v4-all-earnings", walletAddr] });
       queryClient.invalidateQueries({ queryKey: ["release-balances", walletAddr] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", walletAddr] });
+      // 延迟再刷新一次确保数据更新
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["v4-all-earnings", walletAddr] });
+        queryClient.invalidateQueries({ queryKey: ["release-balances", walletAddr] });
+      }, 2000);
       setWithdrawOpen(false);
       setWithdrawAmount("");
     } catch (e: any) {
