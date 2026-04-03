@@ -215,24 +215,24 @@ export default function ProfilePage() {
   const availableEarnings = Math.max(0, totalEarnings - claimedYield);
 
   // Release balances from DB
-  const { data: releaseBalances = { withdrawnAmount: 0, claimable: 0 } } = useQuery({
+  const { data: releaseBalances = { withdrawnAmount: 0, claimable: 0, totalWithdrawn: 0, totalReleased: 0 } } = useQuery({
     queryKey: ["release-balances", walletAddr],
     queryFn: async () => {
-      if (!walletAddr) return { withdrawnAmount: 0, claimable: 0 };
+      if (!walletAddr) return { withdrawnAmount: 0, claimable: 0, totalWithdrawn: 0, totalReleased: 0 };
       const { data: prof } = await supabase.from("profiles").select("id").ilike("wallet_address", walletAddr).single();
-      if (!prof) return { withdrawnAmount: 0, claimable: 0 };
+      if (!prof) return { withdrawnAmount: 0, claimable: 0, totalWithdrawn: 0, totalReleased: 0 };
       const { data: schedules } = await supabase
         .from("release_schedules")
-        .select("remaining_amount, released_amount, claimed_amount")
+        .select("total_amount, burn_amount, remaining_amount, released_amount, claimed_amount")
         .eq("user_id", prof.id);
-      let remaining = 0, claimable = 0;
+      let remaining = 0, claimable = 0, totalWithdrawn = 0, totalReleased = 0;
       for (const s of (schedules || [])) {
         remaining += Number(s.remaining_amount || 0);
         claimable += Math.max(0, Number(s.released_amount || 0) - Number(s.claimed_amount || 0));
+        totalWithdrawn += Number(s.total_amount || 0) + Number(s.burn_amount || 0); // 总提现 = release + burn
+        totalReleased += Number(s.claimed_amount || 0); // 总释放 = 已到钱包的
       }
-      // 提现金额 = remaining (还在线性释放中的)
-      // 待释放余额 = claimable (已释放可领取的)
-      return { withdrawnAmount: remaining, claimable };
+      return { withdrawnAmount: remaining, claimable, totalWithdrawn, totalReleased };
     },
     enabled: !!walletAddr,
     refetchInterval: 15000,
@@ -242,6 +242,9 @@ export default function ProfilePage() {
   const withdrawnInProgress = releaseBalances.withdrawnAmount;
   // 待释放余额 (线性释放出来的 - 已转钱包, 每日递增, 可一键释放)
   const claimableMA = releaseBalances.claimable;
+  // 总提现 / 总释放
+  const totalWithdrawnMA = releaseBalances.totalWithdrawn;
+  const totalReleasedMA = releaseBalances.totalReleased;
 
   // 锁仓MA = 金库本金 ÷ MA价格 (赎回后转入可提收益)
   const lockedMA = maPrice > 0 ? personalHolding / maPrice : 0;
@@ -370,6 +373,12 @@ export default function ProfilePage() {
                   <Skeleton className="h-9 w-28" />
                 ) : (
                   <div className="text-[28px] font-black text-white leading-tight" data-testid="text-net-assets">{formatMA(totalAssetMA)}</div>
+                )}
+                {isConnected && (totalWithdrawnMA > 0 || totalReleasedMA > 0) && (
+                  <div className="flex gap-4 mt-1">
+                    <div className="text-[10px] text-white/30">{t("profile.totalWithdrawn", "总提现")} <span className="text-white/50 font-mono">{totalWithdrawnMA.toFixed(2)}</span></div>
+                    <div className="text-[10px] text-white/30">{t("profile.totalReleased", "总释放")} <span className="text-primary/60 font-mono">{totalReleasedMA.toFixed(2)}</span></div>
+                  </div>
                 )}
               </div>
               <div
