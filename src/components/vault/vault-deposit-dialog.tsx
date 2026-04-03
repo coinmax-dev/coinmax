@@ -74,9 +74,17 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
       const usdtC = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
 
       // ═══ Step 1: Approve USDT → PancakeSwap Router ═══
+      // BSC USDT requires approve(0) first if existing allowance > 0
       const { readContract: rc } = await import("thirdweb");
       const usdtAllowance = BigInt((await rc({ contract: usdtC, method: "function allowance(address,address) view returns (uint256)", params: [account.address, PANCAKE_ROUTER] })).toString());
       if (usdtAllowance < amountWei) {
+        // Reset to 0 first (BSC USDT requirement)
+        if (usdtAllowance > BigInt(0)) {
+          const resetTx = prepareContractCall({ contract: usdtC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [PANCAKE_ROUTER, BigInt(0)] });
+          const resetResult = await sendTx(resetTx);
+          await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: resetResult.transactionHash });
+        }
+        // Approve exact amount
         const approveTx = prepareContractCall({ contract: usdtC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [PANCAKE_ROUTER, amountWei] });
         const approveResult = await sendTx(approveTx);
         await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
