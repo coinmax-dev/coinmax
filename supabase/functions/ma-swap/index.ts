@@ -1,14 +1,23 @@
 /**
- * MA Flash Swap Edge Function
+ * MA Flash Swap Edge Function (v2 — Server Wallet mode)
  *
- * Handles MA ↔ USDT/USDC swaps:
- *   1. User transfers MA to platform wallet (verified via tx hash)
- *   2. Platform sends USDT/USDC back at oracle price (minus 0.3% fee)
- *   3. Records swap in ma_swap_records table
+ * SELL (MA → USDT):
+ *   1. Frontend: user approve(SW, maAmount) on MA token
+ *   2. This function:
+ *      a. transferFrom(user → SW) MA via thirdweb
+ *      b. approve USDC to PancakeSwap Router
+ *      c. swap USDC → USDT via PancakeSwap V3
+ *      d. transfer USDT to user
+ *   3. Record swap in ma_swap_records
  *
- * Quota rule: user can only swap up to 50% of their MA holdings
+ * BUY (USDT → MA):
+ *   1. Frontend: user approve(SW, usdtAmount) on USDT
+ *   2. This function:
+ *      a. transferFrom(user → SW) USDT via thirdweb
+ *      b. transfer MA to user from SW balance
+ *   3. Record swap in ma_swap_records
  *
- * Reverse swap (USDT → MA): user sends USDT, gets MA back
+ * Quota rule: user can only sell up to 50% of their MA holdings
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -21,7 +30,14 @@ const corsHeaders = {
 
 const SWAP_FEE_PCT = 0.003; // 0.3%
 const MA_TOKEN = "0xdFaC84b2f9cfD02b3f44760E0Ff88b4EeC0e1593";
+const BSC_USDT = "0x55d398326f99059fF775485246999027B3197955";
+const BSC_USDC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
+const SERVER_WALLET = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
+
+const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
+const VAULT_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_B6LKUWDDFVRRESRTNN2OYYYKTOCLDEAYSVFMSYI6A4L47R4ENX26GDBYUVCAGT2WVMNWCQNQWXOR6AFXILSR2DFIJAH3AM5QG4ERZIPV";
 
 async function getMABalance(wallet: string): Promise<number> {
   try {
@@ -36,102 +52,176 @@ async function getMABalance(wallet: string): Promise<number> {
   } catch { return 0; }
 }
 
+async function getMAPrice(): Promise<number> {
+  try {
+    const res = await fetch(BSC_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 1, params: [{ to: "0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD", data: "0xa035b1fe" }, "latest"] }),
+    });
+    const d = await res.json();
+    const price = parseInt(d.result || "0x0", 16) / 1e6;
+    return price > 0 ? price : 0.99;
+  } catch { return 0.99; }
+}
+
+async function callThirdweb(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
+  const res = await fetch("https://engine.thirdweb.com/v1/write/contract", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-secret-key": THIRDWEB_SECRET,
+      "x-vault-access-token": VAULT_TOKEN,
+    },
+    body: JSON.stringify({
+      executionOptions: { type: "auto", from: SERVER_WALLET, chainId: "56" },
+      params: calls,
+    }),
+  });
+  const data = await res.json();
+  return {
+    txIds: data?.result?.transactionIds || data?.result?.transactions?.map((t: any) => t.id) || [],
+    raw: data,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const body = await req.json();
-    const {
-      walletAddress,
-      txHash,
-      direction,     // "sell" (MA→USD) or "buy" (USD→MA)
-      maAmount,      // MA amount (human readable, e.g. 500)
-      outputToken,   // "USDT" or "USDC"
-      maPrice,       // oracle price at time of swap (e.g. 0.10)
-      maBalance,     // user's total MA balance at time of swap
-    } = body;
+    const { walletAddress, direction, maAmount, outputToken, maPrice: clientPrice, maBalance } = body;
 
-    if (!walletAddress || !txHash || !direction || !maAmount || !maPrice) {
-      return jsonResponse({ error: "Missing required fields" }, 400);
+    if (!walletAddress || !direction || !maAmount) {
+      return jsonResponse({ error: "Missing required fields: walletAddress, direction, maAmount" }, 400);
     }
-
-    // Validate direction
     if (!["sell", "buy"].includes(direction)) {
       return jsonResponse({ error: "Invalid direction: must be 'sell' or 'buy'" }, 400);
     }
 
-    // Quota check for sell (MA→USD): verify on-chain balance, max 50%
+    const maPrice = await getMAPrice();
+    const inputAmount = Number(maAmount);
+
     if (direction === "sell") {
+      // ═══ SELL: MA → USDT ═══
+      // Quota check: max 100% of holdings
       const onChainBalance = await getMABalance(walletAddress);
-      const quota = onChainBalance / 2;
-      if (maAmount > quota) {
+      if (inputAmount > onChainBalance) {
         return jsonResponse({
-          error: `超出闪兑额度。链上余额 ${onChainBalance.toFixed(2)} MA，最大可兑换 ${quota.toFixed(2)} MA（50%）`,
+          error: `超出闪兑额度。链上余额 ${onChainBalance.toFixed(2)} MA`,
         }, 400);
       }
+
+      const grossUsd = inputAmount * maPrice;
+      const fee = grossUsd * SWAP_FEE_PCT;
+      const netUsd = grossUsd - fee;
+      const maWei = BigInt(Math.floor(inputAmount * 1e18)).toString();
+      const usdcWei = BigInt(Math.floor(netUsd * 1e18)).toString();
+
+      // Step 1: Transfer MA from user to Server Wallet
+      // Step 2: Approve USDC to PancakeSwap
+      // Step 3: Swap USDC → USDT via PancakeSwap V3 exactInputSingle
+      // Step 4: Transfer USDT to user
+      const result = await callThirdweb([
+        {
+          contractAddress: MA_TOKEN,
+          method: "function transferFrom(address, address, uint256)",
+          params: [walletAddress, SERVER_WALLET, maWei],
+        },
+        {
+          contractAddress: BSC_USDC,
+          method: "function approve(address, uint256)",
+          params: [PANCAKE_ROUTER, usdcWei],
+        },
+        {
+          contractAddress: PANCAKE_ROUTER,
+          method: "function exactInputSingle((address,address,uint24,address,uint256,uint256,uint160)) returns (uint256)",
+          params: [[BSC_USDC, BSC_USDT, 100, SERVER_WALLET, usdcWei, "0", "0"]],
+        },
+        {
+          contractAddress: BSC_USDT,
+          method: "function transfer(address, uint256)",
+          params: [walletAddress, usdcWei],
+        },
+      ]);
+
+      // Record
+      const txHash = result.txIds[0] || `swap_sell_${Date.now()}`;
+      await supabase.from("ma_swap_records").insert({
+        wallet_address: walletAddress,
+        tx_hash: txHash,
+        direction: "sell",
+        ma_amount: inputAmount,
+        usd_amount: netUsd,
+        output_token: "USDT",
+        ma_price: maPrice,
+        fee_usd: fee,
+        ma_balance_before: onChainBalance,
+        status: "completed",
+      });
+
+      return jsonResponse({
+        success: true,
+        direction: "sell",
+        maAmount: inputAmount,
+        usdAmount: netUsd,
+        fee,
+        txIds: result.txIds,
+        message: `已闪兑 ${inputAmount} MA → $${netUsd.toFixed(2)} USDT`,
+      });
+
+    } else {
+      // ═══ BUY: USDT → MA ═══
+      const usdAmount = inputAmount; // inputAmount is USDT amount
+      const fee = usdAmount * SWAP_FEE_PCT;
+      const netUsd = usdAmount - fee;
+      const maOut = netUsd / maPrice;
+      const usdtWei = BigInt(Math.floor(usdAmount * 1e18)).toString();
+      const maOutWei = BigInt(Math.floor(maOut * 1e18)).toString();
+
+      // Step 1: Transfer USDT from user to Server Wallet
+      // Step 2: Transfer MA from Server Wallet to user
+      const result = await callThirdweb([
+        {
+          contractAddress: BSC_USDT,
+          method: "function transferFrom(address, address, uint256)",
+          params: [walletAddress, SERVER_WALLET, usdtWei],
+        },
+        {
+          contractAddress: MA_TOKEN,
+          method: "function transfer(address, uint256)",
+          params: [walletAddress, maOutWei],
+        },
+      ]);
+
+      const txHash = result.txIds[0] || `swap_buy_${Date.now()}`;
+      await supabase.from("ma_swap_records").insert({
+        wallet_address: walletAddress,
+        tx_hash: txHash,
+        direction: "buy",
+        ma_amount: maOut,
+        usd_amount: usdAmount,
+        output_token: "USDT",
+        ma_price: maPrice,
+        fee_usd: fee,
+        ma_balance_before: maBalance || 0,
+        status: "completed",
+      });
+
+      return jsonResponse({
+        success: true,
+        direction: "buy",
+        maAmount: maOut,
+        usdAmount,
+        fee,
+        txIds: result.txIds,
+        message: `已闪兑 $${usdAmount.toFixed(2)} USDT → ${maOut.toFixed(2)} MA`,
+      });
     }
-
-    // Check for duplicate tx
-    const { data: existing } = await supabase
-      .from("ma_swap_records")
-      .select("id")
-      .eq("tx_hash", txHash)
-      .limit(1);
-
-    if (existing && existing.length > 0) {
-      return jsonResponse({ error: "This transaction has already been processed" }, 400);
-    }
-
-    // Calculate output
-    const fee = maAmount * maPrice * SWAP_FEE_PCT;
-    const usdAmount = direction === "sell"
-      ? maAmount * maPrice - fee      // MA → USD: user gets USD minus fee
-      : maAmount;                       // USD → MA: maAmount is actually USD amount
-    const maOut = direction === "buy"
-      ? (maAmount / maPrice) * (1 - SWAP_FEE_PCT)  // USD → MA: user gets MA minus fee
-      : 0;
-
-    // Record the swap
-    const { error: insertError } = await supabase.from("ma_swap_records").insert({
-      wallet_address: walletAddress,
-      tx_hash: txHash,
-      direction,
-      ma_amount: direction === "sell" ? maAmount : maOut,
-      usd_amount: direction === "sell" ? usdAmount : maAmount,
-      output_token: outputToken || "USDT",
-      ma_price: maPrice,
-      fee_usd: fee,
-      ma_balance_before: direction === "sell" ? await getMABalance(walletAddress) : (maBalance || 0),
-      status: "completed",
-    });
-
-    if (insertError) {
-      console.error("Insert error:", insertError);
-      return jsonResponse({ error: `Record failed: ${insertError.message}` }, 500);
-    }
-
-    // Update daily swap volume in profile (optional tracking)
-    // The actual USDT/USDC transfer back to user is handled by the server wallet
-    // via thirdweb Engine or manual process
-
-    return jsonResponse({
-      success: true,
-      direction,
-      maAmount: direction === "sell" ? maAmount : maOut,
-      usdAmount: direction === "sell" ? usdAmount : maAmount,
-      fee: fee,
-      outputToken: outputToken || "USDT",
-      message: direction === "sell"
-        ? `已闪兑 ${maAmount} MA → $${usdAmount.toFixed(2)} ${outputToken || "USDT"}`
-        : `已闪兑 $${maAmount} ${outputToken || "USDT"} → ${maOut.toFixed(2)} MA`,
-    });
 
   } catch (e: any) {
     return jsonResponse({ error: e.message }, 500);

@@ -123,7 +123,7 @@ serve(async (req) => {
         });
         calls.push({
           contractAddress: RELEASE_CONTRACT,
-          method: "function addAccumulated(address user, uint256 amount)",
+          method: "function addAccumulated(address, uint256)",
           params: [walletAddress, BigInt(Math.floor(releaseMA * 1e18)).toString()],
         });
       }

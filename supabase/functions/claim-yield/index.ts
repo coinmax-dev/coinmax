@@ -163,7 +163,7 @@ serve(async (req) => {
         // Call addAccumulated on Release contract
         {
           contractAddress: RELEASE_CONTRACT,
-          method: "function addAccumulated(address user, uint256 amount)",
+          method: "function addAccumulated(address, uint256)",
           params: [walletAddress, claimWei],
         },
       ];

@@ -96,12 +96,10 @@ serve(async (req) => {
     const { walletAddress } = body;
 
     // ──────────────────────────────────────────
-    // Step 1: Run DB settlement (node fixed yield)
+    // Step 1: DB settlement already done by run_daily_settlement() cron
+    //         (settle_node_fixed_yield has idempotency guard, safe to skip)
     // ──────────────────────────────────────────
-    const { data: settleResult, error: settleErr } = await supabase.rpc("settle_node_fixed_yield");
-    if (settleErr) {
-      console.error("settle_node_fixed_yield error:", settleErr);
-    }
+    const settleResult = { skipped: true, reason: "handled_by_daily_settlement_cron" };
 
     // ──────────────────────────────────────────
     // Step 2: Run activation + qualification checks
@@ -153,7 +151,7 @@ serve(async (req) => {
         });
         yieldCalls.push({
           contractAddress: RELEASE_CONTRACT,
-          method: "function addAccumulated(address user, uint256 amount)",
+          method: "function addAccumulated(address, uint256)",
           params: [addr, maWei],
         });
       }
@@ -193,7 +191,7 @@ serve(async (req) => {
         });
         brokerCalls.push({
           contractAddress: RELEASE_CONTRACT,
-          method: "function addAccumulated(address user, uint256 amount)",
+          method: "function addAccumulated(address, uint256)",
           params: [addr, maWei],
         });
       }
@@ -304,7 +302,7 @@ serve(async (req) => {
           });
           calls.push({
             contractAddress: RELEASE_CONTRACT,
-            method: "function addAccumulated(address user, uint256 amount)",
+            method: "function addAccumulated(address, uint256)",
             params: [entry.walletAddress, maWei],
           });
         }
@@ -317,7 +315,9 @@ serve(async (req) => {
 
       if (calls.length > 0) {
         const result = await callThirdweb(calls);
-        const txIds = result?.result?.transactionIds || [];
+        const txIds = result?.result?.transactionIds
+          || result?.result?.transactions?.map((t: any) => t.id)
+          || [];
         allTxIds.push(...txIds);
 
         if (result?.error) {

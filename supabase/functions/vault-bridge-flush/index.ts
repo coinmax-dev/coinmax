@@ -4,11 +4,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 /**
  * Vault Bridge + Flush — Full automated cycle (pg_cron every 10 min)
  *
- * 1. Check Server Wallet USDT balance on BSC
- * 2. Transfer USDT: Server Wallet → BatchBridge (thirdweb write)
- * 3. Call swapAndBridge() on BatchBridge (Server Wallet = keeper)
+ * Current flow: Vault deposits go directly to BatchBridge (fundDistributor = BB)
+ *
+ * 1. Check BatchBridge USDT balance on BSC
+ * 2. If Server Wallet has leftover USDT, transfer to BB first
+ * 3. Server Wallet calls swapAndBridge() on BB (keeper role)
  * 4. Wait ~120s for Stargate
- * 5. Call flushAll() on ARB FundRouter (Server Wallet = operator)
+ * 5. Server Wallet calls flushAll() on ARB FundRouter (OPERATOR_ROLE)
  */
 
 const corsHeaders = {
@@ -17,7 +19,7 @@ const corsHeaders = {
 };
 
 const SERVER_WALLET   = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
-const BATCH_BRIDGE    = Deno.env.get("BATCH_BRIDGE_ADDRESS") || "0x96dBfe3aAa877A4f9fB41d592f1D990368a4B2C1";
+const BATCH_BRIDGE    = Deno.env.get("BATCH_BRIDGE_ADDRESS") || "0xAa80a499B8738E3Fd7779057F7E3a7D73c045c4D";
 const ARB_FUND_ROUTER = "0x71237E535d5E00CDf18A609eA003525baEae3489";
 const BSC_USDT        = "0x55d398326f99059fF775485246999027B3197955";
 const ARB_USDC        = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
@@ -32,87 +34,91 @@ serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
-    // ── 1. Check Server Wallet USDT on BSC ──
-    const swBalance = await erc20Balance("https://bsc-dataseed1.binance.org", BSC_USDT, SERVER_WALLET, 18);
+    // ── 1. Check balances ──
     const bbBalance = await erc20Balance("https://bsc-dataseed1.binance.org", BSC_USDT, BATCH_BRIDGE, 18);
+    const swBalance = await erc20Balance("https://bsc-dataseed1.binance.org", BSC_USDT, SERVER_WALLET, 18);
 
-    if (swBalance < MIN_BRIDGE && bbBalance < MIN_BRIDGE) {
-      return json({ status: "skipped", swBalance, bbBalance, reason: "below minimum" });
+    const totalAvailable = bbBalance + swBalance;
+    if (totalAvailable < MIN_BRIDGE) {
+      return json({ status: "skipped", bbBalance, swBalance, reason: `$${totalAvailable.toFixed(0)} < min $${MIN_BRIDGE}` });
     }
 
     let transferTx: string | null = null;
 
-    // ── 2. Transfer SW → BatchBridge (if SW has funds) ──
-    if (swBalance >= MIN_BRIDGE) {
+    // ── 2. If SW has leftover USDT, move to BB first ──
+    if (swBalance >= 10) {
       const amountWei = BigInt(Math.floor(swBalance * 1e18)).toString();
-      transferTx = await tw(56, [{
+      const r = await tw(56, [{
         contractAddress: BSC_USDT,
         method: "function transfer(address to, uint256 amount) returns (bool)",
         params: [BATCH_BRIDGE, amountWei],
       }]);
-
-      if (!transferTx) {
-        await log(supabase, "TRANSFER_FAILED", swBalance);
-        return json({ status: "TRANSFER_FAILED", swBalance }, 500);
-      }
-
-      // Wait for transfer confirmation
-      await sleep(15_000);
+      transferTx = r.txId;
+      if (transferTx) await sleep(15_000);
     }
 
-    // ── 3. Call swapAndBridge() on BatchBridge ──
-    const bridgeTx = await tw(56, [{
+    // ── 3. swapAndBridge (Server Wallet = keeper) ──
+    if (bbBalance < MIN_BRIDGE && !transferTx) {
+      return json({ status: "skipped", bbBalance, swBalance, reason: "BB below min, no SW transfer" });
+    }
+
+    const bridgeResult = await tw(56, [{
       contractAddress: BATCH_BRIDGE,
       method: "function swapAndBridge()",
       params: [],
     }]);
 
-    if (!bridgeTx) {
-      await log(supabase, "BRIDGE_FAILED", swBalance + bbBalance, transferTx);
-      return json({ status: "BRIDGE_FAILED", swBalance, bbBalance, transferTx }, 500);
+    if (!bridgeResult.txId) {
+      await log(supabase, "BRIDGE_FAILED", totalAvailable, null, null, { error: bridgeResult.raw });
+      return json({ status: "BRIDGE_FAILED", bbBalance, swBalance, error: bridgeResult.raw }, 500);
     }
 
     // ── 4. Wait for Stargate (~120s) ──
     await sleep(120_000);
 
-    // ── 5. Check ARB FundRouter + flushAll ──
+    // ── 5. ARB flushAll ──
     const arbBal = await erc20Balance("https://arb1.arbitrum.io/rpc", ARB_USDC, ARB_FUND_ROUTER, 6);
     let flushTx: string | null = null;
     let status = "BRIDGED";
 
     if (arbBal > 1) {
-      flushTx = await tw(42161, [{
+      const flushResult = await tw(42161, [{
         contractAddress: ARB_FUND_ROUTER,
         method: "function flushAll()",
         params: [],
       }]);
+      flushTx = flushResult.txId;
       status = flushTx ? "FLUSHED" : "FLUSH_FAILED";
     } else {
       status = "BRIDGE_PENDING";
     }
 
-    await log(supabase, status, swBalance + bbBalance, bridgeTx, flushTx, { arbBal });
-
-    return json({ status, bridged: swBalance + bbBalance, transferTx, bridgeTx, flushTx, arbBal });
+    await log(supabase, status, totalAvailable, bridgeResult.txId, flushTx, { arbBal, transferTx });
+    return json({ status, bridged: totalAvailable, bridgeTx: bridgeResult.txId, flushTx, arbBal });
 
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
 });
 
-// ── thirdweb write via Server Wallet ──
-async function tw(chainId: number, calls: { contractAddress: string; method: string; params: unknown[] }[]): Promise<string | null> {
-  const res = await fetch("https://api.thirdweb.com/v1/contracts/write", {
+async function tw(chainId: number, calls: { contractAddress: string; method: string; params: unknown[] }[]): Promise<{ txId: string | null; raw: unknown }> {
+  const res = await fetch("https://engine.thirdweb.com/v1/write/contract", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-secret-key": THIRDWEB_SECRET,
       "x-vault-access-token": VAULT_TOKEN,
     },
-    body: JSON.stringify({ chainId, from: SERVER_WALLET, calls }),
+    body: JSON.stringify({
+      executionOptions: { type: "auto", from: SERVER_WALLET, chainId: String(chainId) },
+      params: calls.map(c => ({ contractAddress: c.contractAddress, method: c.method, params: c.params })),
+    }),
   });
   const data = await res.json();
-  return data?.result?.transactionIds?.[0] || null;
+  const txId = data?.result?.transactions?.[0]?.id
+    || data?.result?.transactionIds?.[0]
+    || null;
+  return { txId, raw: data };
 }
 
 async function erc20Balance(rpc: string, token: string, holder: string, decimals: number): Promise<number> {
@@ -136,7 +142,7 @@ async function log(sb: any, status: string, amount: number, bscTx?: string | nul
     initiated_by: "pg_cron",
     bsc_tx: bscTx || null,
     arb_tx: arbTx || null,
-    metadata: { serverWallet: SERVER_WALLET, batchBridge: BATCH_BRIDGE, ...meta },
+    metadata: { batchBridge: BATCH_BRIDGE, ...meta },
   });
 }
 
