@@ -2,10 +2,10 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * V4 FlashSwap — Server USDC → PancakeSwap → USDT 给用户
+ * V4 FlashSwap — 用户 burn MA, Server USDC → PancakeSwap → USDT 给用户
  *
- * 用户不需要链上操作。MA 从钱包余额或释放余额扣除（DB）。
- * Server 钱包用 USDC 通过 PancakeSwap (0x92b7...3121) 换成 USDT 给用户。
+ * 用户链上 burn MA → 本函数只做 Server swap USDC→USDT
+ * 用户看到: burn MA + 收到 PancakeSwap (121) 的 USDT
  */
 
 const corsHeaders = {
@@ -55,7 +55,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { walletAddress, maAmount } = await req.json();
+    const { walletAddress, maAmount, txHash } = await req.json();
     if (!walletAddress || !maAmount) return json({ error: "Missing walletAddress or maAmount" }, 400);
 
     const supabase = createClient(
@@ -66,57 +66,13 @@ serve(async (req) => {
     const amount = Number(maAmount);
     if (amount <= 0) return json({ error: "Invalid amount" }, 400);
 
-    // 1. Validate user
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .ilike("wallet_address", walletAddress)
-      .single();
-    if (!profile) return json({ error: "Profile not found" }, 404);
-
-    // 2. Get MA price
     const maPrice = await getOraclePrice();
     if (maPrice <= 0) return json({ error: "Oracle price unavailable" }, 500);
 
     const usdtAmount = amount * maPrice;
     console.log(`FlashSwap: ${walletAddress} | ${amount} MA × $${maPrice} = $${usdtAmount.toFixed(2)} USDT`);
 
-    // 3. Deduct MA from user's balance (DB — 从释放余额或可提收益扣除)
-    // First try release_schedules (释放余额)
-    const { data: schedules } = await supabase
-      .from("release_schedules")
-      .select("id, released_amount, claimed_amount")
-      .eq("user_id", profile.id);
-
-    let remaining = amount;
-    const deductions: Array<{ id: string; deduct: number }> = [];
-    for (const s of (schedules || [])) {
-      if (remaining <= 0) break;
-      const claimable = Number(s.released_amount || 0) - Number(s.claimed_amount || 0);
-      if (claimable > 0.0001) {
-        const deduct = Math.min(claimable, remaining);
-        deductions.push({ id: s.id, deduct });
-        remaining -= deduct;
-      }
-    }
-
-    if (remaining > 0.01) {
-      return json({ error: `释放余额不足: 需要 ${amount} MA, 可用 ${(amount - remaining).toFixed(2)} MA` }, 400);
-    }
-
-    // Apply deductions
-    for (const d of deductions) {
-      const { data: current } = await supabase
-        .from("release_schedules")
-        .select("claimed_amount")
-        .eq("id", d.id)
-        .single();
-      await supabase.from("release_schedules").update({
-        claimed_amount: Number(current?.claimed_amount || 0) + d.deduct,
-      }).eq("id", d.id);
-    }
-
-    // 4. Server swap USDC → USDT via PancakeSwap to user wallet
+    // Server swap USDC → USDT via PancakeSwap (121 pool) to user wallet
     const amountInStr = BigInt(Math.floor(usdtAmount * 1e18)).toString();
     const minOutStr = BigInt(Math.floor(usdtAmount * 0.995 * 1e18)).toString();
 
@@ -128,28 +84,26 @@ serve(async (req) => {
     const swapTxId = swapResult?.result?.transactions?.[0]?.id || "?";
     console.log("Swap TX:", swapTxId, swapResult?.error?.details?.message || "ok");
 
-    // 5. Record transaction
-    await supabase.from("transactions").insert({
-      user_id: profile.id,
-      type: "FLASH_SWAP",
-      amount: usdtAmount,
-      token: "USDT",
-      status: "CONFIRMED",
-      details: {
-        maAmount: amount,
-        maPrice,
-        usdtAmount,
-        swapTxId,
-      },
-    });
+    // Record transaction
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .ilike("wallet_address", walletAddress)
+      .single();
 
-    return json({
-      status: "ok",
-      maAmount: amount,
-      maPrice,
-      usdtAmount,
-      swapTxId,
-    });
+    if (profile) {
+      await supabase.from("transactions").insert({
+        user_id: profile.id,
+        type: "FLASH_SWAP",
+        amount: usdtAmount,
+        token: "USDT",
+        status: "CONFIRMED",
+        tx_hash: txHash || null,
+        details: { maAmount: amount, maPrice, usdtAmount, swapTxId },
+      });
+    }
+
+    return json({ status: "ok", maAmount: amount, maPrice, usdtAmount, swapTxId });
 
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

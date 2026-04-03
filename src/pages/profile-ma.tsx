@@ -302,7 +302,7 @@ function MASwap() {
 
   const maBalance = Number(maBalanceRaw || BigInt(0)) / 1e18;
 
-  const swapQuota = releaseClaimable > 0 ? releaseClaimable : maBalance; // 释放余额优先
+  const swapQuota = maBalance; // 钱包 MA 余额
   const inputAmount = parseFloat(maAmount) || 0;
   const outputAmount = isSwapped ? inputAmount / maPrice : inputAmount * maPrice;
   const exceedsQuota = !isSwapped && inputAmount > swapQuota;
@@ -368,8 +368,21 @@ function MASwap() {
     try {
       setSwapStatus("transferring");
 
-      // ═══ 闪兑: 纯后端操作 — Server USDC→PancakeSwap→USDT 给用户 ═══
-      // 用户不需要任何链上操作，MA 从释放余额扣除
+      // ═══ 闪兑: 用户 burn 钱包MA → Server USDC→PancakeSwap→USDT 给用户 ═══
+      const maContract = getMATokenContract(client);
+
+      // Step 1: User burns wallet MA
+      const burnTx = prepareContractCall({
+        contract: maContract,
+        method: "function burn(uint256 amount)",
+        params: [amountWei],
+        gas: BigInt(100000),
+      });
+      const burnResult = await sendTransaction(burnTx);
+      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: burnResult.transactionHash });
+      if (receipt.status === "reverted") throw new Error("MA销毁失败");
+
+      // Step 2: Server swap USDC→USDT to user (用户只看到收USDT)
       setSwapStatus("recording");
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const res = await fetch(`${supabaseUrl}/functions/v1/flash-swap-v4`, {
@@ -378,6 +391,7 @@ function MASwap() {
         body: JSON.stringify({
           walletAddress: account.address,
           maAmount: inputAmount,
+          txHash: receipt.transactionHash,
         }),
       });
       const data = await res.json();
