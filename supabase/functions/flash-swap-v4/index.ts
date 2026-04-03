@@ -19,6 +19,7 @@ const corsHeaders = {
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
 const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "";
 const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
+const SERVER_WALLET = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
 const MA_TOKEN = "0xc6d2dbC85DC3091C41692822A128c19F9eAc7988";
 const USDC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
 const USDT = "0x55d398326f99059fF775485246999027B3197955";
@@ -26,7 +27,8 @@ const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
 const ORACLE = "0x35580292fA5c8b7110034EA1a1521952E6F42bbb";
 
-async function engineWriteOne(call: { contractAddress: string; method: string; params: unknown[] }) {
+// Engine wallet: burn MA
+async function engineWrite(from: string, call: { contractAddress: string; method: string; params: unknown[] }) {
   const res = await fetch("https://engine.thirdweb.com/v1/write/contract", {
     method: "POST",
     headers: {
@@ -35,7 +37,7 @@ async function engineWriteOne(call: { contractAddress: string; method: string; p
       "x-vault-access-token": VAULT_ACCESS_TOKEN,
     },
     body: JSON.stringify({
-      executionOptions: { type: "EOA", from: ENGINE_WALLET, chainId: "56" },
+      executionOptions: { type: "EOA", from, chainId: "56" },
       params: [call],
     }),
   });
@@ -83,8 +85,8 @@ serve(async (req) => {
 
     console.log(`FlashSwap: ${walletAddress} | ${amount} MA × $${maPrice} = $${usdtAmount.toFixed(2)} USDT`);
 
-    // Step 1: Engine burns MA (received from user transfer)
-    const burnResult = await engineWriteOne({
+    // Step 1: Engine wallet burns MA (received from user transfer)
+    const burnResult = await engineWrite(ENGINE_WALLET, {
       contractAddress: MA_TOKEN,
       method: "function burn(uint256 amount)",
       params: [maWei],
@@ -94,8 +96,8 @@ serve(async (req) => {
 
     await new Promise(r => setTimeout(r, 3000));
 
-    // Step 2: Approve USDC to PancakeSwap Router
-    const approveResult = await engineWriteOne({
+    // Step 2: Server wallet approves USDC to PancakeSwap Router
+    const approveResult = await engineWrite(SERVER_WALLET, {
       contractAddress: USDC,
       method: "function approve(address spender, uint256 amount) returns (bool)",
       params: [PANCAKE_ROUTER, usdcWei],
@@ -105,16 +107,16 @@ serve(async (req) => {
 
     await new Promise(r => setTimeout(r, 3000));
 
-    // Step 3: Swap USDC → USDT via PancakeSwap, USDT to user wallet
-    const minOut = "0x" + BigInt(Math.floor(usdtAmount * 0.995 * 1e18)).toString(16); // 0.5% slippage
-    const swapResult = await engineWriteOne({
+    // Step 3: Server wallet swaps USDC → USDT via PancakeSwap, USDT to user wallet
+    const minOut = "0x" + BigInt(Math.floor(usdtAmount * 0.995 * 1e18)).toString(16);
+    const swapResult = await engineWrite(SERVER_WALLET, {
       contractAddress: PANCAKE_ROUTER,
       method: "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut)",
       params: [{
         tokenIn: USDC,
         tokenOut: USDT,
-        fee: 100,                   // 0.01% stablecoin fee tier
-        recipient: walletAddress,   // USDT 直接到用户钱包
+        fee: 100,
+        recipient: walletAddress,
         amountIn: usdcWei,
         amountOutMinimum: minOut,
         sqrtPriceLimitX96: "0",
