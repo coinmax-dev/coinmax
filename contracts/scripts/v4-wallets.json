@@ -1,0 +1,49 @@
+{
+  "bsc": {
+    "deployer": "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1",
+    "engine": "0xDd6660E403d0242c1BeE52a4de50484AAF004446",
+    "usdcReceiver": "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff",
+    "contracts": {
+      "cusd": "0x512d6d3C33D4a018e35a7d4c89754e0e3E72fD4B",
+      "maToken": "0xc6d2dbC85DC3091C41692822A128c19F9eAc7988",
+      "oracle": "0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2",
+      "vaultV4": "0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744",
+      "releaseV4": "0x04A210CbdFD3e402EC8d8B2d60f2aA350e65c443",
+      "flashSwapV4": "0xf596f3BEe64C4AB698a8e6A65893cd32457F5Df3"
+    }
+  },
+  "arb": {
+    "tradingWallet": {
+      "address": "0x3869100A4F165aE9C85024A32D90C5D7412D6b9c",
+      "share": 60,
+      "note": "60% Trading+闪兑储备。部分→HL交易，部分留存做闪兑回流(bridge BSC→USDT→FlashSwap)"
+    },
+    "distribution": {
+      "investor": {
+        "address": "0x85c3d07Ee3be12d6502353b4cA52B30cD85Ac5ff",
+        "share": 20,
+        "note": "投资人分配"
+      },
+      "marketing": {
+        "address": "0x1C4D983620B3c8c2f7607c0943f2A5989e655599",
+        "share": 12,
+        "note": "市场推广"
+      },
+      "operations": {
+        "address": "0xDf90770C89732a7eba5B727fCd6a12f827102EE6",
+        "share": 8,
+        "note": "运营开支"
+      }
+    },
+    "hyperliquid": {
+      "depositContract": "0xd6e56265890b76413d1d527eb9b75e334c0c5b42",
+      "note": "HL L1 deposit on ARB — 0x3869 USDC deposit here for trading"
+    }
+  },
+  "flowDescription": {
+    "deposit": "User BSC USDC → VaultV4 → mint cUSD → Receiver(0xe193) → bridge ARB → 分配",
+    "flashSwapRefill": "0x3869 ARB USDC → bridge BSC → Engine(0xDd66) → swap USDT → FlashSwap合约储备",
+    "flashSwap": "User MA → FlashSwap → burn MA → Oracle价格更新 → User gets USDT",
+    "oracleImpact": "MA burned → circulatingSupply下降 → backingPrice上升 → 价格稳定支撑"
+  }
+}

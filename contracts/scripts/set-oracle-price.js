@@ -1,32 +1,18 @@
 const { ethers } = require("hardhat");
+
 async function main() {
-  const oracle = await ethers.getContractAt("MAPriceOracle", "0xff5Ab71939Fa021A7BCa38Db8b3c1672D1B819dD");
-  console.log("Before:", Number(await oracle.getPriceUnsafe()) / 1e6);
+  const oracle = await ethers.getContractAt("src/v4/MAPriceOracle.sol:MAPriceOracle", "0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2");
 
-  // Try emergencySetPrice (bypasses 10% limit)
-  try {
-    const tx = await oracle.emergencySetPrice(900000); // $0.90
-    await tx.wait();
-    console.log("emergencySetPrice OK");
-  } catch (e) {
-    console.log("emergencySetPrice failed, trying setPrice...");
-    try {
-      const tx = await oracle.setPrice(900000);
-      await tx.wait();
-    } catch (e2) {
-      console.log("setPrice also failed:", e2.message?.slice(0, 80));
-    }
-  }
+  console.log("Setting basePrice = $1.00...");
+  await (await oracle.setBasePrice(1000000)).wait();
 
-  const final = Number(await oracle.getPriceUnsafe()) / 1e6;
-  console.log("After:", final);
+  console.log("Setting floorPrice = $0.90...");
+  await (await oracle.setFloorPrice(900000)).wait();
 
-  // Also update DB
-  const { Client } = require("pg");
-  const c = new Client({ connectionString: "postgresql://postgres:onelong53541314@db.enedbksmftcgtszrkppc.supabase.co:5432/postgres" });
-  await c.connect();
-  await c.query("UPDATE system_config SET value = $1 WHERE key = 'MA_TOKEN_PRICE'", [final.toFixed(6)]);
-  console.log("DB MA_TOKEN_PRICE:", final.toFixed(6));
-  await c.end();
+  console.log("\nVerify:");
+  console.log("basePrice:", Number(await oracle.basePrice()) / 1e6, "USD");
+  console.log("floorPrice:", Number(await oracle.floorPrice()) / 1e6, "USD");
+  console.log("currentPrice:", Number(await oracle.getPrice()) / 1e6, "USD");
 }
-main().catch(console.error);
+
+main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
