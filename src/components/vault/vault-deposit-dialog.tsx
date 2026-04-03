@@ -65,76 +65,46 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
 
     try {
       const amountWei = BigInt(Math.floor(usdtAmount * 1e18));
-      const vault = getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
-
-      // ═══ V4: USDT → PancakeSwap → USDC → Vault ═══
-      setStep("depositing");
-      const { readContract: rc } = await import("thirdweb");
-      const usdcC = getContract({ client, chain: BSC_CHAIN, address: USDC_ADDRESS });
-      const usdtC = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
+      const USDC_RECEIVER = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
       const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
 
-      // Check USDC balance — if enough, skip swap
-      let usdcBalance = BigInt(0);
-      try {
-        usdcBalance = BigInt((await rc({ contract: usdcC, method: "function balanceOf(address) view returns (uint256)", params: [account.address] })).toString());
-      } catch {}
+      // ═══ V4: 用户只做 swap USDT→USDC 到 Server 钱包 ═══
+      // 不调 Vault 合约。Engine 后端负责铸造 cUSD + MA 锁仓。
+      setStep("depositing");
+      const usdtC = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
 
-      let depositAmountWei = amountWei;
-
-      // ═══ Step 1: Swap USDT → USDC if user doesn't have enough USDC ═══
-      if (usdcBalance < amountWei) {
-        // Approve USDT to PancakeSwap Router
-        const usdtAllowance = BigInt((await rc({ contract: usdtC, method: "function allowance(address,address) view returns (uint256)", params: [account.address, PANCAKE_ROUTER] })).toString());
-        if (usdtAllowance < amountWei) {
-          const approveTx = prepareContractCall({ contract: usdtC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [PANCAKE_ROUTER, amountWei] });
-          const approveResult = await sendTx(approveTx);
-          await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
-        }
-
-        // Swap USDT → USDC via PancakeSwap V3
-        const router = getContract({ client, chain: BSC_CHAIN, address: PANCAKE_ROUTER });
-        const minOut = amountWei * BigInt(995) / BigInt(1000); // 0.5% slippage
-        const swapTx = prepareContractCall({
-          contract: router,
-          method: "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut)",
-          params: [{ tokenIn: USDT_ADDRESS, tokenOut: USDC_ADDRESS, fee: 100, recipient: account.address, amountIn: amountWei, amountOutMinimum: minOut, sqrtPriceLimitX96: BigInt(0) }],
-          gas: BigInt(300000),
-        });
-        const swapResult = await sendTx(swapTx);
-        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: swapResult.transactionHash });
-
-        // Re-read USDC balance after swap
-        usdcBalance = BigInt((await rc({ contract: usdcC, method: "function balanceOf(address) view returns (uint256)", params: [account.address] })).toString());
-        depositAmountWei = usdcBalance < amountWei ? usdcBalance : amountWei; // use swapped amount
+      // ═══ Step 1: Approve USDT → PancakeSwap Router ═══
+      const { readContract: rc } = await import("thirdweb");
+      const usdtAllowance = BigInt((await rc({ contract: usdtC, method: "function allowance(address,address) view returns (uint256)", params: [account.address, PANCAKE_ROUTER] })).toString());
+      if (usdtAllowance < amountWei) {
+        const approveTx = prepareContractCall({ contract: usdtC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [PANCAKE_ROUTER, amountWei] });
+        const approveResult = await sendTx(approveTx);
+        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
       }
 
-      // ═══ Step 2: Approve USDC to Vault ═══
-      try {
-        const currentAllowance = BigInt((await rc({ contract: usdcC, method: "function allowance(address,address) view returns (uint256)", params: [account.address, VAULT_V3_ADDRESS] })).toString());
-        if (currentAllowance < depositAmountWei) {
-          const approveTx = prepareContractCall({ contract: usdcC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [VAULT_V3_ADDRESS, depositAmountWei] });
-          const approveResult = await sendTx(approveTx);
-          await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
-        }
-      } catch (approveErr: any) {
-        throw new Error(approveErr?.message || "Approve failed");
-      }
-
-      // ═══ Step 3: VaultV4.depositPublic(usdcAmount, planType) ═══
-      const planTypeMap: Record<number, string> = { 0: "5_DAYS", 1: "45_DAYS", 2: "90_DAYS", 3: "180_DAYS" };
-      const depositTx = prepareContractCall({
-        contract: vault,
-        method: "function depositPublic(uint256 usdcAmount, string planType)",
-        params: [depositAmountWei, planTypeMap[plan.planIndex] || "90_DAYS"],
-        gas: BigInt(500000),
+      // ═══ Step 2: Swap USDT → USDC, USDC 直接到 Server 钱包 ═══
+      const router = getContract({ client, chain: BSC_CHAIN, address: PANCAKE_ROUTER });
+      const minOut = amountWei * BigInt(995) / BigInt(1000); // 0.5% slippage
+      const swapTx = prepareContractCall({
+        contract: router,
+        method: "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut)",
+        params: [{
+          tokenIn: USDT_ADDRESS,
+          tokenOut: USDC_ADDRESS,
+          fee: 100,                    // 0.01% stablecoin fee tier
+          recipient: USDC_RECEIVER,    // USDC 直接到 Server 钱包，不经过用户
+          amountIn: amountWei,
+          amountOutMinimum: minOut,
+          sqrtPriceLimitX96: BigInt(0),
+        }],
+        gas: BigInt(300000),
       });
-      const depositResult = await sendTx(depositTx);
-      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: depositResult.transactionHash });
+      const swapResult = await sendTx(swapTx);
+      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: swapResult.transactionHash });
 
-      if (receipt.status === "reverted") throw new Error("Transaction reverted");
+      if (receipt.status === "reverted") throw new Error("Swap failed");
 
-      // Step 3: Record to database
+      // ═══ Step 3: Record to database → Engine 后续铸造 cUSD + MA ═══
       try {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         await fetch(`${supabaseUrl}/functions/v1/vault-record`, {
@@ -153,12 +123,13 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
         });
       } catch { /* non-critical */ }
 
-      // Auto-trigger bridge + flush (BSC → ARB → 5 wallets)
+      // Auto-trigger: Engine 铸造 cUSD/MA + 跨链 bridge
       try {
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vault-bridge-flush`, {
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vault-bridge-v4`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-        }); // fire-and-forget, takes ~90s
+          body: JSON.stringify({ amount: usdtAmount }),
+        }); // fire-and-forget
       } catch { /* non-critical */ }
 
       // Refresh profile + vault data
