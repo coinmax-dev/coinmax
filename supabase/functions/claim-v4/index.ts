@@ -39,7 +39,7 @@ const SPLIT_RATIOS: Record<string, { burnPct: number; releaseDays: number }> = {
   D: { burnPct: 20, releaseDays: 14 },
 };
 
-async function engineWrite(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
+async function engineWriteOne(call: { contractAddress: string; method: string; params: unknown[] }) {
   const res = await fetch("https://engine.thirdweb.com/v1/write/contract", {
     method: "POST",
     headers: {
@@ -49,10 +49,21 @@ async function engineWrite(calls: Array<{ contractAddress: string; method: strin
     },
     body: JSON.stringify({
       executionOptions: { type: "EOA", from: ENGINE_WALLET, chainId: "56" },
-      params: calls,
+      params: [call],
     }),
   });
   return res.json();
+}
+
+async function engineWrite(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
+  const results = [];
+  for (const call of calls) {
+    const r = await engineWriteOne(call);
+    console.log("Engine:", call.method.slice(0, 40), "→", r?.result?.transactions?.[0]?.id || r?.error?.message?.slice(0, 60) || "?");
+    results.push(r);
+    if (calls.indexOf(call) < calls.length - 1) await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+  return results;
 }
 
 serve(async (req) => {
@@ -119,8 +130,9 @@ serve(async (req) => {
       params: [walletAddress, releaseWei, "claim_release_" + splitRatio],
     });
 
-    const txResult = await engineWrite(calls);
-    const txId = txResult?.result?.transactions?.[0]?.id || "unknown";
+    const txResults = await engineWrite(calls);
+    const txIds = txResults.map((r: any) => r?.result?.transactions?.[0]?.id || "failed");
+    const txId = txIds.join(",");
 
     // 4. DB: Record claim and release schedule
     await supabase.from("transactions").insert({
