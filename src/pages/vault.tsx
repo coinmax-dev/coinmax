@@ -129,7 +129,6 @@ export default function Vault() {
   const [yieldDetailPosId, setYieldDetailPosId] = useState<string | null>(null);
   const [redeemV4Open, setRedeemV4Open] = useState(false);
   const [redeemPosId, setRedeemPosId] = useState<string>("");
-  const [redeemSplit, setRedeemSplit] = useState<string>("A");
 
   const { data: positions, isLoading: positionsLoading } = useQuery<VaultPosition[]>({
     queryKey: ["vault-positions", walletAddress],
@@ -247,13 +246,13 @@ export default function Vault() {
   };
 
   const redeemV4Mutation = useMutation({
-    mutationFn: async (data: { walletAddress: string; positionId: string; splitRatio: string }) => {
-      return vaultRedeem(data.walletAddress, data.positionId, data.splitRatio);
+    mutationFn: async (data: { walletAddress: string; positionId: string }) => {
+      return vaultRedeem(data.walletAddress, data.positionId, "");
     },
     onSuccess: (data: any) => {
       toast({
         title: t("vault.redeemSuccess", "赎回成功"),
-        description: `${Number(data.released || 0).toFixed(2)} MA → ${data.releaseDays > 0 ? data.releaseDays + t("vault.dayRelease", "天释放") : t("vault.instantRelease", "即时释放")}`,
+        description: `${Number(data.principalMA || 0).toFixed(2)} MA ${t("vault.toAvailable", "已转入未提现余额")}`,
       });
       queryClient.invalidateQueries({ queryKey: ["vault-positions", walletAddress] });
       queryClient.invalidateQueries({ queryKey: ["transactions", walletAddress] });
@@ -267,8 +266,8 @@ export default function Vault() {
   });
 
   const handleRedeemV4 = () => {
-    if (!walletAddress || !redeemPosId || !redeemSplit) return;
-    redeemV4Mutation.mutate({ walletAddress, positionId: redeemPosId, splitRatio: redeemSplit });
+    if (!walletAddress || !redeemPosId) return;
+    redeemV4Mutation.mutate({ walletAddress, positionId: redeemPosId });
   };
 
   return (
@@ -745,13 +744,13 @@ export default function Vault() {
         </DialogContent>
       </Dialog>
 
-      {/* V4 Redeem dialog — 赎回 (到期/提前) */}
+      {/* V4 Redeem dialog — 赎回 → 锁仓MA转入未提现余额 */}
       <Dialog open={redeemV4Open} onOpenChange={setRedeemV4Open}>
         <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">{t("vault.redeemPosition", "赎回持仓")}</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              {t("vault.redeemDesc", "赎回后锁仓MA将转入待释放余额")}
+              {t("vault.redeemDesc2", "赎回后锁仓MA将转入未提现余额")}
             </DialogDescription>
           </DialogHeader>
           {(() => {
@@ -760,64 +759,33 @@ export default function Vault() {
             const principal = Number(pos.principal);
             const start = new Date(pos.startDate!);
             const days = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400_000));
-            const accYield = principal * Number(pos.dailyRate) * days;
-            const accMA = accYield / maPrice;
+            const totalDays = pos.endDate ? Math.max(1, Math.ceil((new Date(pos.endDate).getTime() - start.getTime()) / 86400_000)) : 0;
+            const principalMA = maPrice > 0 ? principal / maPrice : 0;
             const isMatured = pos.status === "MATURED";
-            const ratio = { A: { burn: 0, days: 60 }, B: { burn: 5, days: 30 }, C: { burn: 10, days: 15 }, D: { burn: 15, days: 7 }, E: { burn: 20, days: 0 } }[redeemSplit] || { burn: 0, days: 60 };
-            const burnMA = accMA * ratio.burn / 100;
-            const releaseMA = accMA - burnMA;
 
             return (
               <div className="space-y-3">
                 <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1.5">
                   <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.depositPrincipal", "存入本金")}</span><span>${principal.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.daysHeld", "持有天数")}</span><span>{days} {t("vault.perDay", "日")}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.accYieldMA", "累计收益")}</span><span className="text-primary">{accMA.toFixed(2)} MA</span></div>
-                  {!isMatured && (
-                    <div className="text-[10px] text-amber-400/80 bg-amber-500/8 rounded px-2 py-1">
-                      {t("vault.earlyRedeemNote", "提前赎回: 累计收益将按选择的释放计划转入待释放余额")}
-                    </div>
-                  )}
+                  <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.daysHeld", "持有天数")}</span><span>{days} / {totalDays} {t("vault.perDay", "日")}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.status", "状态")}</span><span className={isMatured ? "text-green-400" : "text-amber-400"}>{isMatured ? t("vault.matured", "已到期") : t("vault.earlyRedeem", "提前赎回")}</span></div>
                 </div>
 
-                {/* Split ratio selection */}
-                <div>
-                  <label className="text-[10px] text-muted-foreground mb-1.5 block">{t("vault.releasePlan", "释放计划")}</label>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {[
-                      { key: "E", label: "E", burn: "20%", days: t("vault.instant", "即时") },
-                      { key: "D", label: "D", burn: "15%", days: "7" + t("vault.perDay", "日") },
-                      { key: "C", label: "C", burn: "10%", days: "15" + t("vault.perDay", "日") },
-                      { key: "B", label: "B", burn: "5%", days: "30" + t("vault.perDay", "日") },
-                      { key: "A", label: "A", burn: "0%", days: "60" + t("vault.perDay", "日") },
-                    ].map(p => (
-                      <button
-                        key={p.key}
-                        onClick={() => setRedeemSplit(p.key)}
-                        className={cn(
-                          "rounded-lg p-2 text-center transition-all",
-                          redeemSplit === p.key ? "bg-primary/15 border border-primary/30" : "bg-white/5 border border-white/5 hover:bg-white/10"
-                        )}
-                      >
-                        <div className="text-[11px] font-bold">{p.label}</div>
-                        <div className="text-[8px] text-red-400">{t("vault.burn", "销毁")}{p.burn}</div>
-                        <div className="text-[8px] text-muted-foreground">{p.days}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Preview */}
-                <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1">
-                  {burnMA > 0 && <div className="flex justify-between text-red-400"><span>{t("vault.burned", "销毁")}</span><span>-{burnMA.toFixed(2)} MA</span></div>}
+                <div className="bg-primary/5 rounded-md p-3 text-xs border border-primary/10">
                   <div className="flex justify-between font-medium">
-                    <span>{t("vault.toRelease", "转入待释放")}</span>
-                    <span className="text-primary">{releaseMA.toFixed(2)} MA</span>
+                    <span>{t("vault.toAvailableEarnings", "转入未提现余额")}</span>
+                    <span className="text-primary text-sm font-bold">{principalMA.toFixed(2)} MA</span>
                   </div>
-                  <div className="text-[9px] text-muted-foreground">
-                    ≈ ${(releaseMA * maPrice).toFixed(2)} | {ratio.days > 0 ? `${(releaseMA / ratio.days).toFixed(2)} MA/${t("vault.perDay", "日")}` : t("vault.instantRelease", "即时释放")}
+                  <div className="text-[9px] text-muted-foreground mt-1">
+                    ${principal.toFixed(2)} ÷ ${maPrice.toFixed(4)} = {principalMA.toFixed(2)} MA
                   </div>
                 </div>
+
+                {!isMatured && (
+                  <div className="text-[10px] text-amber-400/80 bg-amber-500/8 rounded px-2 py-1.5">
+                    {t("vault.earlyRedeemWarning2", "提前赎回将结束该持仓，锁仓MA转入未提现余额后可选择提现")}
+                  </div>
+                )}
               </div>
             );
           })()}

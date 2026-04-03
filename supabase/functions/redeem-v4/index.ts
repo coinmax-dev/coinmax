@@ -2,10 +2,12 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * V4 Redeem — 金库赎回 (纯 DB, 不触发链上)
+ * V4 Redeem — 金库赎回
  *
- * 赎回 = 关闭 position + 创建 release_schedule
- * 链上铸造由 mint-release 一键释放处理
+ * 赎回 = 关闭 position → 锁仓MA 转入未提现余额 (不涉及 burn/split)
+ * 用户之后从"未提现余额"发起提现才走 A/B/C/D/E 分成
+ *
+ * 锁仓MA = principal ÷ MA价格
  */
 
 const corsHeaders = {
@@ -13,25 +15,30 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SPLIT_RATIOS: Record<string, { burnPct: number; releaseDays: number }> = {
-  A: { burnPct: 0, releaseDays: 60 },
-  B: { burnPct: 5, releaseDays: 30 },
-  C: { burnPct: 10, releaseDays: 15 },
-  D: { burnPct: 15, releaseDays: 7 },
-  E: { burnPct: 20, releaseDays: 0 },
-};
+const ORACLE = "0x35580292fA5c8b7110034EA1a1521952E6F42bbb";
+const BSC_RPC = "https://bsc-dataseed1.binance.org";
+
+async function getOraclePrice(): Promise<number> {
+  const res = await fetch(BSC_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0", method: "eth_call", id: 1,
+      params: [{ to: ORACLE, data: "0x98d5fdca" }, "latest"],
+    }),
+  });
+  const d = await res.json();
+  return parseInt(d.result || "0x0", 16) / 1e6;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { walletAddress, positionId, splitRatio } = await req.json();
-    if (!walletAddress || !positionId || !splitRatio) {
-      return json({ error: "Missing walletAddress, positionId, or splitRatio" }, 400);
+    const { walletAddress, positionId } = await req.json();
+    if (!walletAddress || !positionId) {
+      return json({ error: "Missing walletAddress or positionId" }, 400);
     }
-
-    const ratio = SPLIT_RATIOS[splitRatio];
-    if (!ratio) return json({ error: "Invalid splitRatio (A/B/C/D/E)" }, 400);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -61,47 +68,25 @@ serve(async (req) => {
       return json({ error: "Cannot redeem bonus positions" }, 400);
     }
 
-    const isMatured = position.status === "MATURED";
+    // 2. Get MA price
+    const maPrice = await getOraclePrice();
+    if (maPrice <= 0) return json({ error: "Oracle price unavailable" }, 500);
 
-    // 2. Calculate accumulated yield
-    const { data: rewards } = await supabase
-      .from("vault_rewards")
-      .select("ar_amount")
-      .eq("user_id", profile.id)
-      .eq("position_id", positionId);
+    // 3. Calculate principal in MA
+    const principal = Number(position.principal);
+    const principalMA = principal / maPrice;
 
-    const accumulatedMA = (rewards || []).reduce((s: number, r: any) => s + Number(r.ar_amount || 0), 0);
+    console.log(`Redeem: ${walletAddress} pos:${positionId} | $${principal} ÷ $${maPrice} = ${principalMA.toFixed(2)} MA → 未提现余额`);
 
-    // 3. Calculate burn/release
-    const burnAmount = accumulatedMA * ratio.burnPct / 100;
-    const releaseAmount = accumulatedMA - burnAmount;
-    const dailyRelease = ratio.releaseDays > 0 ? releaseAmount / ratio.releaseDays : releaseAmount;
-    const isInstant = ratio.releaseDays === 0;
-
-    console.log(`Redeem: ${walletAddress} pos:${positionId} | MA:${accumulatedMA.toFixed(2)} burn:${burnAmount.toFixed(2)} release:${releaseAmount.toFixed(2)} | ${isMatured ? "matured" : "early"}`);
-
-    // 4. Create release schedule (DB only)
-    if (releaseAmount > 0) {
-      const now = new Date();
-      const endDate = isInstant ? now : new Date(now.getTime() + ratio.releaseDays * 86400000);
-
-      await supabase.from("release_schedules").insert({
-        user_id: profile.id,
-        wallet_address: walletAddress,
-        total_amount: releaseAmount,
-        daily_amount: dailyRelease,
-        released_amount: isInstant ? releaseAmount : 0,
-        remaining_amount: isInstant ? 0 : releaseAmount,
-        claimed_amount: 0,
-        days_total: isInstant ? 0 : ratio.releaseDays,
-        days_released: 0,
-        split_ratio: splitRatio,
-        burn_amount: burnAmount,
-        start_date: now.toISOString(),
-        end_date: endDate.toISOString(),
-        status: isInstant ? "COMPLETED" : "ACTIVE",
-      });
-    }
+    // 4. Add principal MA to vault_rewards as REDEEM type (goes to 未提现余额)
+    await supabase.from("vault_rewards").insert({
+      user_id: profile.id,
+      position_id: positionId,
+      reward_type: "REDEEM_PRINCIPAL",
+      amount: principal,
+      ar_price: maPrice,
+      ar_amount: principalMA,
+    });
 
     // 5. Close position
     await supabase.from("vault_positions").update({
@@ -112,29 +97,25 @@ serve(async (req) => {
     await supabase.from("transactions").insert({
       user_id: profile.id,
       type: "VAULT_REDEEM",
-      amount: accumulatedMA,
+      amount: principalMA,
       token: "MA",
       status: "CONFIRMED",
       details: {
         positionId,
-        isEarly: !isMatured,
-        splitRatio,
-        burnPct: ratio.burnPct,
-        burnAmount,
-        releaseAmount,
-        releaseDays: ratio.releaseDays,
-        dailyRelease,
+        principal,
+        maPrice,
+        principalMA,
+        isMatured: position.status === "MATURED",
       },
     });
 
     return json({
       status: "redeemed",
       positionId,
-      isEarly: !isMatured,
-      total: accumulatedMA,
-      burned: burnAmount,
-      released: releaseAmount,
-      releaseDays: ratio.releaseDays,
+      principal,
+      maPrice,
+      principalMA,
+      note: `${principalMA.toFixed(2)} MA 已转入未提现余额`,
     });
 
   } catch (e: unknown) {

@@ -285,9 +285,9 @@ export async function vaultWithdraw(walletAddress: string, position_id: string) 
   return toCamel(data);
 }
 
-export async function vaultRedeem(walletAddress: string, positionId: string, splitRatio: string) {
+export async function vaultRedeem(walletAddress: string, positionId: string, _splitRatio?: string) {
   const { data, error } = await supabase.functions.invoke("redeem-v4", {
-    body: { walletAddress, positionId, splitRatio },
+    body: { walletAddress, positionId },
   });
   if (error) throw error;
   if (data?.error) throw new Error(data.error);
