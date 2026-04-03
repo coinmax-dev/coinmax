@@ -4,13 +4,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 /**
  * V4 Daily Settlement — Cron 12:00 SGT (04:00 UTC)
  *
- * 1. DB: settle vault yields + node yields + team commissions
- * 2. Chain: VaultV4.settleYield() → mint cUSD interest + mint MA → Release
- * 3. Chain: Oracle price update (optional)
+ * Flow:
+ *   1. DB: settle vault yields + node yields + team commissions
+ *   2. Chain: VaultV4.addInterest(totalCUSD) → cUSD interest on-chain (记账)
+ *   3. Chain: Engine mints MA → Release contract (based on DB totals)
+ *   4. Chain: MAStaking — no action (MA already locked from deposit)
+ *
+ * VaultV4 only holds cUSD (no MA). MA minting is separate.
  *
  * Contracts:
- *   VaultV4:  0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744
- *   Engine:   0xDd6660E403d0242c1BeE52a4de50484AAF004446
+ *   VaultV4:    0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744
+ *   MAToken:    0xc6d2dbC85DC3091C41692822A128c19F9eAc7988
+ *   ReleaseV4:  0x1de32fF0aa9884536C8ba7Aa7fD1f6Ea6cf523Bc
+ *   Oracle:     0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2
+ *   Engine:     0xDd6660E403d0242c1BeE52a4de50484AAF004446
  */
 
 const corsHeaders = {
@@ -22,6 +29,10 @@ const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
 const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "";
 const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
 const VAULT_V4 = "0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744";
+const MA_TOKEN = "0xc6d2dbC85DC3091C41692822A128c19F9eAc7988";
+const RELEASE_V4 = "0x1de32fF0aa9884536C8ba7Aa7fD1f6Ea6cf523Bc";
+const ORACLE = "0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2";
+const BSC_RPC = "https://bsc-dataseed1.binance.org";
 
 async function engineWrite(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
   const res = await fetch("https://engine.thirdweb.com/v1/write/contract", {
@@ -39,6 +50,19 @@ async function engineWrite(calls: Array<{ contractAddress: string; method: strin
   return res.json();
 }
 
+async function getOraclePrice(): Promise<number> {
+  const res = await fetch(BSC_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0", method: "eth_call", id: 1,
+      params: [{ to: ORACLE, data: "0xa035b1fe" }, "latest"],
+    }),
+  });
+  const d = await res.json();
+  return parseInt(d.result || "0x0", 16) / 1e6;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -48,71 +72,84 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Step 1: DB settlement (vault + node + commission)
+    // ── Step 1: DB settlement ──
     const { data: dbResult, error: dbErr } = await supabase.rpc("run_daily_settlement");
     if (dbErr) throw new Error("DB settlement failed: " + dbErr.message);
     console.log("DB settlement:", JSON.stringify(dbResult));
 
-    // Step 2: Collect yield data for on-chain settlement
-    // Get today's vault_rewards grouped by user
+    // ── Step 2: Calculate totals for on-chain ──
+    const maPrice = await getOraclePrice();
+    if (maPrice <= 0) throw new Error("Oracle price zero");
+
+    // Get today's vault_rewards total
     const todayStart = new Date();
-    todayStart.setUTCHours(todayStart.getUTCHours() - 1); // look back 1hr
-    const { data: rewards } = await supabase
+    todayStart.setUTCHours(todayStart.getUTCHours() - 1);
+    const { data: vaultRewards } = await supabase
       .from("vault_rewards")
-      .select("user_id, amount, ar_amount, ar_price")
-      .gte("created_at", todayStart.toISOString())
-      .order("user_id");
+      .select("amount")
+      .gte("created_at", todayStart.toISOString());
 
-    if (!rewards || rewards.length === 0) {
-      return json({ status: "settled_db_only", dbResult, onchain: "no rewards to mint" });
+    const totalCusdYield = (vaultRewards || []).reduce((s: number, r: { amount: string }) => s + Number(r.amount || 0), 0);
+
+    // Get today's total MA to mint (vault + node + broker rewards)
+    const { data: nodeRewards } = await supabase
+      .from("node_rewards")
+      .select("amount")
+      .gte("created_at", todayStart.toISOString());
+
+    const { data: brokerRewards } = await supabase
+      .from("broker_rewards")
+      .select("amount")
+      .gte("created_at", todayStart.toISOString());
+
+    const totalNodeYield = (nodeRewards || []).reduce((s: number, r: { amount: string }) => s + Number(r.amount || 0), 0);
+    const totalBrokerYield = (brokerRewards || []).reduce((s: number, r: { amount: string }) => s + Number(r.amount || 0), 0);
+
+    // Total MA to mint = (vault yield + node yield + broker yield) / MA price
+    const totalYieldUsd = totalCusdYield + totalNodeYield + totalBrokerYield;
+    const totalMAToMint = totalYieldUsd / maPrice;
+
+    if (totalYieldUsd <= 0) {
+      return json({ status: "settled_db_only", dbResult, reason: "no yield to mint" });
     }
 
-    // Aggregate by user
-    const userMap: Record<string, { cusdYield: number; maAmount: number; wallet: string }> = {};
-    for (const r of rewards) {
-      if (!userMap[r.user_id]) userMap[r.user_id] = { cusdYield: 0, maAmount: 0, wallet: "" };
-      userMap[r.user_id].cusdYield += Number(r.amount || 0);
-      userMap[r.user_id].maAmount += Number(r.ar_amount || 0);
+    // ── Step 3: On-chain — Add cUSD interest to Vault ──
+    const cusdWei = "0x" + BigInt(Math.floor(totalCusdYield * 1e18)).toString(16);
+    const maWei = "0x" + BigInt(Math.floor(totalMAToMint * 1e18)).toString(16);
+
+    const calls: Array<{ contractAddress: string; method: string; params: unknown[] }> = [];
+
+    // VaultV4.addInterest(cusdAmount) — cUSD 链上记账
+    if (totalCusdYield > 0) {
+      calls.push({
+        contractAddress: VAULT_V4,
+        method: "function addInterest(uint256 cusdAmount)",
+        params: [cusdWei],
+      });
     }
 
-    // Get wallet addresses
-    const userIds = Object.keys(userMap);
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, wallet_address")
-      .in("id", userIds);
-
-    const users: string[] = [];
-    const cusdYields: string[] = [];
-    const maAmounts: string[] = [];
-
-    for (const p of profiles || []) {
-      const u = userMap[p.id];
-      if (!u || u.cusdYield <= 0) continue;
-      users.push(p.wallet_address);
-      cusdYields.push("0x" + BigInt(Math.floor(u.cusdYield * 1e18)).toString(16));
-      maAmounts.push("0x" + BigInt(Math.floor(u.maAmount * 1e18)).toString(16));
+    // MA Token.mint(Release, totalMA) — 铸造 MA 到 Release 合约
+    if (totalMAToMint > 0) {
+      calls.push({
+        contractAddress: MA_TOKEN,
+        method: "function mint(address to, uint256 amount)",
+        params: [RELEASE_V4, maWei],
+      });
     }
 
-    if (users.length === 0) {
-      return json({ status: "settled_db_only", dbResult });
-    }
-
-    // Step 3: On-chain: VaultV4.settleYield(users, cusdYields, maAmounts)
-    console.log(`Settling on-chain: ${users.length} users`);
-    const txResult = await engineWrite([{
-      contractAddress: VAULT_V4,
-      method: "function settleYield(address[] users, uint256[] cusdYields, uint256[] maAmounts)",
-      params: [users, cusdYields, maAmounts],
-    }]);
-
+    console.log(`On-chain: ${totalCusdYield.toFixed(2)} cUSD interest + ${totalMAToMint.toFixed(2)} MA mint`);
+    const txResult = await engineWrite(calls);
     const txId = txResult?.result?.transactions?.[0]?.id || "unknown";
-    console.log("On-chain TX:", txId);
 
     return json({
       status: "settled",
       db: dbResult,
-      onchain: { users: users.length, txId },
+      onchain: {
+        cusdInterest: totalCusdYield,
+        maMinted: totalMAToMint,
+        maPrice,
+        txId,
+      },
     });
 
   } catch (e: unknown) {
