@@ -368,11 +368,12 @@ function MASwap() {
     try {
       setSwapStatus("transferring");
 
-      // ═══ 闪兑: 用户 transfer MA → Engine, Engine USDC→PancakeSwap(121)→USDT 给用户 ═══
+      // ═══ 闪兑: MA→Engine, Server给USDC→用户swap USDC→USDT ═══
       const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
+      const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
       const maContract = getMATokenContract(client);
 
-      // Step 1: User transfers MA to Engine wallet
+      // Step 1: User transfers MA to Engine
       const transferTx = prepareContractCall({
         contract: maContract,
         method: "function transfer(address to, uint256 amount) returns (bool)",
@@ -380,10 +381,10 @@ function MASwap() {
         gas: BigInt(100000),
       });
       const transferResult = await sendTransaction(transferTx);
-      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: transferResult.transactionHash });
-      if (receipt.status === "reverted") throw new Error("MA转账失败");
+      const maReceipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: transferResult.transactionHash });
+      if (maReceipt.status === "reverted") throw new Error("MA转账失败");
 
-      // Step 2: 通知后端 → Engine USDC→USDT via PancakeSwap(121) 给用户
+      // Step 2: Server transfer USDC to user wallet
       setSwapStatus("recording");
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const res = await fetch(`${supabaseUrl}/functions/v1/flash-swap-v4`, {
@@ -392,11 +393,56 @@ function MASwap() {
         body: JSON.stringify({
           walletAddress: account.address,
           maAmount: inputAmount,
-          txHash: receipt.transactionHash,
+          txHash: maReceipt.transactionHash,
         }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
+
+      // Step 3: Wait for USDC to arrive then user swap USDC→USDT
+      // Poll USDC balance until it arrives
+      const { readContract: rc } = await import("thirdweb");
+      const usdcContract = getContract({ client, chain: BSC_CHAIN, address: USDC_ADDRESS });
+      const usdcBefore = BigInt((await rc({ contract: usdcContract, method: "function balanceOf(address) view returns (uint256)", params: [account.address] })).toString());
+
+      // Wait up to 30s for USDC to arrive
+      let usdcArrived = false;
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const usdcNow = BigInt((await rc({ contract: usdcContract, method: "function balanceOf(address) view returns (uint256)", params: [account.address] })).toString());
+        if (usdcNow > usdcBefore) { usdcArrived = true; break; }
+      }
+      if (!usdcArrived) throw new Error("USDC未到账，请稍后在闪兑页面手动swap");
+
+      // Step 4: User approve USDC → PancakeSwap
+      const usdcBal = BigInt((await rc({ contract: usdcContract, method: "function balanceOf(address) view returns (uint256)", params: [account.address] })).toString());
+      const usdcAllowance = BigInt((await rc({ contract: usdcContract, method: "function allowance(address,address) view returns (uint256)", params: [account.address, PANCAKE_ROUTER] })).toString());
+      if (usdcAllowance < usdcBal) {
+        const approveTx = prepareContractCall({ contract: usdcContract, method: "function approve(address spender, uint256 amount) returns (bool)", params: [PANCAKE_ROUTER, usdcBal] });
+        const approveResult = await sendTransaction(approveTx);
+        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+      }
+
+      // Step 5: User swap USDC → USDT via PancakeSwap (121 pool)
+      const router = getContract({ client, chain: BSC_CHAIN, address: PANCAKE_ROUTER });
+      const minOut = usdcBal * BigInt(995) / BigInt(1000);
+      const swapTx = prepareContractCall({
+        contract: router,
+        method: "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut)",
+        params: [{
+          tokenIn: USDC_ADDRESS,
+          tokenOut: USDT_ADDRESS,
+          fee: 100,
+          recipient: account.address,
+          amountIn: usdcBal,
+          amountOutMinimum: minOut,
+          sqrtPriceLimitX96: BigInt(0),
+        }],
+        gas: BigInt(300000),
+      });
+      const swapResult2 = await sendTransaction(swapTx);
+      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: swapResult2.transactionHash });
+      if (receipt.status === "reverted") throw new Error("USDC→USDT swap失败");
 
       setSwapStatus("success");
       setMaAmount("");

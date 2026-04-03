@@ -2,10 +2,11 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * V4 FlashSwap — 用户 burn MA, Server USDC → PancakeSwap → USDT 给用户
+ * V4 FlashSwap — Server transfer USDC to user
  *
- * 用户链上 burn MA → 本函数只做 Server swap USDC→USDT
- * 用户看到: burn MA + 收到 PancakeSwap (121) 的 USDT
+ * 1. User transfers MA → Engine (frontend)
+ * 2. This function: Server transfers equivalent USDC → user wallet
+ * 3. User swaps USDC→USDT via PancakeSwap (frontend)
  */
 
 const corsHeaders = {
@@ -17,8 +18,6 @@ const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
 const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "";
 const SERVER_WALLET = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
 const USDC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
-const USDT = "0x55d398326f99059fF775485246999027B3197955";
-const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
 const ORACLE = "0x35580292fA5c8b7110034EA1a1521952E6F42bbb";
 
@@ -69,20 +68,19 @@ serve(async (req) => {
     const maPrice = await getOraclePrice();
     if (maPrice <= 0) return json({ error: "Oracle price unavailable" }, 500);
 
-    const usdtAmount = amount * maPrice;
-    console.log(`FlashSwap: ${walletAddress} | ${amount} MA × $${maPrice} = $${usdtAmount.toFixed(2)} USDT`);
+    const usdcAmount = amount * maPrice;
+    const usdcWei = BigInt(Math.floor(usdcAmount * 1e18)).toString();
 
-    // Server swap USDC → USDT via PancakeSwap (121 pool) to user wallet
-    const amountInStr = BigInt(Math.floor(usdtAmount * 1e18)).toString();
-    const minOutStr = BigInt(Math.floor(usdtAmount * 0.995 * 1e18)).toString();
+    console.log(`FlashSwap: ${walletAddress} | ${amount} MA × $${maPrice} = $${usdcAmount.toFixed(2)} USDC → user`);
 
-    const swapResult = await engineWrite(SERVER_WALLET, {
-      contractAddress: PANCAKE_ROUTER,
-      method: "function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) external payable returns (uint256 amountOut)",
-      params: [[USDC, USDT, "100", walletAddress, amountInStr, minOutStr, "0"]],
+    // Server transfers USDC to user wallet
+    const transferResult = await engineWrite(SERVER_WALLET, {
+      contractAddress: USDC,
+      method: "function transfer(address to, uint256 amount) returns (bool)",
+      params: [walletAddress, usdcWei],
     });
-    const swapTxId = swapResult?.result?.transactions?.[0]?.id || "?";
-    console.log("Swap TX:", swapTxId, swapResult?.error?.details?.message || "ok");
+    const transferTxId = transferResult?.result?.transactions?.[0]?.id || "?";
+    console.log("USDC Transfer TX:", transferTxId, transferResult?.error?.details?.message || "ok");
 
     // Record transaction
     const { data: profile } = await supabase
@@ -95,15 +93,15 @@ serve(async (req) => {
       await supabase.from("transactions").insert({
         user_id: profile.id,
         type: "FLASH_SWAP",
-        amount: usdtAmount,
+        amount: usdcAmount,
         token: "USDT",
         status: "CONFIRMED",
         tx_hash: txHash || null,
-        details: { maAmount: amount, maPrice, usdtAmount, swapTxId },
+        details: { maAmount: amount, maPrice, usdcAmount, transferTxId },
       });
     }
 
-    return json({ status: "ok", maAmount: amount, maPrice, usdtAmount, swapTxId });
+    return json({ status: "ok", maAmount: amount, maPrice, usdcAmount, transferTxId });
 
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
