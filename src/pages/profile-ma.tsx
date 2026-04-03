@@ -566,7 +566,7 @@ function VaultRedeemSection() {
     queryKey: ["vault-positions-ma", account?.address],
     queryFn: async () => {
       if (!account?.address) return [];
-      const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", account.address).single();
+      const { data: profile } = await supabase.from("profiles").select("id").ilike("wallet_address", account.address).single();
       if (!profile) return [];
       const { data } = await supabase.from("vault_positions").select("*").eq("user_id", profile.id).eq("status", "ACTIVE").order("created_at", { ascending: false });
       return data || [];
@@ -671,7 +671,7 @@ function MAReleaseSection() {
     queryFn: async () => {
       if (!account?.address) return { vault: 0, node: 0, broker: 0, claimed: 0, total: 0 };
       // supabase already imported at top of file
-      const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", account.address).single();
+      const { data: profile } = await supabase.from("profiles").select("id").ilike("wallet_address", account.address).single();
       if (!profile) return { vault: 0, node: 0, broker: 0, claimed: 0, total: 0 };
 
       const [vr, nr, br, cl] = await Promise.all([
