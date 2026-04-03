@@ -636,7 +636,7 @@ function VaultRedeemSection() {
   const handleRedeem = async (pos: any) => {
     setRedeeming(pos.id);
     try {
-      const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", account!.address).single();
+      const { data: profile } = await supabase.from("profiles").select("id").ilike("wallet_address", account!.address).single();
       if (!profile) throw new Error("Profile not found");
 
       // Call vault_withdraw RPC

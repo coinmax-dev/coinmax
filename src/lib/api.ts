@@ -50,7 +50,7 @@ export async function getProfile(walletAddress: string) {
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq("wallet_address", walletAddress)
+    .ilike("wallet_address", walletAddress)
     .single();
   if (error && error.code !== "PGRST116") throw error;
   if (!data) return null;
