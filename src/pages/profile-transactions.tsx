@@ -31,6 +31,7 @@ const TX_TYPE_COLORS: Record<string, string> = {
   COMPLETED: "bg-foreground/8 text-foreground/60",
   BONUS_GRANT: "bg-foreground/8 text-foreground/60",
   CONFIRMED: "bg-foreground/8 text-foreground/60",
+  MA_CLAIM: "bg-foreground/8 text-foreground/60",
 };
 
 // Labels resolved at render time via t()
@@ -49,6 +50,7 @@ const TX_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
   FIXED_YIELD: { key: "tx.fixedYield", fallback: "节点收益" },
   REWARD_RELEASE: { key: "tx.rewardRelease", fallback: "释放到账" },
   BONUS_GRANT: { key: "tx.bonusGrant", fallback: "体验金赠送" },
+  MA_CLAIM: { key: "tx.maClaim", fallback: "MA提现" },
 };
 
 const FILTER_KEYS = [
@@ -60,6 +62,7 @@ const FILTER_KEYS = [
   { key: "TEAM_COMMISSION", labelKey: "tx.filterTeam", fallback: "团队奖励" },
   { key: "FIXED_YIELD", labelKey: "tx.filterNode", fallback: "节点收益" },
   { key: "WITHDRAW,VAULT_REDEEM", labelKey: "tx.filterRedeem", fallback: "赎回/提取" },
+  { key: "MA_CLAIM", labelKey: "tx.filterMaClaim", fallback: "MA提现" },
 ];
 
 export default function ProfileTransactionsPage() {

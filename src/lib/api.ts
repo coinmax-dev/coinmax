@@ -1063,9 +1063,36 @@ export async function requestEarningsRelease(walletAddress: string, releaseDays:
 }
 
 export async function getEarningsReleases(walletAddress: string) {
-  const { data, error } = await supabase.rpc("get_earnings_releases", { addr: walletAddress });
-  if (error) throw error;
-  return data;
+  // V4: Read from release_schedules + MA_CLAIM transactions
+  const { data: profile } = await supabase.from("profiles").select("id").ilike("wallet_address", walletAddress).single();
+  if (!profile) return { releases: [] };
+
+  const [schedules, claims] = await Promise.all([
+    supabase.from("release_schedules").select("*").eq("user_id", profile.id).order("created_at", { ascending: false }),
+    supabase.from("transactions").select("*").eq("user_id", profile.id).eq("type", "MA_CLAIM").order("created_at", { ascending: false }),
+  ]);
+
+  const releases = (schedules.data || []).map((s: any) => ({
+    id: s.id,
+    type: "linear_release",
+    total_amount: Number(s.total_amount),
+    burn_amount: Number(s.burn_amount),
+    daily_amount: Number(s.daily_amount),
+    released_amount: Number(s.released_amount),
+    remaining_amount: Number(s.remaining_amount),
+    days_released: s.days_released,
+    days_total: s.days_total,
+    split_ratio: s.split_ratio,
+    status: s.status,
+    progress: s.days_total > 0 ? s.days_released / s.days_total : 1,
+    net_amount: Number(s.total_amount),
+    plan_days: s.days_total,
+    created_at: s.created_at,
+    mint_tx_id: s.mint_tx_id,
+    burn_tx_id: s.burn_tx_id,
+  }));
+
+  return { releases, claims: claims.data || [] };
 }
 
 // ─── Daily Settlement (admin) ───

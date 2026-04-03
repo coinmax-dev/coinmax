@@ -248,6 +248,7 @@ function MASwap() {
   const [swapStatus, setSwapStatus] = useState<"idle" | "transferring" | "recording" | "success" | "error">("idle");
   const [swapError, setSwapError] = useState("");
 
+  // Wallet MA balance (for flash swap)
   const { data: maBalanceRaw } = useQuery({
     queryKey: ["ma-balance", account?.address],
     queryFn: async () => {
@@ -258,10 +259,25 @@ function MASwap() {
     refetchInterval: 15000,
   });
 
+  // Release contract claimable MA (user can claim then swap)
+  const { data: releaseClaimable = 0 } = useQuery({
+    queryKey: ["release-claimable", account?.address],
+    queryFn: async () => {
+      if (!account?.address || !client || !RELEASE_ADDRESS) return 0;
+      try {
+        const contract = getContract({ client, chain: BSC_CHAIN, address: RELEASE_ADDRESS });
+        const result = await readContract({ contract, method: "function getBalance(address) view returns (uint256, uint256, uint256, uint256)", params: [account.address] });
+        return Number(result[0] || BigInt(0)) / 1e18; // result[0] = released (claimable)
+      } catch { return 0; }
+    },
+    enabled: !!account?.address && !!client && !!RELEASE_ADDRESS,
+    refetchInterval: 15000,
+  });
+
   const { price: maPrice } = useMaPrice();
 
   const maBalance = Number(maBalanceRaw || BigInt(0)) / 1e18;
-  const swapQuota = maBalance;
+  const swapQuota = maBalance; // only wallet MA can be swapped
   const inputAmount = parseFloat(maAmount) || 0;
   const outputAmount = isSwapped ? inputAmount / maPrice : inputAmount * maPrice;
   const exceedsQuota = !isSwapped && inputAmount > swapQuota;
@@ -386,6 +402,11 @@ function MASwap() {
         <div className="text-[22px] font-bold font-mono tracking-tight text-white">
           {maBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} <span className="text-[13px] text-primary">MA</span>
         </div>
+        {releaseClaimable > 0 && (
+          <div className="mt-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <div className="text-[10px] text-amber-400">{t("ma.releaseClaimable", "待领取")} {releaseClaimable.toFixed(2)} MA — {t("ma.claimFirst", "领取后可闪兑")}</div>
+          </div>
+        )}
         <div className="mt-2.5 flex gap-2">
           <div className="flex-1 bg-white/5 rounded-lg px-2.5 py-1.5">
             <div className="text-[9px] text-white/30">{t("ma.swapQuota", "闪兑额度")}</div>
