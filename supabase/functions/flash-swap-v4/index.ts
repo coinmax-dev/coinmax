@@ -95,25 +95,21 @@ serve(async (req) => {
     const approveTxId = approveResult?.result?.transactions?.[0]?.id || "?";
     console.log("Approve TX:", approveTxId);
 
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 5000));
 
-    // Step 3: Server wallet swaps USDC → USDT via PancakeSwap, USDT to user wallet
-    const minOut = "0x" + BigInt(Math.floor(usdtAmount * 0.995 * 1e18)).toString(16);
+    // Step 2: Server wallet swaps USDC → USDT via PancakeSwap
+    // Using tuple format that Engine V1 supports
+    const amountInStr = BigInt(Math.floor(usdtAmount * 1e18)).toString();
+    const minOutStr = BigInt(Math.floor(usdtAmount * 0.995 * 1e18)).toString();
+
     const swapResult = await engineWrite(SERVER_WALLET, {
       contractAddress: PANCAKE_ROUTER,
-      method: "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut)",
-      params: [{
-        tokenIn: USDC,
-        tokenOut: USDT,
-        fee: 100,
-        recipient: walletAddress,
-        amountIn: usdcWei,
-        amountOutMinimum: minOut,
-        sqrtPriceLimitX96: "0",
-      }],
+      method: "function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) external payable returns (uint256 amountOut)",
+      params: [[USDC, USDT, "100", walletAddress, amountInStr, minOutStr, "0"]],
     });
     const swapTxId = swapResult?.result?.transactions?.[0]?.id || "?";
-    console.log("Swap TX:", swapTxId, swapResult?.error?.message || "ok");
+    const swapError = swapResult?.error?.message || swapResult?.error?.details?.message || null;
+    console.log("Swap TX:", swapTxId, swapError || "ok");
 
     // Record transaction
     const { data: profile } = await supabase
