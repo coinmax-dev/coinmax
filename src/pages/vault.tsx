@@ -258,16 +258,19 @@ export default function Vault() {
       queryClient.invalidateQueries({ queryKey: ["transactions", walletAddress] });
       queryClient.invalidateQueries({ queryKey: ["profile", walletAddress] });
       setRedeemV4Open(false);
+      setRedeemOpen(false);
       setRedeemPosId("");
+      setSelectedPositionId("");
     },
     onError: (err: Error) => {
       toast({ title: t("vault.redeemFailed", "赎回失败"), description: err.message, variant: "destructive" });
     },
   });
 
-  const handleRedeemV4 = () => {
-    if (!walletAddress || !redeemPosId) return;
-    redeemV4Mutation.mutate({ walletAddress, positionId: redeemPosId });
+  const handleRedeemV4 = (posId?: string) => {
+    const id = posId || redeemPosId || selectedPositionId;
+    if (!walletAddress || !id) return;
+    redeemV4Mutation.mutate({ walletAddress, positionId: id });
   };
 
   return (
@@ -527,27 +530,16 @@ export default function Vault() {
                               </div>
                             )}
 
-                            {/* Yield history + Redeem buttons */}
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 text-[10px] h-7"
-                                onClick={() => setYieldDetailPosId(pos.id)}
-                              >
-                                {t("vault.yieldHistory")} ({posRewards.length})
-                                <ChevronRight className="h-3 w-3 ml-auto" />
-                              </Button>
-                              {!isBonus && (
-                                <Button
-                                  size="sm"
-                                  className={cn("text-[10px] h-7 px-3", isMatured ? "bg-green-600 hover:bg-green-700 text-white" : "bg-white/5 text-white/50 hover:bg-white/10")}
-                                  onClick={() => { setRedeemPosId(pos.id); setRedeemV4Open(true); }}
-                                >
-                                  {isMatured ? t("vault.redeem", "赎回") : t("vault.earlyRedeem", "提前赎回")}
-                                </Button>
-                              )}
-                            </div>
+                            {/* Yield history */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-[10px] h-7"
+                              onClick={() => setYieldDetailPosId(pos.id)}
+                            >
+                              {t("vault.yieldHistory")} ({posRewards.length})
+                              <ChevronRight className="h-3 w-3 ml-auto" />
+                            </Button>
                           </div>
                         );
                       })}
@@ -593,7 +585,7 @@ export default function Vault() {
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">{t("vault.redeemFromVault")}</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              {t("vault.selectPosition")}
+              {t("vault.redeemDesc2", "赎回后锁仓MA将转入未提现余额")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -601,7 +593,7 @@ export default function Vault() {
               <div className="text-center py-4 text-sm text-muted-foreground">
                 {t("vault.connectToViewPositions")}
               </div>
-            ) : activePositions.length === 0 ? (
+            ) : activePositions.filter(p => p.planType !== "BONUS_5D" && !p.isBonus).length === 0 ? (
               <div className="text-center py-4 text-sm text-muted-foreground" data-testid="text-no-active-positions">
                 {t("vault.noActivePositions")}
               </div>
@@ -615,9 +607,10 @@ export default function Vault() {
                   <SelectContent>
                     {activePositions.filter(p => p.planType !== "BONUS_5D" && !p.isBonus).map((pos) => {
                       const planConfig = VAULT_PLANS[pos.planType as keyof typeof VAULT_PLANS];
+                      const isMaturedPos = pos.status === "MATURED";
                       return (
                         <SelectItem key={pos.id} value={pos.id} data-testid={`select-position-${pos.id}`}>
-                          ${Number(pos.principal).toFixed(2)} - {planConfig?.label || pos.planType}
+                          ${Number(pos.principal).toFixed(2)} - {planConfig?.label || pos.planType} {isMaturedPos ? "✓ 已到期" : ""}
                         </SelectItem>
                       );
                     })}
@@ -626,49 +619,34 @@ export default function Vault() {
                 {selectedPositionId && (() => {
                   const pos = activePositions.find(p => p.id === selectedPositionId);
                   if (!pos) return null;
-                  const now = new Date();
-                  const start = new Date(pos.startDate!);
-                  const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
                   const principal = Number(pos.principal);
-                  // MA minted at deposit = principal / MA price at deposit time
-                  // For now use current price as approximation
-                  const totalMA = usdcToMA(principal);
-                  const yieldMA = principal * Number(pos.dailyRate) * days / maPrice;
-                  const isEarly = pos.endDate && now < new Date(pos.endDate);
-                  const penaltyMA = isEarly ? totalMA * 0.20 : 0;
-                  const netMA = totalMA - penaltyMA;
+                  const principalMA = maPrice > 0 ? principal / maPrice : 0;
+                  const start = new Date(pos.startDate!);
+                  const days = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400_000));
+                  const totalDays = pos.endDate ? Math.max(1, Math.ceil((new Date(pos.endDate).getTime() - start.getTime()) / 86400_000)) : 0;
+                  const isMaturedPos = pos.status === "MATURED";
+                  const isEarly = !isMaturedPos && pos.endDate && Date.now() < new Date(pos.endDate).getTime();
                   return (
-                    <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1.5">
-                      <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground">{t("vault.depositPrincipal", "存入本金")}</span>
-                        <span>${principal.toFixed(2)} USDT</span>
+                    <div className="space-y-2">
+                      <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1.5">
+                        <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.depositPrincipal", "存入本金")}</span><span>${principal.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.daysHeld", "持有天数")}</span><span>{days} / {totalDays} {t("vault.perDay", "日")}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.status", "状态")}</span><span className={isMaturedPos ? "text-green-400" : "text-white/60"}>{isMaturedPos ? t("vault.matured", "已到期") : t("vault.active", "质押中")}</span></div>
                       </div>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground">{t("vault.mintedMA", "铸造 MA")}</span>
-                        <span>{totalMA.toFixed(2)} MA</span>
-                      </div>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground">{t("vault.accumulatedInterest", "累计收益 ({{days}}天)", { days })}</span>
-                        <span className="text-neon-value">+{yieldMA.toFixed(2)} MA</span>
+                      <div className="bg-primary/5 rounded-md p-3 text-xs border border-primary/10">
+                        <div className="flex justify-between font-medium">
+                          <span>{t("vault.toAvailableEarnings", "转入未提现余额")}</span>
+                          <span className="text-primary text-sm font-bold">{principalMA.toFixed(2)} MA</span>
+                        </div>
+                        <div className="text-[9px] text-muted-foreground mt-1">
+                          ${principal.toFixed(2)} ÷ ${maPrice.toFixed(4)} = {principalMA.toFixed(2)} MA
+                        </div>
                       </div>
                       {isEarly && (
-                        <>
-                          <div className="flex justify-between gap-2 text-red-400">
-                            <span>{t("vault.earlyRedeemPenalty", "提前赎回罚金 (20%)")}</span>
-                            <span>-{penaltyMA.toFixed(2)} MA</span>
-                          </div>
-                          <div className="text-[10px] text-yellow-400/80 bg-yellow-500/8 rounded px-2 py-1">
-                            {t("vault.earlyRedeemWarning", "未到期赎回将扣除铸造 MA 的 20%，仅返还 80%")}
-                          </div>
-                        </>
+                        <div className="text-[10px] text-amber-400/80 bg-amber-500/8 rounded px-2 py-1.5">
+                          {t("vault.earlyRedeemWarning2", "提前赎回将结束该持仓，锁仓MA转入未提现余额后可选择提现")}
+                        </div>
                       )}
-                      <div className="flex justify-between gap-2 pt-1.5 border-t border-border/30">
-                        <span className="font-medium">{t("vault.redeemReceive", "赎回获得")}</span>
-                        <span className="font-bold text-primary">{(netMA + yieldMA).toFixed(2)} MA</span>
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {t("vault.approxValue", "≈ ${{value}} (按当前价 ${{price}})", { value: ((netMA + yieldMA) * maPrice).toFixed(2), price: maPrice.toFixed(4) })}
-                      </div>
                     </div>
                   );
                 })()}
@@ -678,11 +656,11 @@ export default function Vault() {
           <DialogFooter>
             <Button
               className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 border-emerald-500/50 text-white"
-              onClick={() => handleWithdraw(selectedPositionId)}
-              disabled={withdrawMutation.isPending || !selectedPositionId || !walletAddress}
+              onClick={() => { handleRedeemV4(selectedPositionId); }}
+              disabled={redeemV4Mutation.isPending || !selectedPositionId || !walletAddress}
               data-testid="button-confirm-redeem"
             >
-              {withdrawMutation.isPending ? t("common.processing") : t("vault.confirmRedemption")}
+              {redeemV4Mutation.isPending ? t("common.processing") : t("vault.confirmRedemption")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -744,63 +722,6 @@ export default function Vault() {
         </DialogContent>
       </Dialog>
 
-      {/* V4 Redeem dialog — 赎回 → 锁仓MA转入未提现余额 */}
-      <Dialog open={redeemV4Open} onOpenChange={setRedeemV4Open}>
-        <DialogContent className="bg-card border-border max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">{t("vault.redeemPosition", "赎回持仓")}</DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              {t("vault.redeemDesc2", "赎回后锁仓MA将转入未提现余额")}
-            </DialogDescription>
-          </DialogHeader>
-          {(() => {
-            const pos = activePositions.find(p => p.id === redeemPosId);
-            if (!pos) return <div className="text-sm text-muted-foreground py-4 text-center">{t("vault.selectPositionFirst", "请先选择持仓")}</div>;
-            const principal = Number(pos.principal);
-            const start = new Date(pos.startDate!);
-            const days = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400_000));
-            const totalDays = pos.endDate ? Math.max(1, Math.ceil((new Date(pos.endDate).getTime() - start.getTime()) / 86400_000)) : 0;
-            const principalMA = maPrice > 0 ? principal / maPrice : 0;
-            const isMatured = pos.status === "MATURED";
-
-            return (
-              <div className="space-y-3">
-                <div className="bg-muted/30 rounded-md p-3 text-xs space-y-1.5">
-                  <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.depositPrincipal", "存入本金")}</span><span>${principal.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.daysHeld", "持有天数")}</span><span>{days} / {totalDays} {t("vault.perDay", "日")}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">{t("vault.status", "状态")}</span><span className={isMatured ? "text-green-400" : "text-amber-400"}>{isMatured ? t("vault.matured", "已到期") : t("vault.earlyRedeem", "提前赎回")}</span></div>
-                </div>
-
-                <div className="bg-primary/5 rounded-md p-3 text-xs border border-primary/10">
-                  <div className="flex justify-between font-medium">
-                    <span>{t("vault.toAvailableEarnings", "转入未提现余额")}</span>
-                    <span className="text-primary text-sm font-bold">{principalMA.toFixed(2)} MA</span>
-                  </div>
-                  <div className="text-[9px] text-muted-foreground mt-1">
-                    ${principal.toFixed(2)} ÷ ${maPrice.toFixed(4)} = {principalMA.toFixed(2)} MA
-                  </div>
-                </div>
-
-                {!isMatured && (
-                  <div className="text-[10px] text-amber-400/80 bg-amber-500/8 rounded px-2 py-1.5">
-                    {t("vault.earlyRedeemWarning2", "提前赎回将结束该持仓，锁仓MA转入未提现余额后可选择提现")}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-          <DialogFooter>
-            <Button
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white"
-              onClick={handleRedeemV4}
-              disabled={redeemV4Mutation.isPending || !redeemPosId}
-            >
-              {redeemV4Mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              {redeemV4Mutation.isPending ? t("common.processing") : t("vault.confirmRedeem", "确认赎回")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
