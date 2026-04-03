@@ -296,9 +296,67 @@ Engine V2 钱包 (0xDd66)
 
 ---
 
-## 六、闪兑 (MA → USDT)
+## 六、资金跨链分配
 
-### 6.1 用户闪兑流程
+### 6.1 Engine V2 → USDC Receiver → 跨链 ARB
+
+```
+用户入金后 Engine V2 收到 USDC (BSC)
+  │
+  ▼
+USDC Receiver / Vault V2 Server 钱包 (0xe193)
+  │ 累积 USDC
+  ▼
+thirdweb Bridge → ARB
+  │
+  ▼
+ARB 分配:
+  ├─ 60% → 0x3869 (Trading + 闪兑储备)
+  │         │
+  │         ├─ admin 调用存入 HL 金库
+  │         │  0x3869 → HL Vault: 0xdfc24b077bc1425ad1dea75bcb6f8158e10df303
+  │         │  (通过 HL API 钱包操作)
+  │         │
+  │         └─ 部分留存做闪兑回流
+  │
+  ├─ 20% → 0x85c3 (Investor)
+  ├─ 12% → 0x1C4D (Marketing)
+  └─  8% → 0xDf90 (Operations)
+```
+
+### 6.2 HyperLiquid 交易
+
+```
+0x3869 (ARB) ← 已连接 HL，有 API 钱包
+  │
+  ├─ admin 手动/API 调用: 存入 HL Vault
+  │   目标: 0xdfc24b077bc1425ad1dea75bcb6f8158e10df303
+  │
+  ├─ HL 内部: AI 策略交易
+  │
+  └─ 利润留在 0x3869，作为闪兑回流资金源
+```
+
+---
+
+## 七、闪兑 (MA → USDT)
+
+### 7.1 闪兑资金回流
+
+```
+0x3869 (ARB) ← Trading + 闪兑储备
+  │ USDC
+  ▼
+存入 Vault V2 Server 钱包 (0xe193, BSC)
+  │ 通过 thirdweb Bridge ARB → BSC
+  ▼
+Engine V2 Server 钱包 给用户闪兑
+  │ USDC → PancakeSwap V3 (Pool 0x92b7) → USDT
+  ▼
+USDT → 用户
+```
+
+### 7.2 用户闪兑流程
 
 ```
 用户持有 MA 代币 (BSC)
@@ -311,13 +369,10 @@ FlashSwap 合约: requestSwap(maAmount)
   │ 发出 SwapRequested 事件
   │
   ▼
-Engine 监听事件 (自动处理):
+Engine V2 Server 钱包处理:
   │
-  │ [资金来源] 0x3869 (ARB Trading钱包)
-  │   │ USDC 跨链回 BSC
-  │   ▼
-  │ Engine (0xDd66) 收到 USDC
-  │   │
+  │ [资金来源] 0xe193 (Vault V2 Server 钱包, BSC)
+  │   │ 已从 0x3869(ARB) 跨链回来的 USDC
   │   ▼
   │ PancakeSwap V3 (Pool 0x92b7)
   │   │ Swap USDC → USDT
@@ -328,19 +383,37 @@ Engine 监听事件 (自动处理):
 FlashSwap 合约: fulfillSwap() → 标记完成
 ```
 
-### 6.2 链上可见交易记录
+### 7.3 链上可见交易记录
 
 ```
 TX1 (用户发起):
   MA Transfer: 用户 → 0x000...000 (销毁)
 
-TX2 (Engine 执行):
-  USDC Transfer: Engine(0xDd66) → PancakeSwap Pool(0x92b7)
-  USDT Transfer: Pool(0x92b7) → Engine(0xDd66)
-  USDT Transfer: Engine(0xDd66) → 用户
+TX2 (Engine Server 钱包执行):
+  USDC Transfer: Server(0xe193) → PancakeSwap Pool(0x92b7)
+  USDT Transfer: Pool(0x92b7) → Server(0xe193)
+  USDT Transfer: Server(0xe193) → 用户
 ```
 
-### 6.3 Oracle 价格机制
+### 7.4 闪兑完整闭环
+
+```
+入金:
+  用户 USDT → USDC → Engine → Vault V2 Server(0xe193) → 跨链 ARB
+  → 60% → 0x3869 → 部分存入 HL Vault(0xdfc2) 交易
+
+闪兑回流:
+  0x3869(ARB) → 跨链 BSC → Vault V2 Server(0xe193)
+  → PancakeSwap → USDT → 用户
+
+MA 影响:
+  用户闪兑 burn MA → 流通量减少 → Oracle 背书价上升
+
+资金循环:
+  入金 USDC → HL 交易赚利润 → 利润+本金 → 回流 BSC → 闪兑给用户
+```
+
+### 7.5 Oracle 价格机制
 
 ```
 价格 = max(地板价, max(背书价, 增值价))
@@ -351,44 +424,6 @@ TX2 (Engine 执行):
 
 MA 铸造 → 流通量增加 → 背书价下降 (但 cUSD 同步增加，比例稳定)
 MA 销毁 → 流通量减少 → 背书价上升 → 价格支撑
-```
-
----
-
-## 七、资金跨链分配
-
-### 7.1 USDC 跨链 (BSC → ARB)
-
-```
-USDC Receiver (0xe193, BSC)
-  │ 累积用户入金的 USDC
-  ▼
-thirdweb Bridge → ARB
-  │
-  ▼
-ARB 分配:
-  ├─ 60% → 0x3869 (Trading + 闪兑储备)
-  │         │ 部分 → HyperLiquid (0xd6e5) AI交易
-  │         └ 部分 → 留存做闪兑回流
-  │
-  ├─ 20% → 0x85c3 (Investor)
-  ├─ 12% → 0x1C4D (Marketing)
-  └─  8% → 0xDf90 (Operations)
-```
-
-### 7.2 闪兑回流 (ARB → BSC)
-
-```
-0x3869 (ARB)
-  │ USDC
-  ▼
-thirdweb Bridge → BSC
-  │
-  ▼
-Engine (0xDd66, BSC)
-  │ USDC → PancakeSwap → USDT
-  ▼
-FlashSwap 合约 / 直接转用户
 ```
 
 ---
@@ -412,7 +447,7 @@ FlashSwap 合约 / 直接转用户
 |------|------|-----|
 | Deployer | `0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1` | BSC |
 | Engine V2 | `0xDd6660E403d0242c1BeE52a4de50484AAF004446` | BSC |
-| USDC Receiver | `0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff` | BSC |
+| Vault V2 Server / USDC Receiver | `0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff` | BSC (跨链+闪兑出金) |
 | Trading+闪兑 (60%) | `0x3869100A4F165aE9C85024A32D90C5D7412D6b9c` | ARB |
 | Investor (20%) | `0x85c3d07Ee3be12d6502353b4cA52B30cD85Ac5ff` | ARB |
 | Marketing (12%) | `0x1C4D983620B3c8c2f7607c0943f2A5989e655599` | ARB |
@@ -420,9 +455,11 @@ FlashSwap 合约 / 直接转用户
 
 ### HyperLiquid
 
-| 角色 | 地址 |
-|------|------|
-| HL Bridge Deposit | `0xd6e56265890b76413d1d527eb9b75e334c0c5b42` |
+| 角色 | 地址 | 说明 |
+|------|------|------|
+| HL Vault (金库) | `0xdfc24b077bc1425ad1dea75bcb6f8158e10df303` | 0x3869 通过 API 存入此金库做交易 |
+| HL Bridge Deposit | `0xd6e56265890b76413d1d527eb9b75e334c0c5b42` | HL L1 Bridge |
+| 0x3869 API 钱包 | `0x3869100A4F165aE9C85024A32D90C5D7412D6b9c` | 已连接 HL，admin 可调用存入/查看 |
 
 ---
 
