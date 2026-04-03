@@ -284,7 +284,7 @@ function MASwap() {
   const handleSwap = async () => {
     if (!account || !client || inputAmount <= 0 || exceedsQuota) return;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const EOA_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
+    const FLASH_SWAP = FLASH_SWAP_ADDRESS;
     const amountWei = BigInt(Math.floor(inputAmount * 1e18));
 
     setSwapError("");
@@ -292,46 +292,37 @@ function MASwap() {
       setSwapStatus("transferring");
 
       if (!isSwapped) {
-        // ═══ SELL MA → USDT ═══
-        // User approves MA to EOA wallet
+        // ═══ SELL MA → USDT (V4: requestSwap on FlashSwap contract) ═══
+        // Step 1: Approve MA to FlashSwap contract
         const maContract = getMATokenContract(client);
         const approveTx = prepareContractCall({
           contract: maContract,
           method: "function approve(address spender, uint256 amount) returns (bool)",
-          params: [EOA_WALLET, amountWei],
+          params: [FLASH_SWAP, amountWei],
         });
         const approveResult = await sendTransaction(approveTx);
         await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+
+        // Step 2: Call FlashSwapV4.requestSwap → burn MA, Server sends USDT
+        setSwapStatus("recording");
+        const flashContract = getContract({ client, chain: BSC_CHAIN, address: FLASH_SWAP });
+        const swapTx = prepareContractCall({
+          contract: flashContract,
+          method: "function requestSwap(uint256 maAmount) returns (uint256)",
+          params: [amountWei],
+          gas: BigInt(500000),
+        });
+        const swapResult = await sendTransaction(swapTx);
+        const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: swapResult.transactionHash });
+        if (receipt.status === "reverted") throw new Error("闪兑失败");
+
       } else {
-        // ═══ BUY MA with USDT ═══
-        // User approves USDT to EOA wallet
-        const tokenContract = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
-        const approveTx = prepareContractCall({
-          contract: tokenContract,
-          method: "function approve(address spender, uint256 amount) returns (bool)",
-          params: [EOA_WALLET, amountWei],
-        });
-        const approveResult = await sendTransaction(approveTx);
-        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+        // ═══ BUY MA with USDT — V4 不支持直接买入 ═══
+        throw new Error("V4 暂不支持 USDT 买入 MA");
       }
 
-      // Edge function: EOA executes transferFrom + swap + send
-      setSwapStatus("recording");
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const resp = await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
-        body: JSON.stringify({
-          walletAddress: account.address,
-          direction: isSwapped ? "buy" : "sell",
-          maAmount: inputAmount,
-          outputToken,
-          maPrice,
-          maBalance,
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "当前繁忙，稍后重试");
+      // No need to call edge function — FlashSwap event triggers Server auto-fulfill
+      const data = { success: true };
 
       setSwapStatus("success");
       setMaAmount("");

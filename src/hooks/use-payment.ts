@@ -217,13 +217,7 @@ export function usePayment() {
         setTxHash(confirmedHash);
         setStatus("recording");
 
-        // Trigger immediate node fund relay (3-hop privacy)
-        try {
-          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flush-node-pool`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          });
-        } catch { /* non-critical */ }
+        // V4: Node fund relay handled by vault-bridge-v4 (no separate flush needed)
 
         return confirmedHash;
       } catch (err: any) {
