@@ -67,23 +67,11 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
       const amountWei = BigInt(Math.floor(usdtAmount * 1e18));
       const vault = getContract({ client, chain: BSC_CHAIN, address: VAULT_V3_ADDRESS });
 
-      // ═══ Detect token: prefer USDC, fallback USDT ═══
+      // ═══ V4: Only USDC accepted. thirdweb payModal handles USDT→USDC swap ═══
       setStep("depositing");
       const usdcC = getContract({ client, chain: BSC_CHAIN, address: USDC_ADDRESS });
-      const usdtC = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
-      let payToken = USDC_ADDRESS;
-      let tokenContract = usdcC;
-      try {
-        const { readContract: rc } = await import("thirdweb");
-        const usdcBal = await rc({ contract: usdcC, method: "function balanceOf(address) view returns (uint256)", params: [account.address] });
-        if (BigInt(usdcBal.toString()) < amountWei) {
-          payToken = USDT_ADDRESS;
-          tokenContract = usdtC;
-        }
-      } catch {
-        payToken = USDT_ADDRESS;
-        tokenContract = usdtC;
-      }
+      const payToken = USDC_ADDRESS;
+      const tokenContract = usdcC;
 
       // ═══ Step 1: Approve token to Vault (skip if already enough) ═══
       try {
@@ -106,11 +94,12 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
         throw new Error(approveErr?.message || "Approve failed");
       }
 
-      // ═══ Step 2: Vault.depositPublic(token, amount, planIndex) ═══
+      // ═══ Step 2: VaultV4.depositPublic(usdcAmount, planType) ═══
+      const planTypeMap: Record<number, string> = { 0: "5_DAYS", 1: "45_DAYS", 2: "90_DAYS", 3: "180_DAYS" };
       const depositTx = prepareContractCall({
         contract: vault,
-        method: "function depositPublic(address token, uint256 amount, uint256 planIndex)",
-        params: [payToken, amountWei, BigInt(plan.planIndex)],
+        method: "function depositPublic(uint256 usdcAmount, string planType)",
+        params: [amountWei, planTypeMap[plan.planIndex] || "90_DAYS"],
         gas: BigInt(500000),
       });
       const depositResult = await sendTx(depositTx);

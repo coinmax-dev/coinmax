@@ -46,7 +46,9 @@ contract CoinMaxVaultV4 is Initializable, ERC4626Upgradeable, AccessControlUpgra
         usdc.safeTransferFrom(user, address(this), usdcAmount);
         if (usdcReceiver != address(0)) usdc.safeTransfer(usdcReceiver, usdcAmount);
         cusd.mint(address(this), usdcAmount);
-        shares = deposit(usdcAmount, user);
+        // Mint shares directly (bypass ERC4626.deposit which does transferFrom on msg.sender)
+        shares = previewDeposit(usdcAmount);
+        _mint(user, shares);
         uint256 duration = _parseDuration(planType); uint256 rate = _parseRate(planType);
         userStakes[user].push(StakePosition(usdcAmount, shares, planType, rate, block.timestamp, duration, false, false, false));
         totalCUSDDeposited += usdcAmount;
@@ -69,7 +71,9 @@ contract CoinMaxVaultV4 is Initializable, ERC4626Upgradeable, AccessControlUpgra
         uint256 tCUSD = 0; uint256 tMA = 0; uint256 maPrice = oracle.getPrice();
         for (uint256 i = 0; i < users.length; i++) {
             if (cusdYields[i] == 0) continue;
-            cusd.mint(address(this), cusdYields[i]); tCUSD += cusdYields[i];
+            cusd.mint(address(this), cusdYields[i]);
+            IERC20(address(cusd)).approve(address(this), cusdYields[i]);
+            tCUSD += cusdYields[i];
             if (maAmounts[i] > 0) { maToken.mint(maReceiver, maAmounts[i]); tMA += maAmounts[i]; }
         }
         totalYieldMinted += tCUSD; totalMAMinted += tMA;
