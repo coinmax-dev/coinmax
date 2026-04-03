@@ -33,7 +33,7 @@ const MA_TOKEN = "0xdFaC84b2f9cfD02b3f44760E0Ff88b4EeC0e1593";
 const BSC_USDT = "0x55d398326f99059fF775485246999027B3197955";
 const BSC_USDC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
 const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
-const SERVER_WALLET = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
+const SERVER_WALLET = "0xeBAB6D22278c9839A46B86775b3AC9469710F84b";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
 
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
@@ -74,7 +74,7 @@ async function callThirdweb(calls: Array<{ contractAddress: string; method: stri
       "x-vault-access-token": VAULT_TOKEN,
     },
     body: JSON.stringify({
-      executionOptions: { type: "auto", from: SERVER_WALLET, chainId: "56" },
+      executionOptions: { type: "EOA", from: SERVER_WALLET, chainId: "56" },
       params: calls,
     }),
   });
