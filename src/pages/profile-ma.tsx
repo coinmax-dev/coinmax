@@ -284,54 +284,69 @@ function MASwap() {
   const handleSwap = async () => {
     if (!account || !client || inputAmount <= 0 || exceedsQuota) return;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const SERVER_WALLET = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
+    const flashSwap = getContract({ client, chain: BSC_CHAIN, address: FLASH_SWAP_ADDRESS });
     const amountWei = BigInt(Math.floor(inputAmount * 1e18));
 
     setSwapError("");
     try {
       setSwapStatus("transferring");
 
+      let swapTxHash = "";
+
       if (!isSwapped) {
-        // ═══ SELL MA → USDT (Server Wallet mode) ═══
-        // Step 1: User approves MA to Server Wallet
+        // ═══ SELL MA → USDT/USDC (via FlashSwap contract) ═══
         const maContract = getMATokenContract(client);
         const approveTx = prepareContractCall({
           contract: maContract,
           method: "function approve(address spender, uint256 amount) returns (bool)",
-          params: [SERVER_WALLET, amountWei],
+          params: [FLASH_SWAP_ADDRESS, amountWei],
         });
         const approveResult = await sendTransaction(approveTx);
         await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+
+        const method = outputToken === "USDC" ? "function swapMAtoUSDC(uint256 maAmount)" : "function swapMAtoUSDT(uint256 maAmount)";
+        const swapTx = prepareContractCall({ contract: flashSwap, method, params: [amountWei] });
+        const result = await sendTransaction(swapTx);
+        const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
+        if (receipt.status === "reverted") throw new Error("Transaction reverted");
+        swapTxHash = result.transactionHash;
       } else {
-        // ═══ BUY MA with USDT (Server Wallet mode) ═══
-        // Step 1: User approves USDT to Server Wallet
+        // ═══ BUY MA with USDT/USDC (via FlashSwap contract) ═══
         const tokenAddr = outputToken === "USDC" ? USDC_ADDRESS : USDT_ADDRESS;
         const tokenContract = getContract({ client, chain: BSC_CHAIN, address: tokenAddr });
         const approveTx = prepareContractCall({
           contract: tokenContract,
           method: "function approve(address spender, uint256 amount) returns (bool)",
-          params: [SERVER_WALLET, amountWei],
+          params: [FLASH_SWAP_ADDRESS, amountWei],
         });
         const approveResult = await sendTransaction(approveTx);
         await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+
+        const method = outputToken === "USDC" ? "function swapUSDCtoMA(uint256 usdcAmount)" : "function swapUSDTtoMA(uint256 usdtAmount)";
+        const swapTx = prepareContractCall({ contract: flashSwap, method, params: [amountWei] });
+        const result = await sendTransaction(swapTx);
+        const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
+        if (receipt.status === "reverted") throw new Error("Transaction reverted");
+        swapTxHash = result.transactionHash;
       }
 
-      // Step 2: Edge function handles transferFrom + swap + send USDT
+      // Record via edge function
       setSwapStatus("recording");
-      const resp = await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletAddress: account.address,
-          direction: isSwapped ? "buy" : "sell",
-          maAmount: inputAmount,
-          outputToken,
-          maPrice,
-          maBalance,
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Swap failed");
+      try {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/ma-swap`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            walletAddress: account.address,
+            txHash: swapTxHash,
+            direction: isSwapped ? "buy" : "sell",
+            maAmount: inputAmount,
+            outputToken,
+            maPrice,
+            maBalance,
+          }),
+        });
+      } catch { /* non-critical */ }
 
       setSwapStatus("success");
       setMaAmount("");
