@@ -178,13 +178,14 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
-      // Step 1: Call edge function to mint MA + prepare release
-      const resp = await fetch(`${supabaseUrl}/functions/v1/claim-yield`, {
+      // Step 1: Call V4 claim edge function → mint MA + burn + create linear release schedule
+      const splitRatioMap: Record<number, string> = { 0: "A", 1: "B", 2: "C", 3: "D" };
+      const resp = await fetch(`${supabaseUrl}/functions/v1/claim-v4`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           walletAddress: account.address,
-          planIndex: selectedPlan,
+          splitRatio: splitRatioMap[selectedPlan] || "C",
           amount: inputAmount,
         }),
       });
