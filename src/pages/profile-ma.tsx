@@ -670,7 +670,7 @@ function MAReleaseSection() {
     queryKey: ["ma-pending-balance", account?.address],
     queryFn: async () => {
       if (!account?.address) return { vault: 0, node: 0, broker: 0, claimed: 0, total: 0 };
-      const supabase = (await import("@/lib/supabase")).supabase;
+      // supabase already imported at top of file
       const { data: profile } = await supabase.from("profiles").select("id").eq("wallet_address", account.address).single();
       if (!profile) return { vault: 0, node: 0, broker: 0, claimed: 0, total: 0 };
 
