@@ -457,9 +457,10 @@ MA 销毁 → 流通量减少 → 背书价上升 → 价格支撑
 
 | 角色 | 地址 | 说明 |
 |------|------|------|
-| HL Vault (金库) | `0xdfc24b077bc1425ad1dea75bcb6f8158e10df303` | 0x3869 通过 API 存入此金库做交易 |
+| HL 主钱包 | `0x3869100A4F165aE9C85024A32D90C5D7412D6b9c` | 连接 HL，持有资金，存入/提取金库 |
+| HL API 钱包 | `0xac5FC34064147eC19B49b56E0a35594a0115B0b0` | API 自动化交易执行 |
+| HL Vault (金库) | `0xdfc24b077bc1425ad1dea75bcb6f8158e10df303` | 主钱包存入此金库做 AI 策略交易 |
 | HL Bridge Deposit | `0xd6e56265890b76413d1d527eb9b75e334c0c5b42` | HL L1 Bridge |
-| 0x3869 API 钱包 | `0x3869100A4F165aE9C85024A32D90C5D7412D6b9c` | 已连接 HL，admin 可调用存入/查看 |
 
 ---
 
