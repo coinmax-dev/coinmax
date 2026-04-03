@@ -116,21 +116,30 @@ serve(async (req) => {
       }).eq("id", s.id);
     }
 
-    // 5. Wait for on-chain tx hash (poll thirdweb)
+    // 5. Wait for on-chain tx hash (poll thirdweb Engine V1)
     let onChainHash: string | null = null;
     try {
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 20; i++) {
         await new Promise(r => setTimeout(r, 2000));
         const statusRes = await fetch(`https://engine.thirdweb.com/v1/transactions/${txId}`, {
-          headers: { "x-secret-key": THIRDWEB_SECRET },
+          headers: {
+            "x-secret-key": THIRDWEB_SECRET,
+            "x-vault-access-token": VAULT_ACCESS_TOKEN,
+          },
         });
+        if (!statusRes.ok) continue;
         const statusData = await statusRes.json();
         const tx = statusData?.result;
+        // V1 Engine: transactionHash at top level
         if (tx?.transactionHash) {
           onChainHash = tx.transactionHash;
+          console.log("On-chain confirmed:", onChainHash);
           break;
         }
-        if (tx?.status === "FAILED") break;
+        if (tx?.status === "FAILED") {
+          console.log("TX failed:", tx?.executionResult?.error?.message?.slice(0, 100));
+          break;
+        }
       }
     } catch (e) {
       console.log("Polling error (non-critical):", e);
