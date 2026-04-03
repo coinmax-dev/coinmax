@@ -374,12 +374,6 @@ export default function ProfilePage() {
                 ) : (
                   <div className="text-[28px] font-black text-white leading-tight" data-testid="text-net-assets">{formatMA(totalAssetMA)}</div>
                 )}
-                {isConnected && (totalWithdrawnMA > 0 || totalReleasedMA > 0) && (
-                  <div className="flex gap-4 mt-1">
-                    <div className="text-[10px] text-white/30">{t("profile.totalWithdrawn", "总提现")} <span className="text-white/50 font-mono">{totalWithdrawnMA.toFixed(2)}</span></div>
-                    <div className="text-[10px] text-white/30">{t("profile.totalReleased", "总释放")} <span className="text-primary/60 font-mono">{totalReleasedMA.toFixed(2)}</span></div>
-                  </div>
-                )}
               </div>
               <div
                 className="h-11 w-11 rounded-2xl flex items-center justify-center"
@@ -408,10 +402,10 @@ export default function ProfilePage() {
                   ))}
                 </div>
 
-                {/* ① 未提现余额 + 提现按钮 */}
+                {/* ① 总提现金额 + 提现按钮 */}
                 <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.12)" }}>
                   <div>
-                    <div className="text-[10px] text-white/40">{t("profile.unwithdraw", "未提现余额")}</div>
+                    <div className="text-[10px] text-white/40">{t("profile.totalWithdrawable", "总提现金额")}</div>
                     <div className="text-[18px] font-bold text-white">{formatMA(availableEarnings)}</div>
                   </div>
                   <Button
@@ -424,18 +418,18 @@ export default function ProfilePage() {
                   </Button>
                 </div>
 
-                {/* ② 提现金额 (线性释放中, 每日减少) */}
+                {/* ② 提现金额 (已提现但还在线性释放中) */}
                 <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.03)", border: "1px solid rgba(251,191,36,0.08)" }}>
                   <div>
-                    <div className="text-[10px] text-amber-400/60">{t("profile.withdrawnAmount", "提现金额")}</div>
+                    <div className="text-[10px] text-amber-400/60">{t("profile.pendingRelease", "提现金额")}</div>
                     <div className="text-[16px] font-bold text-amber-400/80">{formatMA(withdrawnInProgress)}</div>
                   </div>
                 </div>
 
-                {/* ③ 待释放余额 + 释放按钮 */}
+                {/* ③ 释放余额 + 释放按钮 */}
                 <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.1)" }}>
                   <div>
-                    <div className="text-[10px] text-white/40">{t("profile.claimableBalance", "待释放余额")}</div>
+                    <div className="text-[10px] text-white/40">{t("profile.releaseBalance", "释放余额")}</div>
                     <div className="text-[16px] font-bold text-primary">{formatMA(claimableMA)}</div>
                   </div>
                   <Button

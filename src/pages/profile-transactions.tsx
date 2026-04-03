@@ -32,6 +32,8 @@ const TX_TYPE_COLORS: Record<string, string> = {
   BONUS_GRANT: "bg-foreground/8 text-foreground/60",
   CONFIRMED: "bg-foreground/8 text-foreground/60",
   MA_CLAIM: "bg-foreground/8 text-foreground/60",
+  MA_RELEASE: "bg-primary/10 text-primary",
+  FLASH_SWAP: "bg-foreground/8 text-foreground/60",
 };
 
 // Labels resolved at render time via t()
@@ -51,6 +53,8 @@ const TX_TYPE_LABEL_KEYS: Record<string, { key: string; fallback: string }> = {
   REWARD_RELEASE: { key: "tx.rewardRelease", fallback: "释放到账" },
   BONUS_GRANT: { key: "tx.bonusGrant", fallback: "体验金赠送" },
   MA_CLAIM: { key: "tx.maClaim", fallback: "MA提现" },
+  MA_RELEASE: { key: "tx.maRelease", fallback: "释放到账" },
+  FLASH_SWAP: { key: "tx.flashSwap", fallback: "闪兑" },
 };
 
 const FILTER_KEYS = [
@@ -63,6 +67,8 @@ const FILTER_KEYS = [
   { key: "FIXED_YIELD", labelKey: "tx.filterNode", fallback: "节点收益" },
   { key: "WITHDRAW,VAULT_REDEEM", labelKey: "tx.filterRedeem", fallback: "赎回/提取" },
   { key: "MA_CLAIM", labelKey: "tx.filterMaClaim", fallback: "MA提现" },
+  { key: "MA_RELEASE", labelKey: "tx.filterRelease", fallback: "释放到账" },
+  { key: "FLASH_SWAP", labelKey: "tx.filterFlashSwap", fallback: "闪兑" },
 ];
 
 export default function ProfileTransactionsPage() {
@@ -162,6 +168,16 @@ export default function ProfileTransactionsPage() {
                         <span className="text-xs font-bold text-neon-value font-mono">
                           {formatCompact(Number(tx.amount))} {tx.token}
                         </span>
+                        {tx.type === "MA_CLAIM" && (tx as any).details?.burnAmount > 0 && (
+                          <span className="text-[9px] text-red-400/70 font-mono">
+                            -{Number((tx as any).details.burnAmount).toFixed(2)} {t("tx.burnLabel", "销毁")}
+                          </span>
+                        )}
+                        {tx.type === "MA_RELEASE" && (
+                          <span className="text-[9px] text-primary/70 font-mono">
+                            {t("tx.onchain", "链上到账")}
+                          </span>
+                        )}
                         <Badge className={`text-[9px] shrink-0 no-default-hover-elevate no-default-active-elevate ${
                           tx.status === "CONFIRMED" || tx.status === "COMPLETED"
                             ? "bg-foreground/8 text-foreground/50"
@@ -187,7 +203,7 @@ export default function ProfileTransactionsPage() {
                           <span className="text-[10px] text-muted-foreground/40">-</span>
                         )}
                       </div>
-                      {(tx.type === "REWARD_RELEASE" || tx.type === "YIELD_CLAIM" || tx.type === "MA_CLAIM") && (
+                      {(tx.type === "REWARD_RELEASE" || tx.type === "YIELD_CLAIM" || tx.type === "MA_CLAIM" || tx.type === "MA_RELEASE") && (
                         <button
                           onClick={() => setExpandedRelease(expandedRelease === tx.id ? null : tx.id)}
                           className="text-[9px] text-primary/60 hover:text-primary flex items-center gap-0.5"
