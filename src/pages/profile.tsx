@@ -67,7 +67,7 @@ export default function ProfilePage() {
     queryKey: ["vault-yield-settled", walletAddr],
     queryFn: async () => {
       if (!walletAddr) return { unlocked: 0, locked: 0 };
-      const { data: prof } = await supabase.from("profiles").select("id").eq("wallet_address", walletAddr).single();
+      const { data: prof } = await supabase.from("profiles").select("id").ilike("wallet_address", walletAddr).single();
       if (!prof) return { unlocked: 0, locked: 0 };
       const { data: rewards } = await supabase
         .from("vault_rewards")
@@ -131,28 +131,38 @@ export default function ProfilePage() {
 
   const deposited = personalHolding; // excludes bonus
   const withdrawn = Number(profile?.totalWithdrawn || 0);
-  // Node earnings in MA (from node_memberships available_balance)
-  const nodeAvailableMA = Number(nodeOverview?.availableBalance || 0);
-  const nodeEarnings = nodeAvailableMA;
-  // Broker/referral earnings (already in MA from settle_team_commission)
-  const referralEarnings = Number(profile?.referralEarnings || 0);
-  // Total available earnings in MA (all sources already in MA)
-  const totalEarnings = nodeEarnings + vaultYieldMA + referralEarnings;
   const net = deposited - withdrawn;
 
-  // Claimed yield = sum of YIELD_CLAIM transactions
-  const { data: claimedYield = 0 } = useQuery({
-    queryKey: ["claimed-yield", walletAddr],
+  // V4: Read all earnings from DB tables
+  const { data: allEarnings = { vault: 0, node: 0, broker: 0, claimed: 0 } } = useQuery({
+    queryKey: ["v4-all-earnings", walletAddr],
     queryFn: async () => {
-      if (!walletAddr) return 0;
-      const { data: prof } = await supabase.from("profiles").select("id").eq("wallet_address", walletAddr).single();
-      if (!prof) return 0;
-      const { data: txs } = await supabase.from("transactions").select("amount").eq("user_id", prof.id).eq("type", "YIELD_CLAIM");
-      return (txs || []).reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+      if (!walletAddr) return { vault: 0, node: 0, broker: 0, claimed: 0 };
+      const { data: prof } = await supabase.from("profiles").select("id").ilike("wallet_address", walletAddr).single();
+      if (!prof) return { vault: 0, node: 0, broker: 0, claimed: 0 };
+
+      const [vr, nr, br, cl] = await Promise.all([
+        supabase.from("vault_rewards").select("ar_amount").eq("user_id", prof.id),
+        supabase.from("node_rewards").select("amount").eq("user_id", prof.id),
+        supabase.from("broker_rewards").select("amount").eq("user_id", prof.id),
+        supabase.from("transactions").select("amount").eq("user_id", prof.id).in("type", ["MA_CLAIM", "YIELD_CLAIM"]),
+      ]);
+
+      return {
+        vault: (vr.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || 0), 0),
+        node: (nr.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0),
+        broker: (br.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0),
+        claimed: (cl.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0),
+      };
     },
     enabled: !!walletAddr,
+    refetchInterval: 30000,
   });
-  // Available = total unlocked earnings - already claimed
+
+  const nodeEarnings = allEarnings.node;
+  const referralEarnings = allEarnings.broker;
+  const totalEarnings = allEarnings.vault + allEarnings.node + allEarnings.broker;
+  const claimedYield = allEarnings.claimed;
   const availableEarnings = Math.max(0, totalEarnings - claimedYield);
 
   const refCode = profile?.refCode;
