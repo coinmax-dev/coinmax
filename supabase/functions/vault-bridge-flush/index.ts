@@ -18,7 +18,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SERVER_WALLET   = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
+const SERVER_WALLET   = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
 const BATCH_BRIDGE    = Deno.env.get("BATCH_BRIDGE_ADDRESS") || "0xAa80a499B8738E3Fd7779057F7E3a7D73c045c4D";
 const ARB_FUND_ROUTER = "0x71237E535d5E00CDf18A609eA003525baEae3489";
 const BSC_USDT        = "0x55d398326f99059fF775485246999027B3197955";

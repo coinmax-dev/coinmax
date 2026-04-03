@@ -42,7 +42,7 @@ const RISK_PRESETS: Record<string, { labelKey: string; color: string; bg: string
   },
 };
 
-const ENGINE_WALLET = "0x0831e8875685C796D05F2302D3c5C2Dd77fAc3B6";
+const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
 
 interface Props {
   selectedModels: string[];

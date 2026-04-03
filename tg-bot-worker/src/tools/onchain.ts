@@ -7,9 +7,9 @@ const ARB_USDC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
 
 // Key contract addresses
 const CONTRACTS: Record<string, [string, string]> = {
-  "Vault": ["0xE0A80b82F42d009cdE772d5c34b1682C2D79e821", "BSC"],
+  "Vault": ["0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744", "BSC"],
   "BatchBridge": ["0xAa80a499B8738E3Fd7779057F7E3a7D73c045c4D", "BSC"],
-  "Server Wallet": ["0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b", "BSC"],
+  "Server Wallet": ["0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff", "BSC"],
   "Node Wallet": ["0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", "BSC"],
   "SwapRouter": ["0x5650383D9f8d8f80fc972b8F49A3cc31d3A7F7E3", "BSC"],
   "Deployer": ["0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", "BSC"],
@@ -116,7 +116,7 @@ ${transfers.join("\n") || "  无"}`;
 async function checkVaultConfig(): Promise<string> {
   // Read Vault fundDistributor
   const fdData = await rpcCall(BSC_RPC, "eth_call", [{
-    to: "0xE0A80b82F42d009cdE772d5c34b1682C2D79e821",
+    to: "0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744",
     data: "0xde9d6d59"
   }, "latest"]);
   const fd = fdData ? "0x" + fdData.slice(-40) : "读取失败";

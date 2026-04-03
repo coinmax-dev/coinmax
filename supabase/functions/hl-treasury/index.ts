@@ -2,7 +2,7 @@
  * HyperLiquid Treasury Edge Function (thirdweb Server Wallet)
  *
  * Uses thirdweb server wallet for all signing — no raw private key needed.
- * Server wallet: 0x60D416dA873508c23C1315a2b750a31201959d78
+ * Server wallet: 0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff
  *
  * Actions:
  *   - balance:  Query HL perps account (balances + positions)
@@ -28,7 +28,7 @@ const TREASURY_ADMIN_KEY = Deno.env.get("TREASURY_ADMIN_KEY") || "";
 
 // thirdweb server wallet
 const TW_SECRET_KEY = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
-const SERVER_WALLET = Deno.env.get("THIRDWEB_SERVER_WALLET") || "0x60D416dA873508c23C1315a2b750a31201959d78";
+const SERVER_WALLET = Deno.env.get("THIRDWEB_SERVER_WALLET") || "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
 
 // Contracts on Arbitrum
 const USDC_ARB = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";

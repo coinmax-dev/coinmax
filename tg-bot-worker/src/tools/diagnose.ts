@@ -21,7 +21,7 @@ export async function diagnose(env: Env, user: BotUser, params: Record<string, s
 async function checkFunds(): Promise<string> {
   const balances: Record<string, string> = {};
   const addrs: [string, string, number][] = [
-    ["Server Wallet", "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b", 18],
+    ["Server Wallet", "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff", 18],
     ["BatchBridge", "0xAa80a499B8738E3Fd7779057F7E3a7D73c045c4D", 18],
     ["Node Wallet", "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", 18],
   ];

@@ -284,7 +284,7 @@ function MASwap() {
   const handleSwap = async () => {
     if (!account || !client || inputAmount <= 0 || exceedsQuota) return;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const EOA_WALLET = "0xeBAB6D22278c9839A46B86775b3AC9469710F84b";
+    const EOA_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
     const amountWei = BigInt(Math.floor(inputAmount * 1e18));
 
     setSwapError("");

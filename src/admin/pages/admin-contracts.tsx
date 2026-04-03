@@ -105,12 +105,12 @@ const FLASH_SWAP_READ_ABI = {
 
 // ── Server Wallets for gas monitoring ──
 const SERVER_WALLETS = [
-  { label: "Server Wallet (ERC-4337·MINTER/FEEDER/ENGINE)", address: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b" },
+  { label: "Server Wallet (ERC-4337·MINTER/FEEDER/ENGINE)", address: "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff" },
   { label: "Deployer (EOA·合约admin·跨链)", address: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1" },
   { label: "Relayer (EIP-7702·BSC不可用)", address: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA" },
   { label: "VIP接收钱包", address: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A" },
   { label: "节点接收钱包", address: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9" },
-  { label: "HL Treasury (ARB)", address: "0x60D416dA873508c23C1315a2b750a31201959d78" },
+  { label: "HL Treasury (ARB)", address: "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff" },
 ] as const;
 
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
@@ -629,7 +629,7 @@ export default function AdminContracts() {
               { label: "FlashSwap (MA闪兑) UUPS", value: FLASH_SWAP_ADDRESS, type: "address" },
               { label: "── 代币 ──", value: "" },
               { label: "MA Token", value: MA_TOKEN_ADDRESS, type: "address" },
-              { label: "cUSD (记账)", value: "0xDDB67fe20382868d7378FB3F4f5e23DBd1B2C4D6", type: "address" },
+              { label: "cUSD (记账)", value: "0x512d6d3C33D4a018e35a7d4c89754e0e3E72fD4B", type: "address" },
               { label: "── 安全 ──", value: "" },
               { label: "Forwarder (EIP-2771)", value: FORWARDER_ADDRESS, type: "address" },
               { label: "Timelock (24h延迟)", value: TIMELOCK_ADDRESS, type: "address" },
@@ -668,13 +668,13 @@ export default function AdminContracts() {
             address=""
             items={[
               { label: "── 执行钱包 ──", value: "" },
-              { label: "Server Wallet (ERC-4337·主执行)", value: "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b", type: "address" },
+              { label: "Server Wallet (ERC-4337·主执行)", value: "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff", type: "address" },
               { label: "Deployer (EOA·跨链+紧急恢复)", value: "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1", type: "address" },
               { label: "Relayer (EIP-7702·BSC不可用)", value: "0xcb41F3C3eD6C255F57Cda1bA3fd42389B0f0F0aA", type: "address" },
               { label: "── 接收钱包 ──", value: "" },
               { label: "VIP接收 (USDT)", value: "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A", type: "address" },
               { label: "节点接收 (USDC)", value: "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9", type: "address" },
-              { label: "HL Treasury (ARB)", value: "0x60D416dA873508c23C1315a2b750a31201959d78", type: "address" },
+              { label: "HL Treasury (ARB)", value: "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff", type: "address" },
             ]}
             loading={false}
             onRefresh={() => {}}
@@ -1282,7 +1282,7 @@ function BatchGasPanel() {
 
 const THIRDWEB_SECRET = import.meta.env.VITE_THIRDWEB_SECRET_KEY || "";
 const THIRDWEB_VAULT_TOKEN = import.meta.env.VITE_THIRDWEB_VAULT_TOKEN || "";
-const EXECUTOR_ADDR = "0x85e44A8Be3B0b08e437B16759357300A4Cd1d95b";
+const EXECUTOR_ADDR = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
 const FEEDER_ROLE_HASH = "0x80a586cc4ecf40a390b370be075aa38ab3cc512c5c1a7bc1007974dbdf2663c7";
 
 async function callExecutor(calls: { contractAddress: string; method: string; params: string[] }[]) {
@@ -1765,7 +1765,7 @@ function VaultFlowDiagram() {
           { label: "BatchBridgeV2", addr: formatAddress("0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db"), fullAddr: "0x5BDc4220Ea06CfaD6B42fD1c69ce4D2BAA46C0Db", color: "text-emerald-400", bg: "bg-emerald-500/10" },
         ]},
         { label: "Vault内部: USDT→cUSD记账 + Oracle定价 → mint MA锁仓", steps: [
-          { label: "mint cUSD", addr: formatAddress("0xDDB67fe20382868d7378FB3F4f5e23DBd1B2C4D6"), fullAddr: "0xDDB67fe20382868d7378FB3F4f5e23DBd1B2C4D6", color: "text-cyan-400", bg: "bg-cyan-500/10" },
+          { label: "mint cUSD", addr: formatAddress("0x512d6d3C33D4a018e35a7d4c89754e0e3E72fD4B"), fullAddr: "0x512d6d3C33D4a018e35a7d4c89754e0e3E72fD4B", color: "text-cyan-400", bg: "bg-cyan-500/10" },
           { label: "Oracle", addr: formatAddress(PRICE_ORACLE_ADDRESS), fullAddr: PRICE_ORACLE_ADDRESS, color: "text-amber-400", bg: "bg-amber-500/10" },
           { label: "mint MA", addr: formatAddress(MA_TOKEN_ADDRESS), fullAddr: MA_TOKEN_ADDRESS, color: "text-yellow-400", bg: "bg-yellow-500/10" },
           { label: "锁仓", addr: "5/45/90/180天", color: "text-green-400", bg: "bg-green-500/10" },
