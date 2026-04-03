@@ -301,7 +301,8 @@ function MASwap() {
   };
 
   const maBalance = Number(maBalanceRaw || BigInt(0)) / 1e18;
-  const swapQuota = maBalance; // only wallet MA can be swapped
+
+  const swapQuota = maBalance; // wallet MA can be swapped
   const inputAmount = parseFloat(maAmount) || 0;
   const outputAmount = isSwapped ? inputAmount / maPrice : inputAmount * maPrice;
   const exceedsQuota = !isSwapped && inputAmount > swapQuota;
@@ -367,38 +368,35 @@ function MASwap() {
     try {
       setSwapStatus("transferring");
 
-      if (!isSwapped) {
-        // ═══ SELL MA → USDT (V4: requestSwap on FlashSwap contract) ═══
-        // Step 1: Approve MA to FlashSwap contract
-        const maContract = getMATokenContract(client);
-        const approveTx = prepareContractCall({
-          contract: maContract,
-          method: "function approve(address spender, uint256 amount) returns (bool)",
-          params: [FLASH_SWAP, amountWei],
-        });
-        const approveResult = await sendTransaction(approveTx);
-        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+      // ═══ 闪兑: 用户 transfer MA → Engine, 后端 burn MA + USDC→USDT 给用户 ═══
+      const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
+      const maContract = getMATokenContract(client);
 
-        // Step 2: Call FlashSwapV4.requestSwap → burn MA, Server sends USDT
-        setSwapStatus("recording");
-        const flashContract = getContract({ client, chain: BSC_CHAIN, address: FLASH_SWAP });
-        const swapTx = prepareContractCall({
-          contract: flashContract,
-          method: "function requestSwap(uint256 maAmount) returns (uint256)",
-          params: [amountWei],
-          gas: BigInt(500000),
-        });
-        const swapResult = await sendTransaction(swapTx);
-        const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: swapResult.transactionHash });
-        if (receipt.status === "reverted") throw new Error("闪兑失败");
+      // Step 1: Transfer MA to Engine wallet
+      const transferTx = prepareContractCall({
+        contract: maContract,
+        method: "function transfer(address to, uint256 amount) returns (bool)",
+        params: [ENGINE_WALLET, amountWei],
+        gas: BigInt(100000),
+      });
+      const transferResult = await sendTransaction(transferTx);
+      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: transferResult.transactionHash });
+      if (receipt.status === "reverted") throw new Error("MA转账失败");
 
-      } else {
-        // ═══ BUY MA with USDT — V4 不支持直接买入 ═══
-        throw new Error("V4 暂不支持 USDT 买入 MA");
-      }
-
-      // No need to call edge function — FlashSwap event triggers Server auto-fulfill
-      const data = { success: true };
+      // Step 2: Call edge function → Engine burns MA + swaps USDC→USDT to user
+      setSwapStatus("recording");
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/flash-swap-v4`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          walletAddress: account.address,
+          maAmount: inputAmount,
+          txHash: receipt.transactionHash,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
 
       setSwapStatus("success");
       setMaAmount("");
