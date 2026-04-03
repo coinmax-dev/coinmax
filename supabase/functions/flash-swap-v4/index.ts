@@ -81,7 +81,6 @@ serve(async (req) => {
     // Calculate USDT output: MA amount × MA price = USD value
     const usdtAmount = amount * maPrice;
     const usdcWei = "0x" + BigInt(Math.floor(usdtAmount * 1e18)).toString(16);
-    const maWei = "0x" + BigInt(Math.floor(amount * 1e18)).toString(16);
 
     console.log(`FlashSwap: ${walletAddress} | ${amount} MA × $${maPrice} = $${usdtAmount.toFixed(2)} USDT`);
 
@@ -146,7 +145,6 @@ serve(async (req) => {
       maAmount: amount,
       maPrice,
       usdtAmount,
-      burnTxId,
       swapTxId,
     });
 
