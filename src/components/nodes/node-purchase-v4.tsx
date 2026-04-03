@@ -1,23 +1,24 @@
 import { useState } from "react";
 import { useActiveAccount, useSendTransaction } from "thirdweb/react";
 import { prepareContractCall, getContract, waitForReceipt } from "thirdweb";
-import { transfer } from "thirdweb/extensions/erc20";
 import { useThirdwebClient } from "@/hooks/use-thirdweb";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { BSC_CHAIN, USDT_ADDRESS } from "@/lib/contracts";
+import { BSC_CHAIN, USDT_ADDRESS, USDC_ADDRESS } from "@/lib/contracts";
 import { useTranslation } from "react-i18next";
 
 /**
- * V4 Node Purchase — User pays USDT to Server, Engine mints NFT + cUSD + MA
+ * V4 Node Purchase — User pays USDT → swap USDC → Server, Engine mints NFT + cUSD + MA
  *
  * Flow:
- *   1. User transfers USDT to Receiver Server (0xe193)
- *   2. Frontend callback → POST /vault-bridge-v4 {type:"node"}
- *   3. Engine: VaultV4 position + NodeNFT mint + MAStaking lock
+ *   1. Approve USDT → PancakeSwap Router
+ *   2. Swap USDT → USDC → Receiver Server (0xe193)
+ *   3. Frontend callback → POST /vault-bridge-v4 {type:"node"}
+ *   4. Engine: VaultV4 position + NodeNFT mint + MAStaking lock
  */
 
 const USDC_RECEIVER = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
+const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
 
 const NODE_PLANS = {
   MAX: { label: "大节点", price: 600, frozen: 6000, rate: "0.9%", days: 120, daily: 54 },
@@ -41,17 +42,38 @@ export function NodePurchaseV4({ nodeType, onClose }: { nodeType: "MAX" | "MINI"
     try {
       const usdtC = getContract({ client, chain: BSC_CHAIN, address: USDT_ADDRESS });
       const amountWei = BigInt(Math.floor(plan.price * 1e18));
+      const minOut = amountWei * BigInt(995) / BigInt(1000);
 
-      // Step 1: Transfer USDT to Receiver Server
-      const tx = transfer({
-        contract: usdtC,
-        to: USDC_RECEIVER,
-        amount: plan.price.toString(),
+      // Step 1: Approve USDT → PancakeSwap Router
+      const { readContract: rc } = await import("thirdweb");
+      const usdtAllowance = BigInt((await rc({ contract: usdtC, method: "function allowance(address,address) view returns (uint256)", params: [account.address, PANCAKE_ROUTER] })).toString());
+      if (usdtAllowance < amountWei) {
+        if (usdtAllowance > BigInt(0)) {
+          const resetTx = prepareContractCall({ contract: usdtC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [PANCAKE_ROUTER, BigInt(0)] });
+          const resetResult = await sendTx(resetTx);
+          await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: resetResult.transactionHash });
+        }
+        const approveTx = prepareContractCall({ contract: usdtC, method: "function approve(address spender, uint256 amount) returns (bool)", params: [PANCAKE_ROUTER, amountWei] });
+        const approveResult = await sendTx(approveTx);
+        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+      }
+
+      // Step 2: Swap USDT → USDC → Server
+      const router = getContract({ client, chain: BSC_CHAIN, address: PANCAKE_ROUTER });
+      const swapTx = prepareContractCall({
+        contract: router,
+        method: "function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut)",
+        params: [{
+          tokenIn: USDT_ADDRESS, tokenOut: USDC_ADDRESS, fee: 100,
+          recipient: USDC_RECEIVER, amountIn: amountWei,
+          amountOutMinimum: minOut, sqrtPriceLimitX96: BigInt(0),
+        }],
+        gas: BigInt(300000),
       });
-      const result = await sendTx(tx);
+      const result = await sendTx(swapTx);
       const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
 
-      if (receipt.status === "reverted") throw new Error("Transfer failed");
+      if (receipt.status === "reverted") throw new Error("Swap failed");
 
       // Step 2: Trigger Engine to mint NFT + cUSD + MA
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
