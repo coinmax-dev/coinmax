@@ -538,21 +538,11 @@ export default function ProfileNodesPage() {
             </div>
 
             <div className="rounded-2xl p-4 sm:p-5 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #161418, #0e1216)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="flex items-center justify-between mb-2.5">
-                <div className="flex items-center gap-1.5">
-                  <Lock className="h-4 w-4" style={{ color: "#fbbf24" }} />
-                  <span className="text-[11px] sm:text-xs text-white/40 font-medium uppercase tracking-wider">{t("profile.availableBalance")}</span>
-                </div>
-                <button
-                  className="text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all active:scale-95"
-                  style={{ background: "rgba(10,186,181,0.12)", border: "1px solid rgba(10,186,181,0.25)", color: tiffanyLight }}
-                  onClick={() => toast({ title: t("profile.withdrawNotReady"), description: t("profile.withdrawNotReadyDesc") })}
-                >
-                  {t("profile.withdrawBtn")}
-                </button>
+              <div className="flex items-center gap-1.5 mb-2.5">
+                <TrendingUp className="h-4 w-4" style={{ color: tiffanyLight }} />
+                <span className="text-[11px] sm:text-xs text-white/40 font-medium uppercase tracking-wider">{t("profile.nodeEarningsTotal", "节点已提收益")}</span>
               </div>
               <div className="text-base sm:text-lg font-bold text-white">{formatCompactMA(availableBalance)}</div>
-              <div className="text-[11px] text-white/25 mt-0.5">/ {formatCompactMA(lockedEarnings)}</div>
             </div>
           </div>
 
