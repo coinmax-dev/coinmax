@@ -31,9 +31,10 @@ const MA_TOKEN = "0xc6d2dbC85DC3091C41692822A128c19F9eAc7988";
 
 const SPLIT_RATIOS: Record<string, { burnPct: number; releaseDays: number }> = {
   A: { burnPct: 0, releaseDays: 60 },
-  B: { burnPct: 5, releaseDays: 45 },
-  C: { burnPct: 10, releaseDays: 30 },
-  D: { burnPct: 20, releaseDays: 14 },
+  B: { burnPct: 5, releaseDays: 30 },
+  C: { burnPct: 10, releaseDays: 15 },
+  D: { burnPct: 15, releaseDays: 7 },
+  E: { burnPct: 20, releaseDays: 0 },  // 立即释放
 };
 
 async function engineWriteOne(call: { contractAddress: string; method: string; params: unknown[] }) {
@@ -115,27 +116,42 @@ serve(async (req) => {
       console.log("Burn TX:", burnTxId);
     }
 
-    // 5. DB: Create linear release schedule (NOT immediate addReleased)
+    // 5. Release MA
     const now = new Date();
-    const endDate = new Date(now.getTime() + ratio.releaseDays * 86400000);
+    let releaseTxId = "none";
 
-    await supabase.from("release_schedules").insert({
-      user_id: profile.id,
-      wallet_address: walletAddress,
-      total_amount: releaseAmount,
-      daily_amount: dailyRelease,
-      released_amount: 0,
-      remaining_amount: releaseAmount,
-      days_total: ratio.releaseDays,
-      days_released: 0,
-      split_ratio: splitRatio,
-      burn_amount: burnAmount,
-      start_date: now.toISOString(),
-      end_date: endDate.toISOString(),
-      status: "ACTIVE",
-      mint_tx_id: mintTxId,
-      burn_tx_id: burnTxId,
-    });
+    if (ratio.releaseDays === 0) {
+      // ═══ 立即释放: addReleased 全部 ═══
+      await new Promise(r => setTimeout(r, 3000));
+      const releaseWei = "0x" + BigInt(Math.floor(releaseAmount * 1e18)).toString(16);
+      const relResult = await engineWriteOne({
+        contractAddress: RELEASE,
+        method: "function addReleased(address user, uint256 amount, string source)",
+        params: [walletAddress, releaseWei, "instant_release_" + splitRatio],
+      });
+      releaseTxId = relResult?.result?.transactions?.[0]?.id || "failed";
+      console.log("Instant release TX:", releaseTxId);
+    } else {
+      // ═══ 线性释放: 创建 schedule, 每日 settle 处理 ═══
+      const endDate = new Date(now.getTime() + ratio.releaseDays * 86400000);
+      await supabase.from("release_schedules").insert({
+        user_id: profile.id,
+        wallet_address: walletAddress,
+        total_amount: releaseAmount,
+        daily_amount: dailyRelease,
+        released_amount: 0,
+        remaining_amount: releaseAmount,
+        days_total: ratio.releaseDays,
+        days_released: 0,
+        split_ratio: splitRatio,
+        burn_amount: burnAmount,
+        start_date: now.toISOString(),
+        end_date: endDate.toISOString(),
+        status: "ACTIVE",
+        mint_tx_id: mintTxId,
+        burn_tx_id: burnTxId,
+      });
+    }
 
     // 6. DB: Record in transactions history
     await supabase.from("transactions").insert({

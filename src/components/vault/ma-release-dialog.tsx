@@ -37,9 +37,10 @@ interface MAReleaseDialogProps {
 }
 
 const PLAN_DATA = [
-  { index: 3, release: 80, burn: 20, days: 14, ratio: "D", color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
-  { index: 2, release: 90, burn: 10, days: 30, ratio: "C", color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/20" },
-  { index: 1, release: 95, burn: 5, days: 45, ratio: "B", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+  { index: 4, release: 80, burn: 20, days: 0, ratio: "E", color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/20" },
+  { index: 3, release: 85, burn: 15, days: 7, ratio: "D", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  { index: 2, release: 90, burn: 10, days: 15, ratio: "C", color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/20" },
+  { index: 1, release: 95, burn: 5, days: 30, ratio: "B", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
   { index: 0, release: 100, burn: 0, days: 60, ratio: "A", color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
 ];
 
