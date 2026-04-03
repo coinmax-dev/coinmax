@@ -224,37 +224,76 @@ serve(async (req) => {
       const receiverBalance = parseInt(balData.result || "0x0", 16) / 1e18;
 
       if (receiverBalance >= 1) {
-        // Bridge: Receiver(BSC USDC) → ARB Trading wallet
-        // Step 1: Approve USDC to thirdweb bridge contract (if needed)
-        // Step 2: Use thirdweb Engine to initiate bridge
-        // thirdweb bridge uses their universal router
-        const bridgeAmountWei = "0x" + BigInt(Math.floor(receiverBalance * 1e18)).toString(16);
+        const bridgeAmountWei = BigInt(Math.floor(receiverBalance * 1e18));
 
-        // Transfer USDC from Receiver to a bridge-compatible path
-        // For now: Receiver sends USDC to Engine, Engine uses thirdweb bridge SDK
-        // Simpler: just transfer USDC to Trading wallet on BSC, manual bridge later
-        // OR: use thirdweb Engine bridge endpoint if available
-
-        // Try thirdweb Engine bridge (experimental)
-        const bridgeRes = await fetch("https://engine.thirdweb.com/v1/write/contract", {
+        // Step 1: Approve USDC to thirdweb Bridge universal router
+        // thirdweb bridge prepare endpoint to get the router address + tx
+        const prepareRes = await fetch("https://bridge.thirdweb.com/v1/transactions/prepare", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-secret-key": THIRDWEB_SECRET,
-            "x-vault-access-token": VAULT_ACCESS_TOKEN,
           },
           body: JSON.stringify({
-            executionOptions: { type: "EOA", from: RECEIVER, chainId: "56" },
-            params: [{
-              contractAddress: BSC_USDC,
-              method: "function transfer(address to, uint256 amount) returns (bool)",
-              params: [ARB_TRADING, bridgeAmountWei],
-            }],
+            type: "transfer",
+            params: {
+              senderAddress: RECEIVER,
+              receiverAddress: ARB_TRADING,
+              originChainId: 56,
+              destinationChainId: 42161,
+              originTokenAddress: BSC_USDC,
+              destinationTokenAddress: ARB_USDC,
+              amount: bridgeAmountWei.toString(),
+            },
           }),
         });
-        bridgeResult = await bridgeRes.json();
-        const bridgeTxId = bridgeResult?.result?.transactions?.[0]?.id || "pending";
-        console.log("Bridge USDC:", receiverBalance.toFixed(2), "→ ARB Trading, tx:", bridgeTxId);
+        const prepareData = await prepareRes.json();
+        console.log("Bridge prepare:", JSON.stringify(prepareData).slice(0, 200));
+
+        if (prepareData?.result?.steps) {
+          // Execute each bridge step via Engine
+          for (const step of prepareData.result.steps) {
+            for (const tx of (step.transactions || [])) {
+              const execRes = await fetch("https://engine.thirdweb.com/v1/write/contract", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-secret-key": THIRDWEB_SECRET,
+                  "x-vault-access-token": VAULT_ACCESS_TOKEN,
+                },
+                body: JSON.stringify({
+                  executionOptions: {
+                    type: "EOA",
+                    from: RECEIVER,
+                    chainId: String(tx.chainId || 56),
+                  },
+                  params: [{
+                    contractAddress: tx.to,
+                    method: "raw",
+                    params: [],
+                    // Raw transaction data
+                    ...(tx.data ? { rawTransaction: { to: tx.to, data: tx.data, value: tx.value || "0x0" } } : {}),
+                  }],
+                }),
+              });
+              const execData = await execRes.json();
+              const txId = execData?.result?.transactions?.[0]?.id || "?";
+              console.log("Bridge step tx:", txId);
+              await new Promise(r => setTimeout(r, 3000));
+            }
+          }
+          bridgeResult = { status: "bridged", steps: prepareData.result.steps.length };
+        } else {
+          // Fallback: simple transfer on BSC to Trading wallet
+          console.log("Bridge API no steps, fallback to BSC transfer");
+          const transferRes = await engineWriteOne({
+            contractAddress: BSC_USDC,
+            method: "function transfer(address to, uint256 amount) returns (bool)",
+            params: [ARB_TRADING, "0x" + bridgeAmountWei.toString(16)],
+          });
+          bridgeResult = { status: "bsc_transfer", txId: transferRes?.result?.transactions?.[0]?.id };
+        }
+        console.log("Bridge result:", JSON.stringify(bridgeResult).slice(0, 100));
       }
     } catch (bridgeErr) {
       console.log("Bridge error (non-critical):", bridgeErr);

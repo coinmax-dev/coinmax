@@ -144,21 +144,20 @@ serve(async (req) => {
     // MA minting is DB-only. Actual mint happens in claim-v4 when user withdraws.
     console.log(`DB-only: ${totalMAToMint.toFixed(2)} MA recorded (not minted until claim)`);
 
-    // ── Step 4: Process linear release schedules (提现线性释放) ──
+    // ── Step 4: Process linear release schedules ──
+    // DB: 每日从 remaining → released (待释放余额递增)
+    // Chain: Engine 预铸造当天释放总额到 Engine 钱包, 一键释放时 transfer 给用户
     const { data: activeSchedules } = await supabase
       .from("release_schedules")
       .select("*")
-      .eq("status", "ACTIVE")
-      .lt("days_released", supabase.raw ? undefined : 999); // get all active
+      .eq("status", "ACTIVE");
 
     let releasedCount = 0;
     let releasedTotal = 0;
-    const releaseResults: string[] = [];
 
     if (activeSchedules && activeSchedules.length > 0) {
       for (const schedule of activeSchedules) {
         if (schedule.days_released >= schedule.days_total) {
-          // Mark as completed
           await supabase.from("release_schedules").update({ status: "COMPLETED" }).eq("id", schedule.id);
           continue;
         }
@@ -169,23 +168,11 @@ serve(async (req) => {
 
         if (releaseToday <= 0) continue;
 
-        const releaseWei = "0x" + BigInt(Math.floor(releaseToday * 1e18)).toString(16);
-
-        // On-chain: Release.addReleased(user, dailyAmount)
-        const relResult = await engineWriteOne({
-          contractAddress: RELEASE_V4,
-          method: "function addReleased(address user, uint256 amount, string source)",
-          params: [schedule.wallet_address, releaseWei, "linear_release_day_" + (schedule.days_released + 1)],
-        });
-        const relTxId = relResult?.result?.transactions?.[0]?.id || "?";
-        releaseResults.push(`${schedule.wallet_address.slice(0,8)}: ${releaseToday.toFixed(2)} MA → ${relTxId}`);
-        await new Promise(r => setTimeout(r, 2000));
-
-        // Update schedule in DB
+        // DB: move from remaining → released (待释放余额递增)
         const newDaysReleased = schedule.days_released + 1;
         const newReleasedAmount = Number(schedule.released_amount) + releaseToday;
         const newRemaining = remaining - releaseToday;
-        const isCompleted = newDaysReleased >= schedule.days_total || newRemaining <= 0;
+        const isCompleted = newDaysReleased >= schedule.days_total || newRemaining <= 0.001;
 
         await supabase.from("release_schedules").update({
           days_released: newDaysReleased,
@@ -196,12 +183,38 @@ serve(async (req) => {
 
         releasedCount++;
         releasedTotal += releaseToday;
+        console.log(`Release: ${schedule.wallet_address.slice(0,8)} +${releaseToday.toFixed(2)} MA → 待释放 (${newDaysReleased}/${schedule.days_total}d)`);
       }
+    }
+
+    // Chain: Engine 预铸造今日释放总额到 Engine 钱包 (一键释放时 transfer 给用户)
+    let preMintTxId = "skipped";
+    if (releasedTotal > 0.001) {
+      const releaseMintWei = "0x" + BigInt(Math.floor(releasedTotal * 1e18)).toString(16);
+      const preMintResult = await engineWriteOne({
+        contractAddress: MA_TOKEN,
+        method: "function mint(address to, uint256 amount)",
+        params: [ENGINE_WALLET, releaseMintWei],
+      });
+      preMintTxId = preMintResult?.result?.transactions?.[0]?.id || "?";
+      console.log(`Pre-mint: ${releasedTotal.toFixed(2)} MA → Engine wallet → ${preMintTxId}`);
+    }
+
+    // ── Step 5: Process vault maturity (到期 + 自动续期) ──
+    let maturityResult: any = null;
+    try {
+      const { data: matData, error: matErr } = await supabase.rpc("process_vault_maturity");
+      if (matErr) console.error("Maturity error:", matErr.message);
+      else maturityResult = matData;
+      console.log("Maturity:", JSON.stringify(maturityResult));
+    } catch (e) {
+      console.error("Maturity processing failed:", e);
     }
 
     return json({
       status: "settled",
       db: dbResult,
+      maturity: maturityResult,
       onchain: {
         cusdInterest: totalCusdYield,
         maRecorded: totalMAToMint,
@@ -212,7 +225,7 @@ serve(async (req) => {
       linearRelease: {
         schedulesProcessed: releasedCount,
         totalReleased: releasedTotal,
-        details: releaseResults,
+        preMintTxId,
       },
     });
 

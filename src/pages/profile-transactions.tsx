@@ -187,7 +187,7 @@ export default function ProfileTransactionsPage() {
                           <span className="text-[10px] text-muted-foreground/40">-</span>
                         )}
                       </div>
-                      {(tx.type === "REWARD_RELEASE" || tx.type === "YIELD_CLAIM") && releases.length > 0 && (
+                      {(tx.type === "REWARD_RELEASE" || tx.type === "YIELD_CLAIM" || tx.type === "MA_CLAIM") && (
                         <button
                           onClick={() => setExpandedRelease(expandedRelease === tx.id ? null : tx.id)}
                           className="text-[9px] text-primary/60 hover:text-primary flex items-center gap-0.5"
@@ -198,43 +198,43 @@ export default function ProfileTransactionsPage() {
                       )}
                     </div>
 
-                    {/* Release detail expansion */}
+                    {/* Release detail expansion — V4: uses tx.details + release_schedules */}
                     {expandedRelease === tx.id && (() => {
-                      // Match release by amount/date
+                      // V4 MA_CLAIM: details has splitRatio, burnAmount, releaseAmount, releaseDays, mintTxId, burnTxId
+                      const d = (tx as any).details || {};
                       const matchedRelease = releases.find((r: any) =>
-                        Math.abs(Number(r.gross_amount) - Number(tx.amount)) < 0.01 ||
-                        Math.abs(Number(r.net_amount) - Number(tx.amount)) < 0.01
+                        (r.split_ratio === d.splitRatio && Math.abs(Number(r.total_amount) - Number(d.releaseAmount || 0)) < 0.1) ||
+                        Math.abs(Number(r.total_amount || r.net_amount || r.gross_amount) - Number(tx.amount)) < 0.1
                       );
-                      if (!matchedRelease) return <p className="text-[9px] text-foreground/20 mt-2">{t("tx.noReleaseFound", "未找到释放记录")}</p>;
 
-                      const r = matchedRelease;
-                      const now = Date.now();
-                      const start = new Date(r.release_start).getTime();
-                      const end = new Date(r.release_end).getTime();
-                      const totalDuration = end - start;
-                      const elapsed = Math.min(now - start, totalDuration);
-                      const progress = totalDuration > 0 ? Math.min(elapsed / totalDuration, 1) : 1;
-                      const releasedAmount = Number(r.net_amount) * progress;
-                      const remainingAmount = Number(r.net_amount) - releasedAmount;
-                      const isCompleted = r.status === "COMPLETED" || progress >= 1;
+                      const burnAmt = Number(d.burnAmount || d.burnPct && Number(tx.amount) * d.burnPct / 100 || 0);
+                      const releaseAmt = Number(d.releaseAmount || Number(tx.amount) - burnAmt);
+                      const releaseDays = Number(d.releaseDays || matchedRelease?.days_total || matchedRelease?.plan_days || 0);
+                      const daysReleased = matchedRelease?.days_released || 0;
+                      const progress = releaseDays > 0 ? Math.min(daysReleased / releaseDays, 1) : 1;
+                      const isCompleted = matchedRelease?.status === "COMPLETED" || progress >= 1;
+                      const releasedSoFar = matchedRelease ? Number(matchedRelease.released_amount || 0) : (releaseDays === 0 ? releaseAmt : 0);
+                      const remaining = releaseAmt - releasedSoFar;
+                      const mintHash = d.mintTxId || matchedRelease?.mint_tx_id || null;
+                      const burnHash = d.burnTxId || matchedRelease?.burn_tx_id || null;
 
                       return (
                         <div className="mt-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-foreground/50">
-                              {r.release_days === 0 ? t("tx.immediateRelease", "立即释放") : t("tx.linearRelease", "{{days}}天线性释放", { days: r.release_days })}
+                              {releaseDays === 0 ? t("tx.immediateRelease", "立即释放") : t("tx.linearRelease", "{{days}}天线性释放", { days: releaseDays })}
+                              {d.splitRatio && <span className="ml-1 text-foreground/30">({t("tx.plan", "方案")} {d.splitRatio})</span>}
                             </span>
                             <Badge className={cn("text-[8px]",
                               isCompleted ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                              r.status === "RELEASING" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
                               "bg-amber-500/10 text-amber-400 border-amber-500/20"
                             )}>
-                              {isCompleted ? t("tx.completed", "已完成") : r.status === "RELEASING" ? t("tx.releasing", "释放中") : t("tx.pending", "待释放")}
+                              {isCompleted ? t("tx.completed", "已完成") : `${daysReleased}/${releaseDays}${t("common.days", "天")}`}
                             </Badge>
                           </div>
 
                           {/* Progress bar */}
-                          {r.release_days > 0 && (
+                          {releaseDays > 0 && (
                             <div className="w-full h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
                               <div
                                 className={cn("h-full rounded-full transition-all", isCompleted ? "bg-green-400" : "bg-primary")}
@@ -246,25 +246,33 @@ export default function ProfileTransactionsPage() {
                           <div className="grid grid-cols-2 gap-2 text-[9px]">
                             <div>
                               <span className="text-foreground/25">{t("tx.grossAmount", "总额")}</span>
-                              <p className="font-mono text-foreground/50">{Number(r.gross_amount).toFixed(2)} MA</p>
+                              <p className="font-mono text-foreground/50">{Number(tx.amount).toFixed(2)} MA</p>
                             </div>
                             <div>
-                              <span className="text-foreground/25 flex items-center gap-0.5"><Flame className="h-2 w-2 text-red-400" />{t("tx.burned", "销毁")} ({(Number(r.burn_rate) * 100).toFixed(0)}%)</span>
-                              <p className="font-mono text-red-400/60">{Number(r.burn_amount).toFixed(2)} MA</p>
+                              <span className="text-foreground/25 flex items-center gap-0.5"><Flame className="h-2 w-2 text-red-400" />{t("tx.burned", "销毁")}</span>
+                              <p className="font-mono text-red-400/60">{burnAmt.toFixed(2)} MA</p>
                             </div>
                             <div>
                               <span className="text-foreground/25 flex items-center gap-0.5"><CheckCircle className="h-2 w-2 text-green-400" />{t("tx.released", "已释放")}</span>
-                              <p className="font-mono text-green-400/60">{releasedAmount.toFixed(2)} MA</p>
+                              <p className="font-mono text-green-400/60">{releasedSoFar.toFixed(2)} MA</p>
                             </div>
                             <div>
                               <span className="text-foreground/25 flex items-center gap-0.5"><Clock className="h-2 w-2 text-blue-400" />{t("tx.remaining", "待释放")}</span>
-                              <p className="font-mono text-blue-400/60">{remainingAmount.toFixed(2)} MA</p>
+                              <p className="font-mono text-blue-400/60">{remaining.toFixed(2)} MA</p>
                             </div>
                           </div>
 
-                          {!isCompleted && r.release_days > 0 && (
+                          {/* TX Hashes */}
+                          {(mintHash || burnHash) && (
+                            <div className="space-y-0.5 text-[8px]">
+                              {mintHash && <div className="flex gap-1"><span className="text-foreground/20">Mint:</span><span className="font-mono text-foreground/30">{mintHash.slice(0,16)}...</span></div>}
+                              {burnHash && burnHash !== "none" && <div className="flex gap-1"><span className="text-foreground/20">Burn:</span><span className="font-mono text-red-400/30">{burnHash.slice(0,16)}...</span></div>}
+                            </div>
+                          )}
+
+                          {matchedRelease && releaseDays > 0 && (
                             <p className="text-[8px] text-foreground/20">
-                              {t("tx.releaseEnd", "预计 {{date}} 释放完成", { date: new Date(r.release_end).toLocaleDateString("zh-CN") })}
+                              {t("tx.dailyRelease", "每日释放")} {Number(matchedRelease.daily_amount || releaseAmt / releaseDays).toFixed(4)} MA
                             </p>
                           )}
                         </div>

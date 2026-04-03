@@ -247,6 +247,7 @@ function MASwap() {
   const [isSwapped, setIsSwapped] = useState(false);
   const [swapStatus, setSwapStatus] = useState<"idle" | "transferring" | "recording" | "success" | "error">("idle");
   const [swapError, setSwapError] = useState("");
+  const [claimBusy, setClaimBusy] = useState(false);
 
   // Wallet MA balance (for flash swap)
   const { data: maBalanceRaw } = useQuery({
@@ -275,6 +276,29 @@ function MASwap() {
   });
 
   const { price: maPrice } = useMaPrice();
+
+  // Claim released MA from Release contract → user wallet
+  const handleClaimRelease = async () => {
+    if (!account?.address || !client || releaseClaimable <= 0 || claimBusy) return;
+    setClaimBusy(true);
+    try {
+      const releaseContract = getContract({ client, chain: BSC_CHAIN, address: RELEASE_ADDRESS! });
+      const tx = prepareContractCall({
+        contract: releaseContract,
+        method: "function claim()",
+        params: [],
+      });
+      const receipt = await sendTransaction(tx);
+      await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: receipt.transactionHash });
+      queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["release-claimable"] });
+    } catch (e: any) {
+      console.error("Claim release failed:", e);
+      setSwapError(e?.message?.slice(0, 80) || "Claim failed");
+    } finally {
+      setClaimBusy(false);
+    }
+  };
 
   const maBalance = Number(maBalanceRaw || BigInt(0)) / 1e18;
   const swapQuota = maBalance; // only wallet MA can be swapped
@@ -403,8 +427,15 @@ function MASwap() {
           {maBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} <span className="text-[13px] text-primary">MA</span>
         </div>
         {releaseClaimable > 0 && (
-          <div className="mt-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
-            <div className="text-[10px] text-amber-400">{t("ma.releaseClaimable", "待领取")} {releaseClaimable.toFixed(2)} MA — {t("ma.claimFirst", "领取后可闪兑")}</div>
+          <div className="mt-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+            <div className="text-[10px] text-amber-400">{t("ma.releaseClaimable", "待领取")} {releaseClaimable.toFixed(2)} MA</div>
+            <button
+              onClick={handleClaimRelease}
+              disabled={claimBusy}
+              className="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 text-[10px] font-medium hover:bg-amber-500/30 disabled:opacity-50 transition-colors"
+            >
+              {claimBusy ? t("ma.claiming", "领取中...") : t("ma.claimNow", "领取")}
+            </button>
           </div>
         )}
         <div className="mt-2.5 flex gap-2">
@@ -536,28 +567,7 @@ function MASwap() {
         </button>
       </div>
 
-      {/* Swap History */}
-      {swapHistory && swapHistory.length > 0 && (
-        <div className="rounded-2xl p-3.5" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-          <h3 className="text-[11px] font-bold text-white/40 mb-2">{t("ma.swapHistory", "闪兑记录")}</h3>
-          <div className="space-y-1.5">
-            {swapHistory.map((s: any) => (
-              <div key={s.id} className="flex items-center justify-between px-1.5 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors">
-                <div className="flex items-center gap-1.5">
-                  <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded", s.direction === "sell" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400")}>
-                    {s.direction === "sell" ? t("ma.sell", "卖出") : t("ma.buy", "买入")}
-                  </span>
-                  <span className="text-[11px] text-white/50 font-mono">{Number(s.ma_amount).toFixed(2)} MA</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[11px] text-white/40 font-mono">${Number(s.usd_amount).toFixed(2)}</span>
-                  <p className="text-[8px] text-white/15">{new Date(s.created_at).toLocaleDateString("zh-CN")}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Swap history removed — view in transaction history page */}
     </div>
   );
 }

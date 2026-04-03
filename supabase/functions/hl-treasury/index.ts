@@ -28,7 +28,9 @@ const TREASURY_ADMIN_KEY = Deno.env.get("TREASURY_ADMIN_KEY") || "";
 
 // thirdweb server wallet
 const TW_SECRET_KEY = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
-const SERVER_WALLET = Deno.env.get("THIRDWEB_SERVER_WALLET") || "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
+// V4: HL main wallet (connected to HyperLiquid)
+const SERVER_WALLET = Deno.env.get("THIRDWEB_HL_WALLET") || "0x3869100A4F165aE9C85024A32D90C5D7412D6b9c";
+const HL_VAULT = "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303";
 
 // Contracts on Arbitrum
 const USDC_ARB = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831";
@@ -419,10 +421,8 @@ serve(async (req) => {
         if (!amount || amount <= 0) throw new Error("Amount required and must be > 0");
         result = await depositToHL(amount);
 
-        await supabase.from("treasury_events").insert({
-          event_type: "HL_DEPOSIT",
-          details: { amount, txHash: result.txHash, wallet: SERVER_WALLET },
-        });
+        // Log to system_config or just console (treasury_events archived)
+        console.log("HL_DEPOSIT:", amount, result.txHash);
         break;
       }
 
@@ -430,10 +430,7 @@ serve(async (req) => {
         if (!amount || amount <= 0) throw new Error("Amount required and must be > 0");
         result = await withdrawFromHL(amount, destination);
 
-        await supabase.from("treasury_events").insert({
-          event_type: "HL_WITHDRAW",
-          details: { amount, destination: destination || SERVER_WALLET, status: "pending_24h" },
-        });
+        console.log("HL_WITHDRAW:", amount, destination || SERVER_WALLET);
         break;
       }
 
@@ -442,43 +439,18 @@ serve(async (req) => {
         if (!destination) throw new Error("Destination address required");
         result = await internalTransfer(amount, destination);
 
-        await supabase.from("treasury_events").insert({
-          event_type: "HL_TRANSFER",
-          details: { amount, destination, status: "completed" },
-        });
+        console.log("HL_TRANSFER:", amount, destination);
         break;
       }
 
       case "status": {
         const balance = await getBalance(SERVER_WALLET);
 
-        const { data: events } = await supabase
-          .from("treasury_events")
-          .select("*")
-          .in("event_type", ["HL_DEPOSIT", "HL_WITHDRAW", "HL_TRANSFER"])
-          .order("created_at", { ascending: false })
-          .limit(20);
-
-        const { data: state } = await supabase
-          .from("treasury_state")
-          .select("*")
-          .eq("id", 1)
-          .single();
-
         result = {
           wallet: SERVER_WALLET,
+          hlVault: HL_VAULT,
           hlAccount: balance,
-          treasuryState: state,
-          recentEvents: events || [],
         };
-
-        await supabase.from("treasury_state").update({
-          total_deployed: balance.accountValue,
-          available_balance: balance.withdrawable,
-          total_unrealized_pnl: balance.positions.reduce((s: number, p: any) => s + p.unrealizedPnl, 0),
-          active_positions: balance.positions,
-          updated_at: new Date().toISOString(),
-        }).eq("id", 1);
         break;
       }
 

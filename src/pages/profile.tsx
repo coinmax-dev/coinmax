@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { copyText } from "@/lib/copy";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getProfile, getNodeOverview, getVaultPositions, activateVipTrial } from "@/lib/api";
+import { getProfile, getNodeOverview, getVaultPositions, activateVipTrial, mintRelease } from "@/lib/api";
 import type { NodeOverview } from "@shared/types";
 import { queryClient } from "@/lib/queryClient";
 import { usePayment, getPaymentStatusLabel } from "@/hooks/use-payment";
@@ -57,9 +57,9 @@ export default function ProfilePage() {
   // Personal vault holding (excludes bonus positions)
   const personalHolding = useMemo(() => {
     if (!vaultPositions) return 0;
-    return vaultPositions
-      .filter(p => p.status === "ACTIVE" && p.planType !== "BONUS_5D" && !p.isBonus)
-      .reduce((s, p) => s + Number(p.principal || 0), 0);
+    return (vaultPositions as any[])
+      .filter((p: any) => (p.status === "ACTIVE" || p.status === "MATURED") && p.planType !== "BONUS_5D" && !p.isBonus)
+      .reduce((s: number, p: any) => s + Number(p.principal || 0), 0);
   }, [vaultPositions]);
 
   // Vault yield from settled vault_rewards (actual, not estimated)
@@ -91,6 +91,22 @@ export default function ProfilePage() {
   const payment = usePayment();
   const [showVipPlans, setShowVipPlans] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
+
+  const mintReleaseMutation = useMutation({
+    mutationFn: () => mintRelease(walletAddr),
+    onSuccess: (data: any) => {
+      toast({
+        title: t("profile.releaseSuccess", "释放成功"),
+        description: `${Number(data.totalMinted || 0).toFixed(2)} MA ${t("profile.mintedToWallet", "已铸造到钱包")}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["release-balances", walletAddr] });
+      queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions", walletAddr] });
+    },
+    onError: (err: Error) => {
+      toast({ title: t("profile.releaseFailed", "释放失败"), description: err.message, variant: "destructive" });
+    },
+  });
   const [selectedVipPlan, setSelectedVipPlan] = useState<"monthly" | "halfyear" | null>(null);
 
   const vipMutation = useMutation({
@@ -164,6 +180,38 @@ export default function ProfilePage() {
   const totalEarnings = allEarnings.vault + allEarnings.node + allEarnings.broker;
   const claimedYield = allEarnings.claimed;
   const availableEarnings = Math.max(0, totalEarnings - claimedYield);
+
+  // Release balances from DB
+  const { data: releaseBalances = { withdrawnAmount: 0, claimable: 0 } } = useQuery({
+    queryKey: ["release-balances", walletAddr],
+    queryFn: async () => {
+      if (!walletAddr) return { withdrawnAmount: 0, claimable: 0 };
+      const { data: prof } = await supabase.from("profiles").select("id").ilike("wallet_address", walletAddr).single();
+      if (!prof) return { withdrawnAmount: 0, claimable: 0 };
+      const { data: schedules } = await supabase
+        .from("release_schedules")
+        .select("remaining_amount, released_amount, claimed_amount")
+        .eq("user_id", prof.id);
+      let remaining = 0, claimable = 0;
+      for (const s of (schedules || [])) {
+        remaining += Number(s.remaining_amount || 0);
+        claimable += Math.max(0, Number(s.released_amount || 0) - Number(s.claimed_amount || 0));
+      }
+      // 提现金额 = remaining (还在线性释放中的)
+      // 待释放余额 = claimable (已释放可领取的)
+      return { withdrawnAmount: remaining, claimable };
+    },
+    enabled: !!walletAddr,
+    refetchInterval: 15000,
+  });
+
+  // 提现金额 (发起提现总额中还在线性释放的部分, 每日减少)
+  const withdrawnInProgress = releaseBalances.withdrawnAmount;
+  // 待释放余额 (线性释放出来的 - 已转钱包, 每日递增, 可一键释放)
+  const claimableMA = releaseBalances.claimable;
+
+  // 总资产 = 未提现余额 + 提现金额 + 待释放余额
+  const totalAssetMA = availableEarnings + withdrawnInProgress + claimableMA;
 
   const refCode = profile?.refCode;
   // Self-referral link: both sponsor and placement = self
@@ -286,7 +334,7 @@ export default function ProfilePage() {
                 ) : profileLoading ? (
                   <Skeleton className="h-9 w-28" />
                 ) : (
-                  <div className="text-[28px] font-black text-white leading-tight" data-testid="text-net-assets">{formatMA(net)}</div>
+                  <div className="text-[28px] font-black text-white leading-tight" data-testid="text-net-assets">{formatMA(totalAssetMA)}</div>
                 )}
               </div>
               <div
@@ -311,7 +359,7 @@ export default function ProfilePage() {
                       <TrendingUp className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <div className="text-[11px] text-white/45 font-medium">{t("profile.availableEarnings", "可提收益")}</div>
+                      <div className="text-[11px] text-white/45 font-medium">{t("profile.availableEarnings", "未提现余额")}</div>
                       {profileLoading ? (
                         <Skeleton className="h-5 w-20" />
                       ) : (
@@ -343,6 +391,32 @@ export default function ProfilePage() {
                     </div>
                   ))}
                 </div>
+                {(claimableMA > 0 || withdrawnInProgress > 0) && (
+                  <div className="mt-2 space-y-1.5">
+                    {withdrawnInProgress > 0 && (
+                      <div className="rounded-xl p-2.5 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.03)", border: "1px solid rgba(251,191,36,0.08)" }}>
+                        <div className="text-[10px] text-amber-400/60">{t("profile.withdrawnInProgress", "提现金额")}</div>
+                        <div className="text-[12px] font-bold text-amber-400/70">{formatCompactMA(withdrawnInProgress)}</div>
+                      </div>
+                    )}
+                    {claimableMA > 0 && (
+                      <div className="rounded-xl p-2.5 flex items-center justify-between" style={{ background: "rgba(74,222,128,0.05)", border: "1px solid rgba(74,222,128,0.1)" }}>
+                        <div>
+                          <div className="text-[10px] text-white/40">{t("profile.claimableRelease", "待释放余额")}</div>
+                          <div className="text-[12px] font-bold text-primary/80">{formatCompactMA(claimableMA)}</div>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="h-7 text-[10px] rounded-lg bg-primary/20 text-primary hover:bg-primary/30"
+                          onClick={() => mintReleaseMutation.mutate()}
+                          disabled={mintReleaseMutation.isPending}
+                        >
+                          {mintReleaseMutation.isPending ? t("common.processing") : t("profile.oneClickRelease", "一键释放")}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {lockedBonusYield > 0 && (
                   <div className="mt-2 rounded-xl p-2.5 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.1)" }}>
                     <div className="text-[10px] text-amber-400/60">{t("profile.lockedYield", "锁仓收益 (体验金)")}</div>

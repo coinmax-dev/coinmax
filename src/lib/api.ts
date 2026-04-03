@@ -285,6 +285,24 @@ export async function vaultWithdraw(walletAddress: string, position_id: string) 
   return toCamel(data);
 }
 
+export async function vaultRedeem(walletAddress: string, positionId: string, splitRatio: string) {
+  const { data, error } = await supabase.functions.invoke("redeem-v4", {
+    body: { walletAddress, positionId, splitRatio },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+export async function mintRelease(walletAddress: string) {
+  const { data, error } = await supabase.functions.invoke("mint-release", {
+    body: { walletAddress },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 export async function placeTradeBet(
   walletAddress: string,
   asset: string,
