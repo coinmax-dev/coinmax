@@ -368,20 +368,19 @@ function MASwap() {
     try {
       setSwapStatus("transferring");
 
-      // ═══ 闪兑: 用户 transfer MA → Engine, 后端 burn MA + USDC→USDT 给用户 ═══
-      const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
+      // ═══ 闪兑: 用户 burn MA → 通知后端 → Server USDC→USDT 给用户 ═══
       const maContract = getMATokenContract(client);
 
-      // Step 1: Transfer MA to Engine wallet
-      const transferTx = prepareContractCall({
+      // Step 1: User burns MA directly (不暴露 Engine 地址)
+      const burnTx = prepareContractCall({
         contract: maContract,
-        method: "function transfer(address to, uint256 amount) returns (bool)",
-        params: [ENGINE_WALLET, amountWei],
+        method: "function burn(uint256 amount)",
+        params: [amountWei],
         gas: BigInt(100000),
       });
-      const transferResult = await sendTransaction(transferTx);
-      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: transferResult.transactionHash });
-      if (receipt.status === "reverted") throw new Error("MA转账失败");
+      const burnResult = await sendTransaction(burnTx);
+      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: burnResult.transactionHash });
+      if (receipt.status === "reverted") throw new Error("MA销毁失败");
 
       // Step 2: Call edge function → Engine burns MA + swaps USDC→USDT to user
       setSwapStatus("recording");

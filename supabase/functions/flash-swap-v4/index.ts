@@ -85,18 +85,9 @@ serve(async (req) => {
 
     console.log(`FlashSwap: ${walletAddress} | ${amount} MA × $${maPrice} = $${usdtAmount.toFixed(2)} USDT`);
 
-    // Step 1: Engine wallet burns MA (received from user transfer)
-    const burnResult = await engineWrite(ENGINE_WALLET, {
-      contractAddress: MA_TOKEN,
-      method: "function burn(uint256 amount)",
-      params: [maWei],
-    });
-    const burnTxId = burnResult?.result?.transactions?.[0]?.id || "?";
-    console.log("Burn TX:", burnTxId, burnResult?.error?.message || "ok");
+    // User already burned MA on-chain. Now Server swaps USDC→USDT to user.
 
-    await new Promise(r => setTimeout(r, 3000));
-
-    // Step 2: Server wallet approves USDC to PancakeSwap Router
+    // Step 1: Server wallet approves USDC to PancakeSwap Router
     const approveResult = await engineWrite(SERVER_WALLET, {
       contractAddress: USDC,
       method: "function approve(address spender, uint256 amount) returns (bool)",
@@ -144,7 +135,7 @@ serve(async (req) => {
           maAmount: amount,
           maPrice,
           usdtAmount,
-          burnTxId,
+          userBurnTxHash: txHash,
           swapTxId,
         },
       });
