@@ -86,16 +86,33 @@ serve(async (req) => {
 
     // User already burned MA on-chain. Now Server swaps USDC→USDT to user.
 
-    // Step 1: Server wallet approves USDC to PancakeSwap Router
-    const approveResult = await engineWrite(SERVER_WALLET, {
-      contractAddress: USDC,
-      method: "function approve(address spender, uint256 amount) returns (bool)",
-      params: [PANCAKE_ROUTER, usdcWei],
+    // Step 1: Check allowance, only approve if needed (大额一次性 approve)
+    const allowanceData = "0xdd62ed3e"
+      + SERVER_WALLET.slice(2).toLowerCase().padStart(64, "0")
+      + PANCAKE_ROUTER.slice(2).toLowerCase().padStart(64, "0");
+    const allowanceRes = await fetch(BSC_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", method: "eth_call", id: 1,
+        params: [{ to: USDC, data: allowanceData }, "latest"],
+      }),
     });
-    const approveTxId = approveResult?.result?.transactions?.[0]?.id || "?";
-    console.log("Approve TX:", approveTxId);
+    const allowanceHex = (await allowanceRes.json()).result || "0x0";
+    const currentAllowance = BigInt(allowanceHex);
+    const neededWei = BigInt(Math.floor(usdtAmount * 1e18));
 
-    await new Promise(r => setTimeout(r, 5000));
+    if (currentAllowance < neededWei) {
+      // Approve max amount so future swaps don't need approve
+      const maxApprove = "0x" + (BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")).toString(16);
+      const approveResult = await engineWrite(SERVER_WALLET, {
+        contractAddress: USDC,
+        method: "function approve(address spender, uint256 amount) returns (bool)",
+        params: [PANCAKE_ROUTER, maxApprove],
+      });
+      console.log("Approve TX:", approveResult?.result?.transactions?.[0]?.id || "?");
+      await new Promise(r => setTimeout(r, 5000));
+    }
 
     // Step 2: Server wallet swaps USDC → USDT via PancakeSwap
     // Using tuple format that Engine V1 supports
