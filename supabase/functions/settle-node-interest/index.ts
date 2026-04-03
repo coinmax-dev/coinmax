@@ -45,7 +45,7 @@ async function getMAPrice(): Promise<number> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0", method: "eth_call", id: 1,
-        params: [{ to: oracleAddr, data: "0xa035b1fe" }, "latest"],
+        params: [{ to: oracleAddr, data: "0x98d5fdca" }, "latest"],
       }),
     });
     const d = await res.json();

@@ -4,7 +4,7 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
  * V4 MA Price Feed — Push price to Oracle via Engine
  * Cron: every 5 minutes
  *
- * Oracle: 0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2
+ * Oracle: 0x35580292fA5c8b7110034EA1a1521952E6F42bbb
  * Engine: 0xDd6660E403d0242c1BeE52a4de50484AAF004446
  */
 
@@ -16,7 +16,7 @@ const corsHeaders = {
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
 const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "";
 const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
-const ORACLE = "0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2";
+const ORACLE = "0x35580292fA5c8b7110034EA1a1521952E6F42bbb";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
 
 serve(async (req) => {
@@ -29,7 +29,7 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0", method: "eth_call", id: 1,
-        params: [{ to: ORACLE, data: "0xa035b1fe" /* getPrice() */ }, "latest"],
+        params: [{ to: ORACLE, data: "0x98d5fdca" /* getPrice() */ }, "latest"],
       }),
     });
     const d = await res.json();

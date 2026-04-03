@@ -16,7 +16,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  *   VaultV4:    0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744
  *   MAToken:    0xc6d2dbC85DC3091C41692822A128c19F9eAc7988
  *   ReleaseV4:  0x1de32fF0aa9884536C8ba7Aa7fD1f6Ea6cf523Bc
- *   Oracle:     0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2
+ *   Oracle:     0x35580292fA5c8b7110034EA1a1521952E6F42bbb
  *   Engine:     0xDd6660E403d0242c1BeE52a4de50484AAF004446
  */
 
@@ -31,10 +31,10 @@ const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
 const VAULT_V4 = "0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744";
 const MA_TOKEN = "0xc6d2dbC85DC3091C41692822A128c19F9eAc7988";
 const RELEASE_V4 = "0x1de32fF0aa9884536C8ba7Aa7fD1f6Ea6cf523Bc";
-const ORACLE = "0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2";
+const ORACLE = "0x35580292fA5c8b7110034EA1a1521952E6F42bbb";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
 
-async function engineWrite(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
+async function engineWriteOne(call: { contractAddress: string; method: string; params: unknown[] }) {
   const res = await fetch("https://engine.thirdweb.com/v1/write/contract", {
     method: "POST",
     headers: {
@@ -44,10 +44,21 @@ async function engineWrite(calls: Array<{ contractAddress: string; method: strin
     },
     body: JSON.stringify({
       executionOptions: { type: "EOA", from: ENGINE_WALLET, chainId: "56" },
-      params: calls,
+      params: [call],
     }),
   });
   return res.json();
+}
+
+async function engineWrite(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
+  const results = [];
+  for (const call of calls) {
+    const r = await engineWriteOne(call);
+    console.log("Engine:", call.method.slice(0,40), "→", r?.result?.transactions?.[0]?.id || r?.error?.message?.slice(0,60) || "?");
+    results.push(r);
+    if (calls.indexOf(call) < calls.length - 1) await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+  return results;
 }
 
 async function getOraclePrice(): Promise<number> {
@@ -56,7 +67,7 @@ async function getOraclePrice(): Promise<number> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       jsonrpc: "2.0", method: "eth_call", id: 1,
-      params: [{ to: ORACLE, data: "0xa035b1fe" }, "latest"],
+      params: [{ to: ORACLE, data: "0x98d5fdca" }, "latest"],
     }),
   });
   const d = await res.json();

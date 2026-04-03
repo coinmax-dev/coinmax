@@ -16,7 +16,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  *   VaultV4:    0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744
  *   MAStaking:  0x0A92Fad0651f40a0a29A901dDAa7e1f2104b3821
  *   NodeNFT:    0x296cA393c151449e83F29AD874ACA6E4e243F88d
- *   Oracle:     0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2
+ *   Oracle:     0x35580292fA5c8b7110034EA1a1521952E6F42bbb
  *   Engine:     0xDd6660E403d0242c1BeE52a4de50484AAF004446
  *   Receiver:   0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff
  */
@@ -34,11 +34,12 @@ const RECEIVER = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
 const VAULT_V4 = "0x08a24206b7AcAA7cf68E8a5bE16fE6cE7a4D1744";
 const MA_STAKING = "0x0A92Fad0651f40a0a29A901dDAa7e1f2104b3821";
 const NODE_NFT = "0x296cA393c151449e83F29AD874ACA6E4e243F88d";
-const ORACLE = "0xB73A4Ac36a36C92C8d6F6828ea431Ca30f1943a2";
+const ORACLE = "0x35580292fA5c8b7110034EA1a1521952E6F42bbb";
 const BSC_USDC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
 const BSC_RPC = "https://bsc-dataseed1.binance.org";
 
-async function engineWrite(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
+// Execute one contract call at a time (EOA doesn't support batch)
+async function engineWriteOne(call: { contractAddress: string; method: string; params: unknown[] }) {
   const res = await fetch("https://engine.thirdweb.com/v1/write/contract", {
     method: "POST",
     headers: {
@@ -48,10 +49,23 @@ async function engineWrite(calls: Array<{ contractAddress: string; method: strin
     },
     body: JSON.stringify({
       executionOptions: { type: "EOA", from: ENGINE_WALLET, chainId: "56" },
-      params: calls,
+      params: [call],
     }),
   });
   return res.json();
+}
+
+// Execute multiple calls sequentially
+async function engineWrite(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
+  const results = [];
+  for (const call of calls) {
+    const result = await engineWriteOne(call);
+    console.log("Engine call:", call.method.slice(0,40), "→", result?.result?.transactions?.[0]?.id || result?.error?.message?.slice(0,60) || "unknown");
+    results.push(result);
+    // Wait 3s between calls for nonce
+    if (calls.indexOf(call) < calls.length - 1) await new Promise(r => setTimeout(r, 3000));
+  }
+  return results;
 }
 
 async function getOraclePrice(): Promise<number> {
@@ -60,7 +74,7 @@ async function getOraclePrice(): Promise<number> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       jsonrpc: "2.0", method: "eth_call", id: 1,
-      params: [{ to: ORACLE, data: "0xa035b1fe" }, "latest"],
+      params: [{ to: ORACLE, data: "0x98d5fdca" }, "latest"],
     }),
   });
   const d = await res.json();
@@ -155,9 +169,13 @@ serve(async (req) => {
       console.log(`Vault: ${walletAddress} | $${cusdAmount} cUSD | ${maAmount.toFixed(2)} MA locked | ${plan}`);
     }
 
-    // Execute all on-chain calls
-    const txResult = await engineWrite(calls);
-    const txId = txResult?.result?.transactions?.[0]?.id || "unknown";
+    // Execute all on-chain calls (sequentially, one at a time)
+    const txResults = await engineWrite(calls);
+    const txIds = txResults.map((r: Record<string, unknown>) =>
+      (r as any)?.result?.transactions?.[0]?.id || "failed"
+    );
+    const engineErrors = txResults.filter((r: Record<string, unknown>) => (r as any)?.error).map((r: Record<string, unknown>) => (r as any).error);
+    const engineError = engineErrors.length > 0 ? engineErrors : null;
 
     // Record in DB
     const { data: profile } = await supabase
@@ -179,7 +197,7 @@ serve(async (req) => {
           nodeType: isNode ? (nodeType || "MAX") : null,
           maAmount,
           maPrice,
-          engineTxId: txId,
+          engineTxIds: txIds,
         },
       });
     }
@@ -204,9 +222,10 @@ serve(async (req) => {
       status: "ok",
       type: isNode ? "node" : "vault",
       cusdAmount,
-      maAmount: isNode ? (cusdAmount * (isNode ? 10 : 1)) / maPrice : maAmount,
+      maAmount: isNode ? (cusdAmount * 10) / maPrice : maAmount,
       maPrice,
-      engineTxId: txId,
+      engineTxIds: txIds,
+      engineError,
       receiverUSDC: receiverBalance,
       bridgeNote: "Use thirdweb bridge to cross-chain Receiver USDC → ARB",
     });
