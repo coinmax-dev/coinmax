@@ -149,8 +149,63 @@ serve(async (req) => {
     }
 
     console.log(`On-chain: ${totalCusdYield.toFixed(2)} cUSD interest + ${totalMAToMint.toFixed(2)} MA mint`);
-    const txResult = await engineWrite(calls);
-    const txId = txResult?.result?.transactions?.[0]?.id || "unknown";
+    const txResults = await engineWrite(calls);
+    const txIds = txResults.map((r: any) => r?.result?.transactions?.[0]?.id || "?");
+
+    // ── Step 4: Process linear release schedules (提现线性释放) ──
+    const { data: activeSchedules } = await supabase
+      .from("release_schedules")
+      .select("*")
+      .eq("status", "ACTIVE")
+      .lt("days_released", supabase.raw ? undefined : 999); // get all active
+
+    let releasedCount = 0;
+    let releasedTotal = 0;
+    const releaseResults: string[] = [];
+
+    if (activeSchedules && activeSchedules.length > 0) {
+      for (const schedule of activeSchedules) {
+        if (schedule.days_released >= schedule.days_total) {
+          // Mark as completed
+          await supabase.from("release_schedules").update({ status: "COMPLETED" }).eq("id", schedule.id);
+          continue;
+        }
+
+        const dailyAmount = Number(schedule.daily_amount);
+        const remaining = Number(schedule.remaining_amount);
+        const releaseToday = Math.min(dailyAmount, remaining);
+
+        if (releaseToday <= 0) continue;
+
+        const releaseWei = "0x" + BigInt(Math.floor(releaseToday * 1e18)).toString(16);
+
+        // On-chain: Release.addReleased(user, dailyAmount)
+        const relResult = await engineWriteOne({
+          contractAddress: RELEASE_V4,
+          method: "function addReleased(address user, uint256 amount, string source)",
+          params: [schedule.wallet_address, releaseWei, "linear_release_day_" + (schedule.days_released + 1)],
+        });
+        const relTxId = relResult?.result?.transactions?.[0]?.id || "?";
+        releaseResults.push(`${schedule.wallet_address.slice(0,8)}: ${releaseToday.toFixed(2)} MA → ${relTxId}`);
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Update schedule in DB
+        const newDaysReleased = schedule.days_released + 1;
+        const newReleasedAmount = Number(schedule.released_amount) + releaseToday;
+        const newRemaining = remaining - releaseToday;
+        const isCompleted = newDaysReleased >= schedule.days_total || newRemaining <= 0;
+
+        await supabase.from("release_schedules").update({
+          days_released: newDaysReleased,
+          released_amount: newReleasedAmount,
+          remaining_amount: Math.max(0, newRemaining),
+          status: isCompleted ? "COMPLETED" : "ACTIVE",
+        }).eq("id", schedule.id);
+
+        releasedCount++;
+        releasedTotal += releaseToday;
+      }
+    }
 
     return json({
       status: "settled",
@@ -159,7 +214,12 @@ serve(async (req) => {
         cusdInterest: totalCusdYield,
         maMinted: totalMAToMint,
         maPrice,
-        txId,
+        txIds,
+      },
+      linearRelease: {
+        schedulesProcessed: releasedCount,
+        totalReleased: releasedTotal,
+        details: releaseResults,
       },
     });
 

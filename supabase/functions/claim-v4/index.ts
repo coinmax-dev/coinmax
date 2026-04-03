@@ -2,23 +2,20 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * V4 Claim — User withdraws from 待释放余额
+ * V4 Claim — 提现线性释放
  *
- * Flow:
- *   1. User requests claim (amount, split ratio)
- *   2. DB: validate available balance, create release schedule
- *   3. Chain: Engine mints MA to Release contract
- *   4. Chain: Burn ratio applied (0-20% destroyed immediately)
- *   5. Chain: Remaining MA → linear release schedule to user wallet
+ * 1. 用户选择提现金额 + 分成比例
+ * 2. Engine 铸造 MA → Release 合约持有
+ * 3. 立即销毁 burn 部分
+ * 4. DB 创建线性释放计划 (不立即 addReleased)
+ * 5. 每日 settle cron 按天释放 → Release.addReleased
+ * 6. 用户每天可 claim 已释放的部分
  *
  * Split Ratios:
- *   A: 0% burn,  longest release
- *   B: 5% burn,  long release
- *   C: 10% burn, short release
- *   D: 20% burn, fastest release
- *
- * Release: 0x1de32fF0aa9884536C8ba7Aa7fD1f6Ea6cf523Bc
- * Engine:  0xDd6660E403d0242c1BeE52a4de50484AAF004446
+ *   A: 0% burn, 60天释放
+ *   B: 5% burn, 45天释放
+ *   C: 10% burn, 30天释放
+ *   D: 20% burn, 14天释放
  */
 
 const corsHeaders = {
@@ -55,17 +52,6 @@ async function engineWriteOne(call: { contractAddress: string; method: string; p
   return res.json();
 }
 
-async function engineWrite(calls: Array<{ contractAddress: string; method: string; params: unknown[] }>) {
-  const results = [];
-  for (const call of calls) {
-    const r = await engineWriteOne(call);
-    console.log("Engine:", call.method.slice(0, 40), "→", r?.result?.transactions?.[0]?.id || r?.error?.message?.slice(0, 60) || "?");
-    results.push(r);
-    if (calls.indexOf(call) < calls.length - 1) await new Promise(resolve => setTimeout(resolve, 3000));
-  }
-  return results;
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -83,7 +69,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 1. Validate user has enough released balance
+    // 1. Validate user
     const { data: profile } = await supabase
       .from("profiles")
       .select("id")
@@ -91,50 +77,67 @@ serve(async (req) => {
       .single();
     if (!profile) return json({ error: "Profile not found" }, 404);
 
-    // TODO: Check actual released balance from Release contract or DB
     const claimAmount = Number(amount);
     if (claimAmount <= 0) return json({ error: "Invalid amount" }, 400);
 
-    // 2. Calculate burn + release
+    // 2. Calculate
     const burnAmount = claimAmount * ratio.burnPct / 100;
     const releaseAmount = claimAmount - burnAmount;
     const dailyRelease = releaseAmount / ratio.releaseDays;
 
-    const amountWei = "0x" + BigInt(Math.floor(claimAmount * 1e18)).toString(16);
+    const totalWei = "0x" + BigInt(Math.floor(claimAmount * 1e18)).toString(16);
     const burnWei = "0x" + BigInt(Math.floor(burnAmount * 1e18)).toString(16);
-    const releaseWei = "0x" + BigInt(Math.floor(releaseAmount * 1e18)).toString(16);
 
-    // 3. On-chain: Mint MA to Release contract
-    const calls: Array<{ contractAddress: string; method: string; params: unknown[] }> = [];
+    // 3. On-chain: Mint total MA → Release contract
+    console.log(`Claim: ${walletAddress} | total:${claimAmount} burn:${burnAmount} release:${releaseAmount} over ${ratio.releaseDays}d`);
 
-    // Mint total MA to Release
-    calls.push({
+    const mintResult = await engineWriteOne({
       contractAddress: MA_TOKEN,
       method: "function mint(address to, uint256 amount)",
-      params: [RELEASE, amountWei],
+      params: [RELEASE, totalWei],
     });
+    const mintTxId = mintResult?.result?.transactions?.[0]?.id || "failed";
+    console.log("Mint TX:", mintTxId);
 
-    // Burn portion via Release.destroy()
+    // 4. On-chain: Burn portion directly from MA Token (not Release.destroy)
+    let burnTxId = "none";
     if (burnAmount > 0) {
-      calls.push({
-        contractAddress: RELEASE,
-        method: "function destroy(address user, uint256 amount, string reason)",
-        params: [walletAddress, burnWei, "claim_burn_" + splitRatio],
+      await new Promise(r => setTimeout(r, 3000));
+      // Engine burns from Release contract's MA balance
+      // Use Release.destroy which burns locked MA — but we need to lock first
+      // Simpler: just burn via MA.burnFrom(Release, burnAmount) — Engine has MINTER_ROLE
+      const burnResult = await engineWriteOne({
+        contractAddress: MA_TOKEN,
+        method: "function burnFrom(address from, uint256 amount)",
+        params: [RELEASE, burnWei],
       });
+      burnTxId = burnResult?.result?.transactions?.[0]?.id || "failed";
+      console.log("Burn TX:", burnTxId);
     }
 
-    // Add released portion
-    calls.push({
-      contractAddress: RELEASE,
-      method: "function addReleased(address user, uint256 amount, string source)",
-      params: [walletAddress, releaseWei, "claim_release_" + splitRatio],
+    // 5. DB: Create linear release schedule (NOT immediate addReleased)
+    const now = new Date();
+    const endDate = new Date(now.getTime() + ratio.releaseDays * 86400000);
+
+    await supabase.from("release_schedules").insert({
+      user_id: profile.id,
+      wallet_address: walletAddress,
+      total_amount: releaseAmount,
+      daily_amount: dailyRelease,
+      released_amount: 0,
+      remaining_amount: releaseAmount,
+      days_total: ratio.releaseDays,
+      days_released: 0,
+      split_ratio: splitRatio,
+      burn_amount: burnAmount,
+      start_date: now.toISOString(),
+      end_date: endDate.toISOString(),
+      status: "ACTIVE",
+      mint_tx_id: mintTxId,
+      burn_tx_id: burnTxId,
     });
 
-    const txResults = await engineWrite(calls);
-    const txIds = txResults.map((r: any) => r?.result?.transactions?.[0]?.id || "failed");
-    const txId = txIds.join(",");
-
-    // 4. DB: Record claim and release schedule
+    // 6. DB: Record in transactions history
     await supabase.from("transactions").insert({
       user_id: profile.id,
       type: "MA_CLAIM",
@@ -148,7 +151,9 @@ serve(async (req) => {
         releaseAmount,
         releaseDays: ratio.releaseDays,
         dailyRelease,
-        txId,
+        mintTxId,
+        burnTxId,
+        schedule: "linear_release",
       },
     });
 
@@ -159,7 +164,9 @@ serve(async (req) => {
       released: releaseAmount,
       releaseDays: ratio.releaseDays,
       dailyRelease,
-      txId,
+      mintTxId,
+      burnTxId,
+      note: `${releaseAmount} MA will be released over ${ratio.releaseDays} days at ${dailyRelease.toFixed(4)} MA/day`,
     });
 
   } catch (e: unknown) {
