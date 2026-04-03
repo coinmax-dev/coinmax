@@ -124,33 +124,25 @@ serve(async (req) => {
       return json({ status: "settled_db_only", dbResult, reason: "no yield to mint" });
     }
 
-    // ── Step 3: On-chain — Add cUSD interest to Vault ──
-    const cusdWei = "0x" + BigInt(Math.floor(totalCusdYield * 1e18)).toString(16);
-    const maWei = "0x" + BigInt(Math.floor(totalMAToMint * 1e18)).toString(16);
+    // ── Step 3: On-chain — Only cUSD interest to Vault (no MA mint daily) ──
+    // MA is NOT minted daily. Only minted when user claims (提现).
+    // This saves massive gas costs.
+    let txIds: string[] = [];
 
-    const calls: Array<{ contractAddress: string; method: string; params: unknown[] }> = [];
-
-    // VaultV4.addInterest(cusdAmount) — cUSD 链上记账
     if (totalCusdYield > 0) {
-      calls.push({
+      const cusdWei = "0x" + BigInt(Math.floor(totalCusdYield * 1e18)).toString(16);
+      const result = await engineWriteOne({
         contractAddress: VAULT_V4,
         method: "function addInterest(uint256 cusdAmount)",
         params: [cusdWei],
       });
+      const txId = result?.result?.transactions?.[0]?.id || "?";
+      txIds.push(txId);
+      console.log(`On-chain: ${totalCusdYield.toFixed(2)} cUSD interest → ${txId}`);
     }
 
-    // MA Token.mint(Release, totalMA) — 铸造 MA 到 Release 合约
-    if (totalMAToMint > 0) {
-      calls.push({
-        contractAddress: MA_TOKEN,
-        method: "function mint(address to, uint256 amount)",
-        params: [RELEASE_V4, maWei],
-      });
-    }
-
-    console.log(`On-chain: ${totalCusdYield.toFixed(2)} cUSD interest + ${totalMAToMint.toFixed(2)} MA mint`);
-    const txResults = await engineWrite(calls);
-    const txIds = txResults.map((r: any) => r?.result?.transactions?.[0]?.id || "?");
+    // MA minting is DB-only. Actual mint happens in claim-v4 when user withdraws.
+    console.log(`DB-only: ${totalMAToMint.toFixed(2)} MA recorded (not minted until claim)`);
 
     // ── Step 4: Process linear release schedules (提现线性释放) ──
     const { data: activeSchedules } = await supabase
@@ -212,7 +204,8 @@ serve(async (req) => {
       db: dbResult,
       onchain: {
         cusdInterest: totalCusdYield,
-        maMinted: totalMAToMint,
+        maRecorded: totalMAToMint,
+        maNote: "DB only, minted on claim",
         maPrice,
         txIds,
       },

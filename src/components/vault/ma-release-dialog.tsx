@@ -192,34 +192,29 @@ export function MAReleaseDialog({ open, onOpenChange }: MAReleaseDialogProps) {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Claim failed");
 
-      // Step 2: For linear release plans, user needs to call createRelease on-chain
-      if (data.needsCreateRelease && client && RELEASE_ADDRESS) {
-        // Wait for Server Wallet txs to confirm
-        await new Promise(r => setTimeout(r, 10000));
-
-        const contract = getContract({ client, chain: BSC_CHAIN, address: RELEASE_ADDRESS });
-        const amountWei = BigInt(Math.floor(inputAmount * 1e18));
-        const tx = prepareContractCall({
-          contract,
-          method: "function createRelease(uint256 amount, uint256 planIndex)",
-          params: [amountWei, BigInt(selectedPlan)],
-        });
-        const result = await sendTx(tx);
-        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: result.transactionHash });
-      }
-
-      // Instant release: MA already minted to wallet by edge function
-      setSuccessInfo({ releaseMA: Number(data.releaseMA || 0), burnMA: Number(data.burnMA || 0), days: Number(data.planDays || 0) });
+      // V4: Engine handles everything (mint + burn + DB schedule)
+      // No on-chain call from user needed
+      const plan = RELEASE_PLANS.find(p => p.index === selectedPlan) || RELEASE_PLANS[2];
+      setSuccessInfo({
+        releaseMA: Number(data.released || data.releaseMA || 0),
+        burnMA: Number(data.burned || data.burnMA || 0),
+        days: Number(data.releaseDays || plan.days || 0),
+      });
       setStep("success");
+
+      // Refresh all balances immediately
       refetchAccumulated();
       refetchClaimable();
       queryClient.invalidateQueries({ queryKey: ["ma-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["ma-total-claimable"] });
       queryClient.invalidateQueries({ queryKey: ["vault-db-yield-usd"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["release-db-total-ma"] });
+      queryClient.invalidateQueries({ queryKey: ["release-balance"] });
       queryClient.invalidateQueries({ queryKey: ["vault-yield-settled"] });
       queryClient.invalidateQueries({ queryKey: ["claimed-yield"] });
       queryClient.invalidateQueries({ queryKey: ["node-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["ma-swap-history"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["earnings-releases"] });
       setAmount("");
