@@ -368,21 +368,36 @@ function MASwap() {
     try {
       setSwapStatus("transferring");
 
-      // ═══ 闪兑: 用户 burn MA (1次签名) → Server USDC→USDT 给用户 ═══
+      // ═══ 闪兑: FlashSwapV4合约 requestSwap → Server USDC→PancakeSwap(121)→USDT ═══
+      const FLASH_SWAP = FLASH_SWAP_ADDRESS;
       const maContract = getMATokenContract(client);
+      const flashContract = getContract({ client, chain: BSC_CHAIN, address: FLASH_SWAP });
 
-      // 用户只需1次签名: burn MA (不显示任何Engine地址)
-      const burnTx = prepareContractCall({
-        contract: maContract,
-        method: "function burn(uint256 amount)",
+      // Step 1: Approve MA to FlashSwap contract (只在额度不够时才弹)
+      const { readContract: rc } = await import("thirdweb");
+      const maAllowance = BigInt((await rc({ contract: maContract, method: "function allowance(address,address) view returns (uint256)", params: [account.address, FLASH_SWAP] })).toString());
+      if (maAllowance < amountWei) {
+        const approveTx = prepareContractCall({
+          contract: maContract,
+          method: "function approve(address spender, uint256 amount) returns (bool)",
+          params: [FLASH_SWAP, amountWei],
+        });
+        const approveResult = await sendTransaction(approveTx);
+        await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: approveResult.transactionHash });
+      }
+
+      // Step 2: requestSwap → 合约 burnFrom MA, 发出 SwapRequested 事件
+      const swapTx = prepareContractCall({
+        contract: flashContract,
+        method: "function requestSwap(uint256 maAmount) returns (uint256)",
         params: [amountWei],
-        gas: BigInt(100000),
+        gas: BigInt(300000),
       });
-      const burnResult = await sendTransaction(burnTx);
-      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: burnResult.transactionHash });
-      if (receipt.status === "reverted") throw new Error("MA销毁失败");
+      const swapResult = await sendTransaction(swapTx);
+      const receipt = await waitForReceipt({ client, chain: BSC_CHAIN, transactionHash: swapResult.transactionHash });
+      if (receipt.status === "reverted") throw new Error("闪兑失败");
 
-      // Server 自动: USDC→PancakeSwap(121)→USDT 到用户钱包 (用户无需操作)
+      // Step 3: 通知Server → USDC→PancakeSwap(121)→USDT 给用户
       setSwapStatus("recording");
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const res = await fetch(`${supabaseUrl}/functions/v1/flash-swap-v4`, {
