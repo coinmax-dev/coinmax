@@ -435,10 +435,10 @@ export default function ProfilePage() {
                   </Button>
                 </div>
 
-                {/* ② 提现金额 (已提现但还在线性释放中) */}
+                {/* ② 已提现待释放金额 */}
                 <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(251,191,36,0.03)", border: "1px solid rgba(251,191,36,0.08)" }}>
                   <div>
-                    <div className="text-[10px] text-amber-400/60">{t("profile.pendingRelease", "提现金额")}</div>
+                    <div className="text-[10px] text-amber-400/60">{t("profile.pendingRelease", "已提现待释放金额")}</div>
                     <div className="text-[16px] font-bold text-amber-400/80">{formatMA(withdrawnInProgress)}</div>
                   </div>
                 </div>
