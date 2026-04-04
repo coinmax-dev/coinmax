@@ -214,25 +214,49 @@ export default function ProfileTransactionsPage() {
                       )}
                     </div>
 
-                    {/* Release detail expansion — V4: uses tx.details + release_schedules */}
+                    {/* Release detail — matches profile release logic */}
                     {expandedRelease === tx.id && (() => {
-                      // V4 MA_CLAIM: details has splitRatio, burnAmount, releaseAmount, releaseDays, mintTxId, burnTxId
                       const d = (tx as any).details || {};
+
+                      if (tx.type === "MA_RELEASE") {
+                        // 释放到账: show MA minted to wallet
+                        return (
+                          <div className="mt-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-1 text-[9px]">
+                            <div className="flex justify-between"><span className="text-foreground/25">{t("tx.releasedToWallet", "释放到钱包")}</span><span className="text-primary font-mono">{Number(tx.amount).toFixed(4)} MA</span></div>
+                            {d.engineTxId && <div className="text-[8px] text-foreground/20">Engine: {d.engineTxId.slice(0,16)}...</div>}
+                          </div>
+                        );
+                      }
+
+                      if (tx.type === "FLASH_SWAP") {
+                        return (
+                          <div className="mt-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-1 text-[9px]">
+                            <div className="flex justify-between"><span className="text-foreground/25">MA</span><span className="font-mono">{Number(d.maAmount || 0).toFixed(4)} MA</span></div>
+                            <div className="flex justify-between"><span className="text-foreground/25">USDT</span><span className="text-green-400 font-mono">${Number(d.usdtAmount || tx.amount).toFixed(2)}</span></div>
+                            <div className="flex justify-between"><span className="text-foreground/25">{t("tx.maPrice", "MA价格")}</span><span className="font-mono">${Number(d.maPrice || 0).toFixed(4)}</span></div>
+                          </div>
+                        );
+                      }
+
+                      // MA_CLAIM / YIELD_CLAIM: match with release_schedules
                       const matchedRelease = releases.find((r: any) =>
                         (r.split_ratio === d.splitRatio && Math.abs(Number(r.total_amount) - Number(d.releaseAmount || 0)) < 0.1) ||
                         Math.abs(Number(r.total_amount || r.net_amount || r.gross_amount) - Number(tx.amount)) < 0.1
                       );
 
-                      const burnAmt = Number(d.burnAmount || d.burnPct && Number(tx.amount) * d.burnPct / 100 || 0);
+                      const burnAmt = Number(d.burnAmount || 0);
                       const releaseAmt = Number(d.releaseAmount || Number(tx.amount) - burnAmt);
-                      const releaseDays = Number(d.releaseDays || matchedRelease?.days_total || matchedRelease?.plan_days || 0);
+                      const releaseDays = Number(d.releaseDays || matchedRelease?.days_total || 0);
                       const daysReleased = matchedRelease?.days_released || 0;
                       const progress = releaseDays > 0 ? Math.min(daysReleased / releaseDays, 1) : 1;
                       const isCompleted = matchedRelease?.status === "COMPLETED" || progress >= 1;
-                      const releasedSoFar = matchedRelease ? Number(matchedRelease.released_amount || 0) : (releaseDays === 0 ? releaseAmt : 0);
-                      const remaining = releaseAmt - releasedSoFar;
-                      const mintHash = d.mintTxId || matchedRelease?.mint_tx_id || null;
-                      const burnHash = d.burnTxId || matchedRelease?.burn_tx_id || null;
+                      // 已释放到释放余额 (released - claimed)
+                      const releasedToBalance = matchedRelease ? Number(matchedRelease.released_amount || 0) : (releaseDays === 0 ? releaseAmt : 0);
+                      const claimedToWallet = matchedRelease ? Number(matchedRelease.claimed_amount || 0) : 0;
+                      const claimable = Math.max(0, releasedToBalance - claimedToWallet);
+                      // 已提现待释放 (remaining)
+                      const remaining = matchedRelease ? Number(matchedRelease.remaining_amount || 0) : Math.max(0, releaseAmt - releasedToBalance);
+                      const dailyAmount = matchedRelease ? Number(matchedRelease.daily_amount || 0) : (releaseDays > 0 ? releaseAmt / releaseDays : 0);
 
                       return (
                         <div className="mt-2 p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.06] space-y-2">
@@ -249,19 +273,15 @@ export default function ProfileTransactionsPage() {
                             </Badge>
                           </div>
 
-                          {/* Progress bar */}
                           {releaseDays > 0 && (
                             <div className="w-full h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
-                              <div
-                                className={cn("h-full rounded-full transition-all", isCompleted ? "bg-green-400" : "bg-primary")}
-                                style={{ width: `${(progress * 100).toFixed(1)}%` }}
-                              />
+                              <div className={cn("h-full rounded-full transition-all", isCompleted ? "bg-green-400" : "bg-primary")} style={{ width: `${(progress * 100).toFixed(1)}%` }} />
                             </div>
                           )}
 
                           <div className="grid grid-cols-2 gap-2 text-[9px]">
                             <div>
-                              <span className="text-foreground/25">{t("tx.grossAmount", "总额")}</span>
+                              <span className="text-foreground/25">{t("tx.grossAmount", "提取总额")}</span>
                               <p className="font-mono text-foreground/50">{Number(tx.amount).toFixed(2)} MA</p>
                             </div>
                             <div>
@@ -269,28 +289,24 @@ export default function ProfileTransactionsPage() {
                               <p className="font-mono text-red-400/60">{burnAmt.toFixed(2)} MA</p>
                             </div>
                             <div>
-                              <span className="text-foreground/25 flex items-center gap-0.5"><CheckCircle className="h-2 w-2 text-green-400" />{t("tx.released", "已释放")}</span>
-                              <p className="font-mono text-green-400/60">{releasedSoFar.toFixed(2)} MA</p>
+                              <span className="text-foreground/25 flex items-center gap-0.5"><CheckCircle className="h-2 w-2 text-green-400" />{t("tx.releasedBalance", "释放余额")}</span>
+                              <p className="font-mono text-green-400/60">{claimable.toFixed(2)} MA</p>
                             </div>
                             <div>
-                              <span className="text-foreground/25 flex items-center gap-0.5"><Clock className="h-2 w-2 text-blue-400" />{t("tx.remaining", "待释放")}</span>
-                              <p className="font-mono text-blue-400/60">{remaining.toFixed(2)} MA</p>
+                              <span className="text-foreground/25 flex items-center gap-0.5"><Clock className="h-2 w-2 text-amber-400" />{t("tx.pendingRelease", "已提现待释放")}</span>
+                              <p className="font-mono text-amber-400/60">{remaining.toFixed(2)} MA</p>
                             </div>
+                            <div>
+                              <span className="text-foreground/25 flex items-center gap-0.5"><CheckCircle className="h-2 w-2 text-primary" />{t("tx.claimedToWallet", "已到钱包")}</span>
+                              <p className="font-mono text-primary/60">{claimedToWallet.toFixed(2)} MA</p>
+                            </div>
+                            {dailyAmount > 0 && releaseDays > 0 && (
+                              <div>
+                                <span className="text-foreground/25">{t("tx.dailyRelease", "每日释放")}</span>
+                                <p className="font-mono text-foreground/40">{dailyAmount.toFixed(4)} MA</p>
+                              </div>
+                            )}
                           </div>
-
-                          {/* TX Hashes */}
-                          {(mintHash || burnHash) && (
-                            <div className="space-y-0.5 text-[8px]">
-                              {mintHash && <div className="flex gap-1"><span className="text-foreground/20">Mint:</span><span className="font-mono text-foreground/30">{mintHash.slice(0,16)}...</span></div>}
-                              {burnHash && burnHash !== "none" && <div className="flex gap-1"><span className="text-foreground/20">Burn:</span><span className="font-mono text-red-400/30">{burnHash.slice(0,16)}...</span></div>}
-                            </div>
-                          )}
-
-                          {matchedRelease && releaseDays > 0 && (
-                            <p className="text-[8px] text-foreground/20">
-                              {t("tx.dailyRelease", "每日释放")} {Number(matchedRelease.daily_amount || releaseAmt / releaseDays).toFixed(4)} MA
-                            </p>
-                          )}
                         </div>
                       );
                     })()}
