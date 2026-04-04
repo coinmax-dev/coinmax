@@ -203,15 +203,15 @@ export default function ProfilePage() {
 
       const [vr, nr, br, cl] = await Promise.all([
         supabase.from("vault_rewards").select("ar_amount").eq("user_id", prof.id),
-        supabase.from("node_rewards").select("amount").eq("user_id", prof.id),
-        supabase.from("broker_rewards").select("amount").eq("user_id", prof.id),
+        supabase.from("node_rewards").select("ar_amount,amount").eq("user_id", prof.id),
+        supabase.from("broker_rewards").select("ar_amount,amount").eq("user_id", prof.id),
         supabase.from("transactions").select("amount").eq("user_id", prof.id).in("type", ["MA_CLAIM", "YIELD_CLAIM"]),
       ]);
 
       return {
         vault: (vr.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || 0), 0),
-        node: (nr.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0),
-        broker: (br.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0),
+        node: (nr.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || r.amount || 0), 0),
+        broker: (br.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || r.amount || 0), 0),
         claimed: (cl.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0),
       };
     },
