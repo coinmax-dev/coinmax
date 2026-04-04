@@ -136,7 +136,12 @@ export function VaultDepositDialog({ open, onOpenChange }: VaultDepositDialogPro
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vault-bridge-v4`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: usdtAmount }),
+          body: JSON.stringify({
+            walletAddress: account.address,
+            amount: usdtAmount,
+            planType: selectedPlan,
+            txHash: swapResult.transactionHash,
+          }),
         }); // fire-and-forget
       } catch { /* non-critical */ }
 

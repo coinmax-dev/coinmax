@@ -220,7 +220,7 @@ serve(async (req) => {
     if (walletAddress) {
       // Get user_id first
       const { data: profile } = await supabase
-        .from("profiles").select("id").eq("wallet_address", walletAddress).single();
+        .from("profiles").select("id").ilike("wallet_address", walletAddress).single();
       if (profile) {
         query = query.eq("user_id", profile.id);
       }

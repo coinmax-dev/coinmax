@@ -211,7 +211,7 @@ serve(async (req) => {
       const { count: open } = await supabase.from("copy_trade_orders").select("id", { count: "exact", head: true }).eq("user_wallet", w).in("status", ["filled", "partial"]);
       if ((open || 0) >= (cfg.max_positions || MAX_POSITIONS)) { R.skipped++; continue; }
 
-      const { data: prof } = await supabase.from("profiles").select("id").eq("wallet_address", w).single();
+      const { data: prof } = await supabase.from("profiles").select("id").ilike("wallet_address", w).single();
       if (!prof) { R.skipped++; continue; }
 
       const { data: kd } = await supabase.from("user_exchange_keys").select("*").eq("user_id", prof.id).eq("is_valid", true).limit(1).single();

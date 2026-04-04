@@ -32,7 +32,7 @@ serve(async (req) => {
     const { data: profile, error: fetchErr } = await supabase
       .from("profiles")
       .select("is_vip, vip_expires_at, vip_trial_used")
-      .eq("wallet_address", wallet)
+      .ilike("wallet_address", wallet)
       .single();
 
     if (fetchErr || !profile) {
@@ -63,7 +63,7 @@ serve(async (req) => {
         vip_expires_at: trialEnd,
         vip_trial_used: true,
       })
-      .eq("wallet_address", wallet);
+      .ilike("wallet_address", wallet);
 
     if (updateErr) {
       return new Response(JSON.stringify({ error: updateErr.message }), {

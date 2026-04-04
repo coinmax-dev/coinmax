@@ -45,7 +45,7 @@ serve(async (req) => {
     let { data: profile } = await supabase
       .from("profiles")
       .select("id, total_deposited")
-      .eq("wallet_address", walletAddress)
+      .ilike("wallet_address", walletAddress)
       .single();
 
     if (!profile) {

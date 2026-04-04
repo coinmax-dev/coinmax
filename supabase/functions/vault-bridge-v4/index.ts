@@ -181,7 +181,7 @@ serve(async (req) => {
     const { data: profile } = await supabase
       .from("profiles")
       .select("id")
-      .eq("wallet_address", walletAddress)
+      .ilike("wallet_address", walletAddress)
       .single();
 
     if (profile) {

@@ -72,7 +72,7 @@ serve(async (req) => {
     if (!plan) return json({ error: "Invalid plan" }, 400);
 
     // Get profile + yield
-    const { data: profile } = await supabase.from("profiles").select("id, referral_earnings").eq("wallet_address", walletAddress).single();
+    const { data: profile } = await supabase.from("profiles").select("id, referral_earnings").ilike("wallet_address", walletAddress).single();
     if (!profile) return json({ error: "Profile not found" }, 404);
 
     // Read settled yield from vault_rewards (already in MA)

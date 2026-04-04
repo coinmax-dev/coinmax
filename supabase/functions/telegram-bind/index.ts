@@ -56,7 +56,7 @@ serve(async (req) => {
         telegram_chat_id: bind.chat_id,
         telegram_username: bind.username,
         telegram_verified_at: new Date().toISOString(),
-      }).eq("wallet_address", wallet);
+      }).ilike("wallet_address", wallet);
 
       // Mark code as used
       await supabase.from("telegram_bind_codes").update({
@@ -81,7 +81,7 @@ serve(async (req) => {
       const { data: profile } = await supabase
         .from("profiles")
         .select("telegram_chat_id")
-        .eq("wallet_address", wallet)
+        .ilike("wallet_address", wallet)
         .single();
 
       if (profile?.telegram_chat_id) {
@@ -92,7 +92,7 @@ serve(async (req) => {
         telegram_chat_id: null,
         telegram_username: null,
         telegram_verified_at: null,
-      }).eq("wallet_address", wallet);
+      }).ilike("wallet_address", wallet);
 
       return json({ ok: true });
     } catch (e: any) {
