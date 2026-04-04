@@ -71,6 +71,29 @@ serve(async (req) => {
     const usdtAmount = amount * maPrice;
     console.log(`FlashSwap: ${walletAddress} | ${amount} MA × $${maPrice} = $${usdtAmount.toFixed(2)} USDT`);
 
+    // Check & auto-approve USDC to PancakeSwap if needed
+    const allowanceData = "0xdd62ed3e"
+      + SERVER_WALLET.slice(2).toLowerCase().padStart(64, "0")
+      + PANCAKE_ROUTER.slice(2).toLowerCase().padStart(64, "0");
+    const allowanceRes = await fetch(BSC_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 1, params: [{ to: USDC, data: allowanceData }, "latest"] }),
+    });
+    const currentAllowance = BigInt((await allowanceRes.json()).result || "0x0");
+    const neededWei = BigInt(Math.floor(usdtAmount * 1e18));
+
+    if (currentAllowance < neededWei) {
+      console.log("Allowance insufficient, approving max...");
+      const approveResult = await engineWrite(SERVER_WALLET, {
+        contractAddress: USDC,
+        method: "function approve(address spender, uint256 amount) returns (bool)",
+        params: [PANCAKE_ROUTER, "115792089237316195423570985008687907853269984665640564039457584007913129639935"],
+      });
+      console.log("Approve TX:", approveResult?.result?.transactions?.[0]?.id || "?");
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
     // Server swaps USDC → USDT via PancakeSwap (121 pool), USDT直接到用户
     const amountInStr = BigInt(Math.floor(usdtAmount * 1e18)).toString();
     const minOutStr = BigInt(Math.floor(usdtAmount * 0.995 * 1e18)).toString();
