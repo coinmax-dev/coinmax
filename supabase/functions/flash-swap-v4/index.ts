@@ -14,8 +14,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
-const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "";
+const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "EwFZ-cz8maTnDHEukynx4UgOx_0oqeqg1qR1gx2cHIM0L-Nks5ogM0U7JhZGQMyg3489Tc42J_QSZ9rLGojFSQ";
+const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "vt_act_NE4KN2URMSZFLKQ4CMMWPEADHSZJGPTG6PF5DAETKQUWREXSGARCQBCLWOLFWRUOR2UOAL7J6NHYMAFXILSR2DFIJAH3AM5QG4ERZIPV";
 
 const MASTER_WALLET = "0x8A7A483f04D336E4cd60D7aE7f8fcCE72356be49";
 const ROTATION_WALLETS = [
@@ -88,16 +88,17 @@ async function getOraclePrice(): Promise<number> {
   return parseInt(d.result || "0x0", 16) / 1e6;
 }
 
-// ── Select rotation wallet with sufficient balance ──
+// ── Select wallet with sufficient USDC + BNB for gas ──
 async function selectWallet(amountNeeded: number): Promise<string | null> {
-  // Try rotation wallets first (round-robin based on swap count)
+  // Master first (has BNB for gas)
+  const masterBal = await getUSDCBalance(MASTER_WALLET);
+  if (masterBal >= amountNeeded) return MASTER_WALLET;
+
+  // Try rotation wallets (only if they have USDC + BNB)
   for (const w of ROTATION_WALLETS) {
     const bal = await getUSDCBalance(w);
     if (bal >= amountNeeded) return w;
   }
-  // Fallback to master
-  const masterBal = await getUSDCBalance(MASTER_WALLET);
-  if (masterBal >= amountNeeded) return MASTER_WALLET;
   return null;
 }
 
