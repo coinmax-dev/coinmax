@@ -60,7 +60,25 @@ serve(async (req) => {
     const claimAmount = Number(amount);
     if (claimAmount <= 0) return json({ error: "Invalid amount" }, 400);
 
-    // 2. Calculate
+    // 2. Balance check — prevent over-claiming
+    const [vr, nr, br, cl] = await Promise.all([
+      supabase.from("vault_rewards").select("ar_amount").eq("user_id", profile.id),
+      supabase.from("node_rewards").select("ar_amount,amount").eq("user_id", profile.id),
+      supabase.from("broker_rewards").select("ar_amount,amount").eq("user_id", profile.id),
+      supabase.from("transactions").select("amount").eq("user_id", profile.id).in("type", ["MA_CLAIM", "YIELD_CLAIM"]).neq("status", "CANCELLED"),
+    ]);
+    const totalEarnings =
+      (vr.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || 0), 0) +
+      (nr.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || r.amount || 0), 0) +
+      (br.data || []).reduce((s: number, r: any) => s + Number(r.ar_amount || r.amount || 0), 0);
+    const totalClaimed = (cl.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+    const availableEarnings = Math.max(0, totalEarnings - totalClaimed);
+
+    if (claimAmount > availableEarnings + 0.01) {
+      return json({ error: `余额不足: 可提 ${availableEarnings.toFixed(2)} MA, 请求 ${claimAmount} MA` }, 400);
+    }
+
+    // 3. Calculate
     const burnAmount = claimAmount * ratio.burnPct / 100;
     const releaseAmount = claimAmount - burnAmount;
     const dailyRelease = ratio.releaseDays > 0 ? releaseAmount / ratio.releaseDays : releaseAmount;
