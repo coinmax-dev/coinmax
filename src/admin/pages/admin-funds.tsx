@@ -22,20 +22,17 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
-  SWAP_ROUTER_ADDRESS, VAULT_V3_ADDRESS, ENGINE_ADDRESS,
-  RELEASE_ADDRESS, USDT_ADDRESS, USDC_ADDRESS, MA_TOKEN_ADDRESS,
-  BATCH_BRIDGE_ADDRESS, FLASH_SWAP_ADDRESS, PRICE_ORACLE_ADDRESS,
-  NODE_V2_CONTRACT_ADDRESS,
+  VAULT_V3_ADDRESS, RELEASE_ADDRESS, USDT_ADDRESS, USDC_ADDRESS, MA_TOKEN_ADDRESS,
+  FLASH_SWAP_ADDRESS, PRICE_ORACLE_ADDRESS, ENGINE_WALLET_ADDRESS, SERVER_WALLET_ADDRESS,
+  FLASHSWAP_MASTER, FLASHSWAP_ROTATION, MA_STAKING_ADDRESS, NODE_NFT_ADDRESS,
 } from "@/lib/contracts";
 import {
   Coins, RefreshCw, Search, ArrowDownToLine, ArrowUpFromLine,
-  Sparkles, ShieldCheck, Server, Gift, ExternalLink, Globe,
+  Sparkles, ShieldCheck, Server, Gift, ExternalLink,
   Wallet, ArrowRightLeft, Database, TrendingUp, Zap,
 } from "lucide-react";
 
-// ── Addresses ──
-const NODE_POOL = "0x7dE393D02C153cF943E0cf30C7B2B7A073E5e75a";
-const NODE_WALLET = "0xeb8AbD9b47F9Ca0d20e22636B2004B75E84BdcD9";
+// ── V4 Addresses ──
 const CUSD_ADDRESS = "0x512d6d3C33D4a018e35a7d4c89754e0e3E72fD4B";
 
 // ── On-chain balance reading ──
@@ -56,15 +53,15 @@ function useOnChainBalances() {
         { addr: CUSD_ADDRESS, symbol: "cUSD", decimals: 18 },
       ];
       const contracts = [
-        { addr: SWAP_ROUTER_ADDRESS, label: "SwapRouter (入口)", icon: ArrowRightLeft, chain: "BSC" },
-        { addr: VAULT_V3_ADDRESS, label: "Vault (金库)", icon: Database, chain: "BSC" },
-        { addr: ENGINE_ADDRESS, label: "Engine (利息)", icon: TrendingUp, chain: "BSC" },
+        { addr: VAULT_V3_ADDRESS, label: "VaultV4 (金库)", icon: Database, chain: "BSC" },
+        { addr: ENGINE_WALLET_ADDRESS, label: "Engine 钱包", icon: TrendingUp, chain: "BSC" },
+        { addr: SERVER_WALLET_ADDRESS, label: "Server 钱包 (Receiver)", icon: Wallet, chain: "BSC" },
         { addr: RELEASE_ADDRESS, label: "Release (释放)", icon: Sparkles, chain: "BSC" },
-        { addr: FLASH_SWAP_ADDRESS, label: "FlashSwap (闪兑)", icon: Zap, chain: "BSC" },
-        { addr: BATCH_BRIDGE_ADDRESS, label: "BatchBridge (跨链)", icon: Globe, chain: "BSC" },
-        { addr: NODE_POOL, label: "NodePool (节点中转)", icon: Server, chain: "BSC" },
-        { addr: NODE_WALLET, label: "节点钱包", icon: Wallet, chain: "BSC" },
-        { addr: NODE_V2_CONTRACT_ADDRESS, label: "NodesV2", icon: Server, chain: "BSC" },
+        { addr: FLASH_SWAP_ADDRESS, label: "FlashSwap 合约", icon: Zap, chain: "BSC" },
+        { addr: FLASHSWAP_MASTER, label: "闪兑 Master", icon: Wallet, chain: "BSC" },
+        ...FLASHSWAP_ROTATION.map((addr, i) => ({ addr, label: `闪兑 Rotation-${i+1}`, icon: ArrowRightLeft, chain: "BSC" })),
+        { addr: MA_STAKING_ADDRESS, label: "MA Staking", icon: Server, chain: "BSC" },
+        { addr: NODE_NFT_ADDRESS, label: "Node NFT", icon: ShieldCheck, chain: "BSC" },
       ];
 
       const results = [];
@@ -125,7 +122,7 @@ export default function AdminFunds() {
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [section, setSection] = useState<"balances" | "flow" | "bridge" | "allocations" | "swap" | "transactions">("balances");
+  const [section, setSection] = useState<"balances" | "flow" | "swap" | "transactions">("balances");
   const pageSize = 50;
 
   const { data: balances, isLoading: balLoading, refetch: refetchBal } = useOnChainBalances();
@@ -142,30 +139,6 @@ export default function AdminFunds() {
       return data || [];
     },
     enabled: !!adminUser && section === "flow",
-  });
-
-  // Bridge cycles
-  const { data: bridges = [] } = useQuery({
-    queryKey: ["admin", "funds", "bridges"],
-    queryFn: async () => {
-      const { data } = await supabase.from("bridge_cycles").select("*").order("started_at", { ascending: false }).limit(30);
-      return data || [];
-    },
-    enabled: !!adminUser && section === "bridge",
-  });
-
-  // Fund allocation records
-  const { data: allocations = [] } = useQuery({
-    queryKey: ["admin", "funds", "allocations"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("fund_reserve_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      return data || [];
-    },
-    enabled: !!adminUser && section === "allocations",
   });
 
   // MA swap records
@@ -208,8 +181,6 @@ export default function AdminFunds() {
   const sections = [
     { id: "balances" as const, label: "合约余额", icon: Wallet },
     { id: "flow" as const, label: "资金流转", icon: ArrowRightLeft },
-    { id: "bridge" as const, label: "跨链记录", icon: Globe },
-    { id: "allocations" as const, label: "分配记录", icon: ArrowRightLeft },
     { id: "swap" as const, label: "闪兑记录", icon: Zap },
     { id: "transactions" as const, label: "交易流水", icon: Database },
   ];
@@ -336,142 +307,17 @@ export default function AdminFunds() {
         </div>
       )}
 
-      {/* ── Section: Cross-chain Bridge ── */}
-      {section === "bridge" && (
-        <div className="space-y-2">
-          <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 mb-3">
-            <p className="text-[10px] text-foreground/30 mb-2">跨链路径</p>
-            <div className="flex items-center gap-1 text-[9px] flex-wrap">
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">BatchBridge USDT (BSC)</span>
-              <span className="text-foreground/15">→ 10min</span>
-              <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400">thirdweb Bridge</span>
-              <span className="text-foreground/15">→</span>
-              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">ARB</span>
-              <span className="text-foreground/15">→</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">30% HL金库 (可开关)</span>
-              <span className="text-foreground/15">+</span>
-              <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">70% 管理钱包</span>
-            </div>
-          </div>
-
-          {bridges.length === 0 ? (
-            <p className="text-center py-8 text-foreground/20 text-sm">暂无跨链记录</p>
-          ) : (
-            bridges.map((b: any) => {
-              const statusColor = b.status === "COMPLETED" ? "text-green-400" : b.status === "FAILED" ? "text-red-400" : "text-yellow-400";
-              return (
-                <div key={b.id} className="rounded-xl bg-white/[0.02] border border-white/[0.04] px-3 py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4 text-blue-400/50" />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-foreground/60">${Number(b.amount_usd || 0).toLocaleString()}</span>
-                        <Badge className={cn("text-[8px]", statusColor, statusColor.replace("text-", "bg-").replace("400", "500/10"))}>{b.status}</Badge>
-                        <span className="text-[9px] text-foreground/25">{b.cycle_type}</span>
-                      </div>
-                      <p className="text-[9px] text-foreground/20 mt-0.5">
-                        BSC→ARB · {b.initiated_by || "cron"}
-                        {b.tx_hash && (
-                          <a href={`https://bscscan.com/tx/${b.tx_hash}`} target="_blank" rel="noopener noreferrer" className="ml-1 text-primary/40 hover:text-primary">
-                            <ExternalLink className="h-2 w-2 inline" />
-                          </a>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    {b.fees_usd > 0 && <p className="text-[9px] text-red-400/50">费用 ${Number(b.fees_usd).toFixed(2)}</p>}
-                    <p className="text-[9px] text-foreground/20">{b.started_at ? new Date(b.started_at).toLocaleDateString("zh-CN") : "-"}</p>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* ── Section: Fund Allocation Records ── */}
-      {section === "allocations" && (
-        <div className="space-y-2">
-          <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 mb-3">
-            <p className="text-[10px] text-foreground/30 mb-2">资金分配路径</p>
-            <div className="flex items-center gap-1 text-[9px] flex-wrap">
-              <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400">跨链到 ARB</span>
-              <span className="text-foreground/15">→</span>
-              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">Server Wallet</span>
-              <span className="text-foreground/15">→</span>
-              <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">闪兑流动性</span>
-              <span className="text-foreground/15">/</span>
-              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">HL金库</span>
-              <span className="text-foreground/15">/</span>
-              <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">5钱包分配</span>
-            </div>
-          </div>
-
-          {/* Stats */}
-          {allocations.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              {["ALLOCATE_FLASHSWAP", "ALLOCATE_HL", "AUTO_"].map(prefix => {
-                const filtered = allocations.filter((a: any) => a.action?.startsWith(prefix) || (prefix === "AUTO_" && a.initiated_by === "auto"));
-                const total = filtered.reduce((s: number, a: any) => s + Number(a.amount || 0), 0);
-                const label = prefix === "ALLOCATE_FLASHSWAP" ? "闪兑流动性" : prefix === "ALLOCATE_HL" ? "HL 金库" : "自动分配";
-                const color = prefix === "ALLOCATE_FLASHSWAP" ? "text-cyan-400" : prefix === "ALLOCATE_HL" ? "text-amber-400" : "text-green-400";
-                return (
-                  <div key={prefix} className="text-center p-2 rounded-lg bg-white/[0.02]">
-                    <p className="text-[9px] text-foreground/25">{label}</p>
-                    <p className={cn("text-[13px] font-bold font-mono", color)}>${total.toFixed(0)}</p>
-                    <p className="text-[8px] text-foreground/15">{filtered.length} 笔</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {allocations.length === 0 ? (
-            <p className="text-center py-8 text-foreground/20 text-sm">暂无分配记录</p>
-          ) : (
-            allocations.map((a: any) => {
-              const isAuto = a.initiated_by === "auto";
-              const actionColor = a.action?.includes("HL") ? "text-amber-400 bg-amber-500/10" :
-                a.action?.includes("FLASHSWAP") || a.action?.includes("LIQUIDITY") ? "text-cyan-400 bg-cyan-500/10" :
-                a.action?.includes("MA") ? "text-yellow-400 bg-yellow-500/10" :
-                "text-foreground/40 bg-foreground/5";
-              return (
-                <div key={a.id} className="rounded-xl bg-white/[0.02] border border-white/[0.04] px-3 py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <ArrowRightLeft className={cn("h-4 w-4", isAuto ? "text-green-400/50" : "text-foreground/25")} />
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <Badge className={cn("text-[8px]", actionColor)}>{a.action?.replace("ALLOCATE_", "").replace("AUTO_", "自动→")}</Badge>
-                        <span className="text-[11px] font-bold font-mono text-foreground/60">{Number(a.amount).toFixed(2)} {a.token}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[8px] text-foreground/20">→ {a.destination}</span>
-                        {a.tx_id && <span className="text-[8px] text-primary/40 font-mono">{a.tx_id.slice(0, 12)}...</span>}
-                        <Badge className={cn("text-[7px]", isAuto ? "bg-green-500/10 text-green-400" : "bg-foreground/5 text-foreground/30")}>{a.initiated_by}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-[8px] text-foreground/15 shrink-0">{a.created_at ? new Date(a.created_at).toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}</span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
       {/* ── Section: FlashSwap Records ── */}
       {section === "swap" && (
         <div className="space-y-2">
           <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 mb-3">
-            <p className="text-[10px] text-foreground/30 mb-2">闪兑机制</p>
+            <p className="text-[10px] text-foreground/30 mb-2">V4 闪兑机制</p>
             <div className="flex items-center gap-1 text-[9px] flex-wrap">
-              <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400">MA Token</span>
-              <span className="text-foreground/15">↔ Oracle定价</span>
-              <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">FlashSwap (0.3%手续费)</span>
-              <span className="text-foreground/15">↔</span>
-              <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">USDT/USDC</span>
-              <span className="text-[8px] text-foreground/15 ml-1">50%持仓规则</span>
+              <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400">用户 MA</span>
+              <span className="text-foreground/15">→ FlashSwap合约 burn →</span>
+              <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400">Master/Rotation USDC</span>
+              <span className="text-foreground/15">→ PancakeSwap(121) →</span>
+              <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">USDT → 用户</span>
             </div>
           </div>
 

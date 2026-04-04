@@ -13,17 +13,15 @@ export const USDT_DECIMALS = 18;
 export const USDC_ADDRESS = import.meta.env.VITE_USDC_ADDRESS || "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
 export const USDC_DECIMALS = 18;
 
-// ── V1 Contract addresses ──
+// ── Legacy (V1/V2) — deprecated, kept for admin reference ──
 export const VAULT_CONTRACT_ADDRESS = import.meta.env.VITE_VAULT_CONTRACT_ADDRESS || "";
 export const NODE_CONTRACT_ADDRESS = import.meta.env.VITE_NODE_CONTRACT_ADDRESS || "0x71237E535d5E00CDf18A609eA003525baEae3489";
 export const VIP_CONTRACT_ADDRESS = import.meta.env.VITE_VIP_CONTRACT_ADDRESS || "";
 export const VIP_RECEIVER_ADDRESS = import.meta.env.VITE_VIP_RECEIVER_ADDRESS || "0x927eDe64b4B8a7C08Cf4225924Fa9c6759943E0A";
-
-// ── V2 Contract addresses (PancakeSwap V3 swap flow) ──
 export const SWAP_ROUTER_ADDRESS = import.meta.env.VITE_SWAP_ROUTER_ADDRESS || "0x5650383D9f8d8f80fc972b8F49A3cc31d3A7F7E3";
 export const NODE_V2_CONTRACT_ADDRESS = import.meta.env.VITE_NODE_V2_CONTRACT_ADDRESS || "0x17DDad4C9c2fD61859D37dD40300c419cBdd4cE2";
 
-// ── V3 Contract addresses (Verified 2026-04-01) ──
+// ── V4 Contract addresses ──
 export const MA_TOKEN_ADDRESS = import.meta.env.VITE_MA_TOKEN_ADDRESS || "0xc6d2dbC85DC3091C41692822A128c19F9eAc7988";
 export const CUSD_ADDRESS = import.meta.env.VITE_CUSD_ADDRESS || "0x512d6d3C33D4a018e35a7d4c89754e0e3E72fD4B";
 export const PRICE_ORACLE_ADDRESS = import.meta.env.VITE_PRICE_ORACLE_ADDRESS || "0x35580292fA5c8b7110034EA1a1521952E6F42bbb";
@@ -40,6 +38,29 @@ export const MA_STAKING_ADDRESS = import.meta.env.VITE_MA_STAKING_ADDRESS || "0x
 export const NODE_NFT_ADDRESS = import.meta.env.VITE_NODE_NFT_ADDRESS || "0x296cA393c151449e83F29AD874ACA6E4e243F88d";
 export const ARB_FLASH_SWAP_ADDRESS = "0x681a734AbE80D9f52236d70d29cA5504207b6d7C";
 export const MA_DECIMALS = 18;
+
+// ── V4 Server Wallets ──
+export const ENGINE_WALLET_ADDRESS = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
+export const SERVER_WALLET_ADDRESS = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
+export const DEPLOYER_ADDRESS = "0x1B6B492d8fbB8ded7dC6E1D48564695cE5BCB9b1";
+
+// ── FlashSwap Wallets ──
+export const FLASHSWAP_MASTER = "0x8A7A483f04D336E4cd60D7aE7f8fcCE72356be49";
+export const FLASHSWAP_ROTATION = [
+  "0xb5E9dFb8E1375dAB63B0bE9E8DB916bD5fc49535",
+  "0x4FaE1a307B1947ab257ef3D7da9347BBc0A65b2D",
+  "0xE2b4da89709348b45935597046192bDa627a47aa",
+  "0x562a92Fb0b2bC8787a5C3dE4424745fEF8fCbc80",
+  "0x54671ae6627F654A8718Ac7B65AF2DAb489361c4",
+];
+
+// PancakeSwap
+export const PANCAKE_ROUTER_ADDRESS = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
+export const PANCAKE_USDT_USDC_POOL = "0x92b7807bf19b7DDdf89b706143896d05228f3121";
+
+// Deprecated — no longer used
+export const GATEWAY_ADDRESS = "";
+export const SPLITTER_ADDRESS = "";
 
 // Convert USD amount to USDT units (6 decimals)
 export function usdToUsdtUnits(amount: number): bigint {
