@@ -14,7 +14,7 @@ const corsHeaders = {
 
 const THIRDWEB_SECRET = Deno.env.get("THIRDWEB_SECRET_KEY") || "";
 const VAULT_ACCESS_TOKEN = Deno.env.get("THIRDWEB_VAULT_ACCESS_TOKEN") || "";
-const SERVER_WALLET = "0xe193ACcf11aBf508e8c7D0CeE03ea4E6f75B09ff";
+const ENGINE_WALLET = "0xDd6660E403d0242c1BeE52a4de50484AAF004446";
 const USDC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
 const USDT = "0x55d398326f99059fF775485246999027B3197955";
 const PANCAKE_ROUTER = "0x13f4EA83D0bd40E75C8222255bc855a974568Dd4";
@@ -73,7 +73,7 @@ serve(async (req) => {
 
     // Check & auto-approve USDC to PancakeSwap if needed
     const allowanceData = "0xdd62ed3e"
-      + SERVER_WALLET.slice(2).toLowerCase().padStart(64, "0")
+      + ENGINE_WALLET.slice(2).toLowerCase().padStart(64, "0")
       + PANCAKE_ROUTER.slice(2).toLowerCase().padStart(64, "0");
     const allowanceRes = await fetch(BSC_RPC, {
       method: "POST",
@@ -85,7 +85,7 @@ serve(async (req) => {
 
     if (currentAllowance < neededWei) {
       console.log("Allowance insufficient, approving max...");
-      const approveResult = await engineWrite(SERVER_WALLET, {
+      const approveResult = await engineWrite(ENGINE_WALLET, {
         contractAddress: USDC,
         method: "function approve(address spender, uint256 amount) returns (bool)",
         params: [PANCAKE_ROUTER, "115792089237316195423570985008687907853269984665640564039457584007913129639935"],
@@ -98,7 +98,7 @@ serve(async (req) => {
     const amountInStr = BigInt(Math.floor(usdtAmount * 1e18)).toString();
     const minOutStr = BigInt(Math.floor(usdtAmount * 0.995 * 1e18)).toString();
 
-    const swapResult = await engineWrite(SERVER_WALLET, {
+    const swapResult = await engineWrite(ENGINE_WALLET, {
       contractAddress: PANCAKE_ROUTER,
       method: "function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) external payable returns (uint256 amountOut)",
       params: [[USDC, USDT, "100", walletAddress, amountInStr, minOutStr, "0"]],
