@@ -393,6 +393,12 @@ export default function ProfilePage() {
                 <Wallet className="h-5 w-5 text-primary" />
               </div>
             </div>
+            {isConnected && !profileLoading && (
+              <div className="mt-2 flex items-center justify-between">
+                <div className="text-[10px] text-white/40">{t("profile.totalEarnings", "总收益金额")}</div>
+                <div className="text-[15px] font-bold text-primary">{formatMA(totalEarnings)}</div>
+              </div>
+            )}
           </div>
 
           {isConnected && (
@@ -413,10 +419,10 @@ export default function ProfilePage() {
                   ))}
                 </div>
 
-                {/* ① 总提现金额 + 提现按钮 */}
+                {/* ① 可提现 + 提现按钮 */}
                 <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: "rgba(74,222,128,0.04)", border: "1px solid rgba(74,222,128,0.12)" }}>
                   <div>
-                    <div className="text-[10px] text-white/40">{t("profile.totalWithdrawable", "总提现金额")}</div>
+                    <div className="text-[10px] text-white/40">{t("profile.availableEarnings", "可提现金额")}</div>
                     <div className="text-[18px] font-bold text-white">{formatMA(availableEarnings)}</div>
                   </div>
                   <Button

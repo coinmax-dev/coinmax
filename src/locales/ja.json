@@ -259,7 +259,7 @@
     "receive": "受取",
     "exchangeRate": "為替レート",
     "fee": "手数料",
-    "exceedsQuota": "スワップ枠を超過、MAの50%以上を保持する必要があります",
+    "exceedsQuota": "スワップ枠を超過",
     "swapSuccess": "スワップ成功",
     "transferring": "送金中...",
     "recording": "記録中...",

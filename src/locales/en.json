@@ -259,7 +259,7 @@
     "receive": "Receive",
     "exchangeRate": "Exchange Rate",
     "fee": "Fee",
-    "exceedsQuota": "Exceeds swap quota, must keep at least 50% MA",
+    "exceedsQuota": "Exceeds swap quota",
     "swapSuccess": "Swap Successful",
     "transferring": "Transferring...",
     "recording": "Recording...",

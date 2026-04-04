@@ -470,18 +470,6 @@ function MASwap() {
         <div className="text-[22px] font-bold font-mono tracking-tight text-white">
           {maBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} <span className="text-[13px] text-primary">MA</span>
         </div>
-        {releaseClaimable > 0 && (
-          <div className="mt-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
-            <div className="text-[10px] text-amber-400">{t("ma.releaseClaimable", "待领取")} {releaseClaimable.toFixed(2)} MA</div>
-            <button
-              onClick={handleClaimRelease}
-              disabled={claimBusy}
-              className="px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 text-[10px] font-medium hover:bg-amber-500/30 disabled:opacity-50 transition-colors"
-            >
-              {claimBusy ? t("ma.claiming", "领取中...") : t("ma.claimNow", "领取")}
-            </button>
-          </div>
-        )}
         <div className="mt-2.5 flex gap-2">
           <div className="flex-1 bg-white/5 rounded-lg px-2.5 py-1.5">
             <div className="text-[9px] text-white/30">{t("ma.swapQuota", "闪兑额度")}</div>

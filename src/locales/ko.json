@@ -259,7 +259,7 @@
     "receive": "수령",
     "exchangeRate": "환율",
     "fee": "수수료",
-    "exceedsQuota": "스왑 한도 초과, MA의 50% 이상을 유지해야 합니다",
+    "exceedsQuota": "스왑 한도 초과",
     "swapSuccess": "스왑 성공",
     "transferring": "전송 중...",
     "recording": "기록 중...",

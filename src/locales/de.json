@@ -259,7 +259,7 @@
     "receive": "Erhalten",
     "exchangeRate": "Wechselkurs",
     "fee": "Gebühr",
-    "exceedsQuota": "Überschreitet Kontingent, mindestens 50% MA müssen gehalten werden",
+    "exceedsQuota": "Überschreitet das Tauschkontingent",
     "swapSuccess": "Swap Erfolgreich",
     "transferring": "Übertragung...",
     "recording": "Aufzeichnung...",

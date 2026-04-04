@@ -259,7 +259,7 @@
     "receive": "استلام",
     "exchangeRate": "سعر الصرف",
     "fee": "رسوم",
-    "exceedsQuota": "تجاوز حصة التبادل، يجب الاحتفاظ بـ 50% MA على الأقل",
+    "exceedsQuota": "تجاوز حصة التبادل",
     "swapSuccess": "تبادل ناجح",
     "transferring": "جاري التحويل...",
     "recording": "جاري التسجيل...",

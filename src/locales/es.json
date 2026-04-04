@@ -259,7 +259,7 @@
     "receive": "Recibir",
     "exchangeRate": "Tipo de Cambio",
     "fee": "Comisión",
-    "exceedsQuota": "Excede la cuota, debe mantener al menos 50% MA",
+    "exceedsQuota": "Excede la cuota de intercambio",
     "swapSuccess": "Intercambio Exitoso",
     "transferring": "Transfiriendo...",
     "recording": "Registrando...",

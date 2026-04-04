@@ -259,7 +259,7 @@
     "receive": "獲得",
     "exchangeRate": "匯率",
     "fee": "手續費",
-    "exceedsQuota": "超出閃兌額度，需保留至少50% MA",
+    "exceedsQuota": "超出閃兌額度",
     "swapSuccess": "閃兌成功",
     "transferring": "轉帳中...",
     "recording": "記錄中...",
